@@ -47,6 +47,15 @@ export const localToolCatalog: LocalToolDefinition[] = [
     notes: "Paquets de contexte, comptage de tokens, compression et scan de secrets.",
   },
   {
+    id: "gitleaks",
+    name: "Gitleaks",
+    commandCandidates: ["gitleaks"],
+    category: "security",
+    status: "recommended",
+    lightweight: true,
+    notes: "Scan externe des secrets avec rapport JSON expurgé avant partage de contexte ou validation.",
+  },
+  {
     id: "aider",
     name: "Aider",
     commandCandidates: ["aider"],
