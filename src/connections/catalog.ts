@@ -28,9 +28,17 @@ const seeds: Seed[] = [
   { id: "anthropic-api", label: "Anthropic API", kind: "api-key-env", providerId: "anthropic", authMode: "environment", baseUrl: "https://api.anthropic.com", requiredEnv: ["ANTHROPIC_API_KEY"], notes: "API officielle Anthropic." },
   { id: "mistral-api", label: "Mistral API", kind: "api-key-env", providerId: "mistral", authMode: "environment", baseUrl: "https://api.mistral.ai/v1", requiredEnv: ["MISTRAL_API_KEY"], notes: "API officielle Mistral." },
   { id: "gemini-api", label: "Google Gemini API", kind: "api-key-env", providerId: "gemini", authMode: "environment", baseUrl: "https://generativelanguage.googleapis.com", requiredEnv: ["GEMINI_API_KEY"], notes: "API Gemini ou configuration Google Cloud selon le compte." },
+
+  { id: "azure-openai", label: "Azure OpenAI / Microsoft Foundry", kind: "cloud-identity", providerId: "azure-openai", authMode: "session", requiredEnv: ["AZURE_OPENAI_ENDPOINT"], notes: "Authentification par identité Microsoft Entra recommandée ou AZURE_OPENAI_API_KEY stockée hors dépôt." },
+  { id: "aws-bedrock", label: "AWS Bedrock", kind: "cloud-identity", providerId: "aws-bedrock", authMode: "session", notes: "Utilise la chaîne d'identité AWS : profil, rôle attaché ou variables temporaires. Ne pas copier ~/.aws dans Super IA." },
+  { id: "google-vertex-ai", label: "Google Vertex AI", kind: "cloud-identity", providerId: "vertex-ai", authMode: "session", notes: "Utilise Application Default Credentials, Workload Identity ou compte attaché." },
+  { id: "github-models", label: "GitHub Models", kind: "api-key-env", providerId: "github-models", authMode: "environment", baseUrl: "https://models.github.ai/inference", requiredEnv: ["GITHUB_TOKEN"], notes: "Jeton finement limité avec permission models:read ou jeton GitHub App." },
+
   { id: "openrouter", label: "OpenRouter", kind: "openai-compatible", providerId: "openrouter", authMode: "environment", baseUrl: "https://openrouter.ai/api/v1", requiredEnv: ["OPENROUTER_API_KEY"], notes: "Passerelle multi-modèles compatible OpenAI." },
   { id: "deepseek-api", label: "DeepSeek API", kind: "openai-compatible", providerId: "deepseek", authMode: "environment", baseUrl: "https://api.deepseek.com", requiredEnv: ["DEEPSEEK_API_KEY"], notes: "Endpoint compatible OpenAI." },
   { id: "groq-api", label: "Groq API", kind: "openai-compatible", providerId: "groq", authMode: "environment", baseUrl: "https://api.groq.com/openai/v1", requiredEnv: ["GROQ_API_KEY"], notes: "Endpoint compatible OpenAI." },
+  { id: "huggingface-router", label: "Hugging Face Inference Providers", kind: "openai-compatible", providerId: "huggingface", authMode: "environment", baseUrl: "https://router.huggingface.co/v1", requiredEnv: ["HF_TOKEN"], notes: "Routeur compatible OpenAI avec jeton d'inférence à permissions minimales." },
+  { id: "together-api", label: "Together AI", kind: "openai-compatible", providerId: "together", authMode: "environment", baseUrl: "https://api.together.ai/v1", requiredEnv: ["TOGETHER_API_KEY"], notes: "Endpoint compatible OpenAI." },
   { id: "generic-openai-compatible", label: "Endpoint compatible OpenAI", kind: "openai-compatible", providerId: "generic", authMode: "environment", requiredEnv: ["OPENAI_API_KEY"], notes: "Base URL et nom de variable configurables sans enregistrer la valeur du secret." },
 
   { id: "mcp-stdio", label: "Serveur MCP stdio", kind: "mcp-stdio", authMode: "none", notes: "Processus local lancé avec une commande explicite." },
