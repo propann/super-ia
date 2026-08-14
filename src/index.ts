@@ -6,34 +6,42 @@ import { createTask, getTask, listTasks } from "./core/task-store.js";
 import { createWorktree } from "./core/worktree-manager.js";
 import { handleControlCommand } from "./control/cli.js";
 import { syncRepositoryToGlobalControl } from "./control/repository-sync.js";
+import { handleContextCommand } from "./context/cli.js";
 import { providerCatalog } from "./providers/catalog.js";
+import { handleRuntimeCommand } from "./runtime/cli.js";
 import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.4.0
+  console.log(`Super IA v0.5.0
 
 Usage:
-  superia matrix [--once]                       Ouvre la console de contrôle Matrix
+  superia matrix [--once]                       Ouvre la console Matrix
   superia doctor [--json]                       Détecte les IA et outils locaux
-  superia providers [--json]                    Affiche le catalogue des fournisseurs
-  superia local [--json]                        Affiche les outils locaux détectés
+  superia providers [--json]                    Affiche les fournisseurs
+  superia local [--json]                        Affiche les outils locaux
   superia scan [--json]                         Analyse le dépôt courant
-  superia init                                  Initialise le dépôt et le plan de contrôle
-  superia control init|status [--json]          Initialise ou inspecte SQLite WAL
-  superia project add [path] [--json]           Enregistre un dépôt dans le registre global
-  superia project sync [path] [--json]          Resynchronise projet et missions JSON
-  superia project list [--json]                 Liste tous les projets suivis
+  superia init                                  Initialise dépôt et plan de contrôle
+
+  superia control init|status [--json]          Inspecte SQLite WAL
+  superia project add|sync [path] [--json]      Enregistre ou synchronise un dépôt
+  superia project list [--json]                 Liste tous les projets
   superia project show <PROJECT-ID> [--json]    Affiche projet, missions et runs
-  superia task create <objectif>                Crée une mission persistante
+
+  superia task create <objectif>                Crée une mission
   superia task list [--json]                    Liste les missions du dépôt
   superia task show <TASK-ID> [--json]          Affiche une mission
-  superia worktree <TASK-ID> [--dry-run]        Crée son worktree isolé
+  superia worktree <TASK-ID> [--dry-run]        Crée son worktree
+
+  superia context build [TASK-ID] [options]     Crée un contexte Git vérifiable
+      --query "mots clés" --max-bytes 300000 --output <dossier>
+  superia validate [--timeout-minutes 15]       Exécute les checks dans le runner
+
   superia run start <provider> [TASK-ID]        Ouvre un run durable
   superia run list [--project PROJECT-ID]       Liste les runs
   superia run heartbeat <RUN-ID>                Rafraîchit le heartbeat
   superia run finish <RUN-ID> <statut>          Termine un run
-  superia events [--limit N] [--json]           Consulte le journal d'événements
+  superia events [--limit N] [--json]           Consulte les événements
   superia recover [--stale-minutes N]           Marque les runs abandonnés
   superia help                                  Affiche cette aide
 
@@ -41,7 +49,8 @@ Principes:
   - aucune fusion automatique sans validation humaine
   - API désactivées par défaut
   - agents d'écriture confinés dans des worktrees Git
-  - secrets expurgés avant tout envoi distant
+  - aucun fichier sensible dans un paquet de contexte
+  - aucun shell implicite dans le runner
   - état global durable dans SUPERIA_HOME ou ~/.superia
 `);
 }
@@ -85,6 +94,8 @@ async function main(): Promise<void> {
   const json = args.includes("--json");
 
   if (await handleControlCommand(command, args, json, process.cwd())) return;
+  if (await handleContextCommand(command, args, json, process.cwd())) return;
+  if (await handleRuntimeCommand(command, args, json, process.cwd())) return;
 
   if (command === "matrix" || command === "cockpit") {
     await runMatrixConsole(process.cwd(), { once: args.includes("--once") });
