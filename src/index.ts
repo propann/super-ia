@@ -10,12 +10,13 @@ import { handleOperationsCommand } from "./control/operations-cli.js";
 import { syncRepositoryToGlobalControl } from "./control/repository-sync.js";
 import { handleContextCommand } from "./context/cli.js";
 import { providerCatalog } from "./providers/catalog.js";
+import { handleReceiptCommand } from "./quality/cli.js";
 import { handleRuntimeCommand } from "./runtime/cli.js";
 import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.8.0
+  console.log(`Super IA v0.9.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
@@ -44,6 +45,9 @@ Usage:
       --timeout-minutes 60 --max-context-bytes 300000
       Vibe : --max-turns 8 --max-tokens 50000 --max-price 0.25
 
+  superia receipt create <RUN-ID>               Crée la preuve d'un run
+  superia receipt verify <RECEIPT.json>         Vérifie empreinte et artefacts
+
   superia backup create                         Crée une sauvegarde cohérente
   superia backup list                           Liste les sauvegardes
   superia backup verify <dossier>               Vérifie tailles et SHA-256
@@ -64,7 +68,8 @@ Principes:
   - une seule exécution possède une mission grâce aux leases
   - Codex conserve sa sandbox ; Vibe n'obtient aucun shell
   - plafonds de prix, tokens et tours pour Vibe
-  - aucune fusion automatique sans validation humaine
+  - receipts SHA-256 sans jamais supprimer l'approbation humaine
+  - aucune fusion automatique
   - API génériques désactivées par défaut
   - aucun fichier sensible dans un paquet de contexte
   - aucun shell implicite dans le runner
@@ -116,6 +121,7 @@ async function main(): Promise<void> {
   if (await handleContextCommand(command, args, json, process.cwd())) return;
   if (await handleRuntimeCommand(command, args, json, process.cwd())) return;
   if (await handleAgentCommand(command, args, json, process.cwd())) return;
+  if (await handleReceiptCommand(command, args, json)) return;
 
   if (command === "matrix" || command === "cockpit") {
     await runMatrixConsole(process.cwd(), { once: args.includes("--once") });
