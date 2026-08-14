@@ -6,14 +6,14 @@ Pull request : `#1` vers `main`
 
 Ce document distingue ce qui est réellement livré, ce qui est validé sans fournisseur externe et ce qui reste à vérifier sur le Raspberry Pi réel.
 
-## Résultat v0.9.0
+## Résultat v0.10.0
 
 | Élément | Résultat |
 |---|---|
-| Version | `0.9.0` |
+| Version | `0.10.0` |
 | CI GitHub | réussie |
 | Build TypeScript | réussi |
-| Tests | **22 réussis, 0 échec** |
+| Tests | **25 réussis, 0 échec** |
 | Audit npm du job | 0 vulnérabilité signalée |
 | Système CI | Ubuntu 24.04 |
 | Node / npm | 22.23.2 / 10.9.8 |
@@ -31,14 +31,29 @@ bash -n install/pi/uninstall.sh
 
 ## Livré et vérifié
 
-### Git et missions
+### Git, missions et suivi
 
 - scanner Git, stack et checks ;
 - missions `TASK-XXXX` lisibles par dépôt ;
-- branches dédiées ;
-- worktrees ;
+- branches dédiées et worktrees ;
 - mode `--dry-run` ;
-- synchronisation automatique avec le registre global.
+- synchronisation avec le registre global ;
+- statuts `planned`, `ready`, `running`, `blocked`, `review`, `done`, `failed`, `cancelled` ;
+- priorités `low`, `normal`, `high`, `critical` ;
+- responsable, fournisseur et échéance ;
+- tags, dépendances et critères d'acceptation ;
+- notes horodatées ;
+- tableau `superia task board` avec progression ;
+- validation des dépendances inconnues et auto-dépendances.
+
+### Feuille de route contrôlée
+
+- registre machine-lisible `docs/ROADMAP_TRACKER.json` ;
+- identifiants stables `SIA-XXX` ;
+- milestones, statuts, priorités, dépendances, critères de sortie et preuves ;
+- vue humaine `docs/TASK_TRACKER.md` ;
+- test CI de cohérence du registre ;
+- PR maintenue en brouillon tant que la tâche de release `SIA-501` est bloquée.
 
 ### Plan de contrôle global
 
@@ -57,16 +72,26 @@ bash -n install/pi/uninstall.sh
 
 - sélection depuis les fichiers suivis par Git ;
 - instructions et manifests prioritaires ;
-- prise en compte des fichiers modifiés, cités et trouvés par mots-clés ;
+- fichiers modifiés, cités et trouvés par mots-clés ;
 - budget maximal en octets ;
-- SHA-256 de chaque fichier ;
-- empreinte globale du contexte ;
+- SHA-256 de chaque fichier et empreinte globale ;
 - `MISSION.md`, `CONTEXT.md` et `MANIFEST.json` ;
-- exclusion des chemins sensibles ;
-- exclusion des binaires ;
+- exclusion des chemins sensibles et binaires ;
 - blocage de formats de secrets à haute confiance.
 
-Le scanner intégré n'est pas encore Gitleaks. Il constitue une première barrière et reste couvert par un test avec faux jeton.
+### Gitleaks externe
+
+- outil détecté par `superia doctor` ;
+- commande `superia security scan` ;
+- modes `dir` et `git` ;
+- rapport JSON avec secrets expurgés ;
+- exécution dans le runner durable ;
+- mode optionnel lorsque Gitleaks est absent ;
+- mode bloquant `--required` ;
+- finding ou code de sortie non nul marque le scan en échec ;
+- tests avec faux scanner propre et faux scanner contenant un finding.
+
+Gitleaks n'est pas encore automatiquement imposé avant chaque agent distant. Cette intégration est suivie par `SIA-202`.
 
 ### Runner
 
@@ -95,31 +120,21 @@ Le scanner intégré n'est pas encore Gitleaks. Il constitue une première barri
 ### Adaptateur Mistral Vibe
 
 - mode programmatique forcé ;
-- prompt via stdin, pas dans la liste des processus ;
+- prompt via stdin, absent de la liste des processus ;
 - plan/review avec profil `plan` ;
 - build avec `accept-edits` ;
 - `auto-approve` interdit ;
 - shell explicitement désactivé ;
-- outils de fichiers limités par mode ;
+- outils de fichiers limités ;
 - plafonds de prix, tokens et tours ;
 - sortie streaming JSON archivée ;
 - lease exclusif par mission.
 
 ### Nature des tests d'agents
 
-Les tests Codex et Vibe utilisent de faux exécutables locaux. Ils valident :
+Les tests Codex et Vibe utilisent de faux exécutables locaux. Ils valident la plomberie, la sécurité, les budgets, le parsing, les logs et les états SQLite. Ils ne prouvent pas encore l'authentification réelle, la disponibilité d'un compte, la qualité d'un modèle ni le coût observé.
 
-- le contexte réellement transmis par stdin ;
-- les arguments de sécurité ;
-- les budgets ;
-- le parsing JSONL ;
-- les logs et réponses ;
-- les états SQLite ;
-- le refus du build sans worktree.
-
-Ils ne prouvent pas encore l'authentification réelle, la disponibilité d'un compte, la qualité d'un modèle ni le coût observé.
-
-### Sauvegarde et daemon
+### Sauvegarde, daemon et Raspberry Pi
 
 - image SQLite cohérente avec `VACUUM INTO` ;
 - copie du journal JSONL ;
@@ -129,18 +144,10 @@ Ils ne prouvent pas encore l'authentification réelle, la disponibilité d'un co
 - resynchronisation des projets ;
 - récupération des runs ;
 - état `daemon-status.json` ;
-- événement d'échec par projet.
-
-### Raspberry Pi
-
-Le paquet comprend :
-
 - installateur utilisateur ;
 - désinstallateur conservant les données ;
 - wrapper `~/.local/bin/superia` ;
-- service systemd utilisateur ;
-- durcissement `NoNewPrivileges`, `ProtectSystem`, `ProtectHome` et protections du noyau ;
-- test, daemon initial, création et vérification de sauvegarde ;
+- service systemd utilisateur durci ;
 - aucune commande `sudo` ;
 - aucun modèle IA local.
 
@@ -160,56 +167,59 @@ La CI vérifie le paquet, mais l'installation matérielle complète n'a pas enco
 - falsification d'un log détectée par test ;
 - approbation humaine toujours obligatoire.
 
-## Liste des 22 tests
+## Liste des 25 tests
 
 1. sauvegarde cohérente et vérifiable ;
 2. unicité des fournisseurs ;
 3. API distantes désactivées ;
 4. transports déclarés ;
-5. adaptateur Codex de bout en bout simulé ;
+5. adaptateur Codex simulé ;
 6. contexte ciblé et secret exclu ;
 7. SQLite WAL et persistance multi-projets ;
 8. récupération des runs et journal JSONL ;
 9. flux Git mission/worktree ;
 10. daemon synchronisation/récupération ;
-11. lease exclusif ;
-12. reprise d'un lease expiré ;
-13. unicité des outils locaux ;
-14. légèreté des outils requis ;
-15. exécutables candidats déclarés ;
-16. Matrix locale et globale ;
-17. runner réussi avec logs ;
-18. runner timeout et arrêt du groupe ;
-19. receipt et détection de falsification ;
-20. catalogue de recherche valide ;
-21. surface de décision de chaque projet étudié ;
-22. adaptateur Vibe de bout en bout simulé.
+11. Gitleaks propre et finding bloquant ;
+12. lease exclusif ;
+13. reprise d'un lease expiré ;
+14. unicité des outils locaux ;
+15. légèreté des outils requis ;
+16. exécutables candidats déclarés ;
+17. Matrix locale et globale ;
+18. runner réussi avec logs ;
+19. runner timeout et arrêt du groupe ;
+20. receipt et détection de falsification ;
+21. catalogue de recherche valide ;
+22. surface de décision de chaque projet étudié ;
+23. registre de roadmap valide ;
+24. suivi des tâches, blocages et progression ;
+25. adaptateur Vibe simulé.
 
 ## Limites et risques
 
 - `node:sqlite` affiche un avertissement expérimental avec Node 22 ;
 - installation Pi réelle non testée ;
 - comptes Codex/Vibe réels non testés par la CI ;
-- Gitleaks externe non intégré ;
-- sandbox bubblewrap/Podman commune non intégrée ;
-- pas de signature cryptographique d'identité des receipts ;
-- pas de relation de pipeline explicite entre builder, validator et reviewer ;
+- Gitleaks intégré mais pas encore obligatoire dans le préflight des agents ;
+- sandbox Bubblewrap/Podman commune non intégrée ;
+- métadonnées enrichies des tâches conservées dans les fichiers JSON du dépôt, mais pas encore toutes projetées dans les colonnes SQLite globales ;
+- pas de contrôle post-run des chemins modifiés ;
 - pas de reviewer indépendant ;
+- pas de pipeline builder/validator/reviewer ;
 - pas de DAG ou de sous-missions ;
 - pas de routeur automatique coût/qualité ;
 - pas de Restic ni de test automatique de restauration ;
 - pas d'interface web locale ;
 - aucune fusion automatique.
 
-## Prochain lot recommandé
+## Suite prioritaire
 
-1. exécuter `install/pi/install.sh` sur le Pi 5 réel ;
-2. vérifier le service, l'arrêt brutal et la restauration ;
-3. installer/authentifier Codex et Vibe officiellement ;
-4. lancer les mêmes missions de benchmark en mode plan ;
-5. enregistrer durée, erreurs et consommation observée ;
-6. intégrer Gitleaks ;
-7. créer un reviewer indépendant ;
-8. relier builder → validations → review → receipt ;
-9. ajouter Restic et un test de restauration ;
-10. construire ensuite le routeur coût/qualité.
+1. `SIA-202` — imposer Gitleaks avant tout envoi distant ;
+2. `SIA-203` — ajouter Bubblewrap, HOME temporaire et contrôle réseau ;
+3. `SIA-204` — contrôler les fichiers modifiés par les agents ;
+4. `SIA-101` — installer la branche sur le Pi 5 réel ;
+5. `SIA-102` / `SIA-103` — tester reprise et restauration ;
+6. `SIA-104` / `SIA-105` — tester Codex et Vibe réels ;
+7. `SIA-301` / `SIA-302` — reviewer indépendant et pipeline complet ;
+8. `SIA-205` — Restic ;
+9. `SIA-401` — routeur coût/qualité fondé sur des mesures.
