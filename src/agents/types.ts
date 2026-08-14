@@ -2,6 +2,16 @@ import type { ContextBuildResult } from "../context/types.js";
 import type { ManagedProcessResult } from "../runtime/types.js";
 
 export type AgentMode = "plan" | "build" | "review";
+export type SecurityPreflightStatus = "passed" | "waived" | "not-run-dry-run";
+
+export interface SecurityPreflightResult {
+  status: SecurityPreflightStatus;
+  scanner: "gitleaks";
+  reportPath?: string;
+  runId?: string;
+  findings: number;
+  reason?: string;
+}
 
 export interface AgentInvocation {
   provider: string;
@@ -22,6 +32,7 @@ export interface AgentExecutionOptions {
   maxTokens?: number;
   maxPriceUsd?: number;
   dryRun?: boolean;
+  allowWithoutGitleaks?: boolean;
 }
 
 export interface AgentExecutionPreview {
@@ -32,6 +43,7 @@ export interface AgentExecutionPreview {
   cwd: string;
   stdinBytes: number;
   context: ContextBuildResult;
+  securityPreflight: SecurityPreflightResult;
 }
 
 export interface AgentExecutionResult extends AgentExecutionPreview {
