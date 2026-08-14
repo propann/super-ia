@@ -18,7 +18,7 @@ import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.11.0
+  console.log(`Super IA v0.12.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
@@ -48,6 +48,7 @@ Usage:
   superia context build [TASK-ID] [options]     Crée un contexte Git vérifiable
   superia security scan [options]               Lance Gitleaks
       --required --mode dir|git --timeout-minutes 5
+  superia security sandbox-check [--json]       Teste Bubblewrap sur la machine
   superia validate [--timeout-minutes 15]       Exécute les checks dans le runner
 
   superia agent run codex <TASK-ID> [options]   Lance Codex contrôlé
@@ -55,6 +56,7 @@ Usage:
       --mode plan|build|review --model <nom> --dry-run
       --timeout-minutes 60 --max-context-bytes 300000
       --allow-without-gitleaks                   Dérogation explicite et journalisée
+      --allow-without-bwrap                      Dérogation explicite et journalisée
       Vibe : --max-turns 8 --max-tokens 50000 --max-price 0.25
 
   superia receipt create <RUN-ID>               Crée la preuve d'un run
@@ -81,7 +83,9 @@ Principes:
   - suivi explicite des blocages, dépendances et critères d'acceptation
   - Codex conserve sa sandbox ; Vibe n'obtient aucun shell
   - Gitleaks obligatoire avant tout run réel Codex/Vibe
-  - toute dérogation Gitleaks est explicite, visible et journalisée
+  - Bubblewrap obligatoire avant tout run réel Codex/Vibe sous Linux
+  - HOME jetable et workspace limité par mode
+  - toute dérogation de sécurité est explicite, visible et journalisée
   - receipts SHA-256 sans jamais supprimer l'approbation humaine
   - aucune fusion automatique
   - API génériques désactivées par défaut
