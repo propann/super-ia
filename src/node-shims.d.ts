@@ -6,6 +6,7 @@ declare module "node:fs/promises" {
   export function access(path: string): Promise<void>;
   export function mkdir(path: string, options?: unknown): Promise<unknown>;
   export function readFile(path: string, encoding: string): Promise<string>;
+  export function readFile(path: string): Promise<{ byteLength: number }>;
   export function readdir(path: string): Promise<string[]>;
   export function rename(oldPath: string, newPath: string): Promise<void>;
   export function writeFile(path: string, data: string, encoding?: string): Promise<void>;
@@ -25,7 +26,7 @@ declare module "node:os" {
 
 declare module "node:crypto" {
   export function createHash(algorithm: string): {
-    update(value: string): { digest(encoding: "hex"): string };
+    update(value: unknown): { digest(encoding: "hex"): string };
   };
   export function randomUUID(): string;
 }
