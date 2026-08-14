@@ -5,6 +5,8 @@ import type { RunReceipt } from "../quality/types.js";
 export type PipelineProvider = "codex" | "vibe";
 export type ReviewSeverity = "critical" | "high" | "medium" | "low";
 export type ReviewVerdict = "approve" | "changes-requested" | "blocked";
+export type PipelineStage = "initialized" | "builder-completed" | "validation-completed" | "review-completed" | "receipt-created";
+export type PipelineStatus = "running" | "completed" | "failed";
 
 export interface ReviewFinding {
   severity: ReviewSeverity;
@@ -35,6 +37,7 @@ export interface PipelineOptions {
   builder: PipelineProvider;
   reviewer: PipelineProvider;
   dryRun?: boolean;
+  resume?: boolean;
   builderModel?: string;
   reviewerModel?: string;
   timeoutMs?: number;
@@ -63,6 +66,27 @@ export interface PipelineResult {
   receiptPath: string;
   receipt: RunReceipt;
   passed: boolean;
+}
+
+export interface PipelineCheckpoint {
+  schemaVersion: 1;
+  taskId: string;
+  repositoryRoot: string;
+  worktreePath: string;
+  builderProvider: PipelineProvider;
+  reviewerProvider: PipelineProvider;
+  status: PipelineStatus;
+  stage: PipelineStage;
+  startedAt: string;
+  updatedAt: string;
+  builder?: AgentExecutionResult;
+  validation?: ValidationReport;
+  reviewer?: AgentExecutionResult;
+  review?: IndependentReviewReport;
+  reviewPath?: string;
+  receiptPath?: string;
+  receipt?: RunReceipt;
+  error?: string;
 }
 
 export type AgentRunner = (
