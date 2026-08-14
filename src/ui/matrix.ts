@@ -1,5 +1,5 @@
-import type { ProviderCheck, RepositoryScan, SuperIaConfig, SuperIaTask } from "../core/types.js";
-import { inspectProviders } from "../core/doctor.js";
+import type { LocalToolCheck, ProviderCheck, RepositoryScan, SuperIaConfig, SuperIaTask } from "../core/types.js";
+import { inspectLocalTools, inspectProviders } from "../core/doctor.js";
 import { loadProjectConfig } from "../core/config.js";
 import { scanRepository } from "../core/repository-scanner.js";
 import { listTasks } from "../core/task-store.js";
@@ -22,6 +22,7 @@ const ANSI = {
 export interface MatrixSnapshot {
   scan: RepositoryScan;
   providers: ProviderCheck[];
+  localTools: LocalToolCheck[];
   tasks: SuperIaTask[];
   config: SuperIaConfig;
   now: Date;
@@ -68,6 +69,12 @@ function providerState(provider: ProviderCheck): string {
   return `${ANSI.dim}○ ABSENT${ANSI.reset}`;
 }
 
+function localToolState(tool: LocalToolCheck): string {
+  return tool.installed
+    ? `${ANSI.brightGreen}● LOCAL${ANSI.reset}`
+    : `${ANSI.dim}○ ABSENT${ANSI.reset}`;
+}
+
 function taskState(task: SuperIaTask): string {
   const symbol: Record<SuperIaTask["status"], string> = {
     planned: "◇",
@@ -97,6 +104,7 @@ export function renderMatrixDashboard(snapshot: MatrixSnapshot, width = 100): st
   const columnWidth = Math.floor((safeWidth - 2) / 2);
   const readyProviders = snapshot.providers.filter((item) => item.installed === true).length;
   const assistedProviders = snapshot.providers.filter((item) => item.installed === null).length;
+  const readyLocalTools = snapshot.localTools.filter((item) => item.installed).length;
   const activeTasks = snapshot.tasks.filter((task) => !["done", "cancelled"].includes(task.status)).length;
 
   const repo = box("dépôt", [
@@ -111,13 +119,14 @@ export function renderMatrixDashboard(snapshot: MatrixSnapshot, width = 100): st
     `${ANSI.brightGreen}SUPER IA // MATRIX CONTROL${ANSI.reset}`,
     `IA prêtes      ${readyProviders}`,
     `IA assistées   ${assistedProviders}`,
-    `Missions       ${snapshot.tasks.length}`,
-    `Actives        ${activeTasks}`,
+    `Outils locaux  ${readyLocalTools}/${snapshot.localTools.length}`,
+    `Missions       ${snapshot.tasks.length} (${activeTasks} actives)`,
   ], columnWidth);
 
   const providers = box("réseau IA", snapshot.providers.slice(0, 8).map((provider) => `${providerState(provider)}  ${provider.name}`), columnWidth);
   const tasks = box("missions", snapshot.tasks.length ? snapshot.tasks.slice(-8).reverse().map(taskState) : ["Aucune mission enregistrée.", "superia task create \"objectif\""], columnWidth);
 
+  const localTools = box("outils locaux", snapshot.localTools.slice(0, 8).map((tool) => `${localToolState(tool)}  ${tool.name} [${tool.category}]`), columnWidth);
   const policy = box("politique", [
     `API              ${snapshot.config.policy.allowApi ? "AUTORISÉES" : "VERROUILLÉES"}`,
     `Budget mensuel   ${snapshot.config.policy.monthlyApiBudgetEur.toFixed(2)} €`,
@@ -130,9 +139,10 @@ export function renderMatrixDashboard(snapshot: MatrixSnapshot, width = 100): st
     `[R] rafraîchir     [Q] quitter`,
     `superia scan       analyser le dépôt`,
     `superia task list  voir les missions`,
-    `superia doctor     sonder les IA`,
+    `superia doctor     sonder tout le système`,
+    `superia local      voir les capacités locales`,
     `superia worktree   isoler une mission`,
-  ], columnWidth);
+  ], safeWidth);
 
   const header = [
     rainLine(safeWidth, snapshot.now),
@@ -141,17 +151,29 @@ export function renderMatrixDashboard(snapshot: MatrixSnapshot, width = 100): st
     "",
   ];
 
-  return [...header, ...joinColumns(repo, system), "", ...joinColumns(providers, tasks), "", ...joinColumns(policy, actions), "", rainLine(safeWidth, new Date(snapshot.now.getTime() + 7))].join("\n");
+  return [
+    ...header,
+    ...joinColumns(repo, system),
+    "",
+    ...joinColumns(providers, tasks),
+    "",
+    ...joinColumns(localTools, policy),
+    "",
+    ...actions,
+    "",
+    rainLine(safeWidth, new Date(snapshot.now.getTime() + 7)),
+  ].join("\n");
 }
 
 async function captureSnapshot(root: string): Promise<MatrixSnapshot> {
   const scan = await scanRepository(root);
-  const [providers, tasks, config] = await Promise.all([
+  const [providers, localTools, tasks, config] = await Promise.all([
     inspectProviders(),
+    inspectLocalTools(),
     listTasks(scan.root),
     loadProjectConfig(scan.root),
   ]);
-  return { scan, providers, tasks, config, now: new Date() };
+  return { scan, providers, localTools, tasks, config, now: new Date() };
 }
 
 export async function runMatrixConsole(root: string, options: MatrixOptions = {}): Promise<void> {
