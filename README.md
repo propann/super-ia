@@ -11,7 +11,7 @@ La CI GitHub valide :
 - Ubuntu 24.04 ;
 - Node.js 22.23.2 et npm 10.9.8 ;
 - compilation TypeScript réussie ;
-- **44 tests réussis, 0 échec** ;
+- **48 tests réussis, 0 échec** ;
 - 0 vulnérabilité npm signalée ;
 - scripts Pi valides ;
 - aucune commande `sudo` dans le paquet Pi.
@@ -19,13 +19,13 @@ La CI GitHub valide :
 Fonctions principales :
 
 - SQLite WAL multi-projets ;
-- missions, dépendances, priorités, blocages et suivi ;
+- missions, priorités, dépendances, blocages et suivi ;
 - Git branches et worktrees ;
 - contexte ciblé avec SHA-256 ;
 - runner avec logs, heartbeat, timeout et arrêt des descendants ;
 - Codex et Mistral Vibe ;
 - Gitleaks et Bubblewrap obligatoires avant les agents réels ;
-- contrôle des fichiers modifiés après chaque agent ;
+- contrôle des fichiers modifiés, chemins critiques et taille des diffs ;
 - reviewer indépendant et structuré ;
 - pipeline builder → validation → review → receipt ;
 - checkpoints atomiques et reprise contrôlée ;
@@ -37,7 +37,7 @@ Fonctions principales :
 
 Voir [l'état vérifié](docs/STATUS.md).
 
-## Installation de développement
+## Installation
 
 ```bash
 git clone https://github.com/propann/super-ia.git
@@ -50,15 +50,13 @@ npm link
 
 Node.js **22.5 ou supérieur** est requis.
 
-## Installation Raspberry Pi
+Sur Raspberry Pi 5 :
 
 ```bash
 bash install/pi/install.sh
 ```
 
-L'installateur compile, teste, initialise `~/.superia`, installe la commande et le service utilisateur, vérifie une sauvegarde et lance l'autotest Bubblewrap lorsqu'il est disponible. Il n'utilise pas `sudo`.
-
-Sans Gitleaks ou Bubblewrap, le centre de contrôle reste installable mais les agents réels sont bloqués par défaut.
+L'installateur n'utilise pas `sudo`. Sans Gitleaks ou Bubblewrap, le plan de contrôle reste installable mais les agents réels sont bloqués.
 
 ## Flux recommandé
 
@@ -83,14 +81,7 @@ superia pipeline run TASK-0001 \
   --max-total-price 0.75
 ```
 
-Le sens inverse est pris en charge :
-
-```bash
-superia pipeline run TASK-0001 \
-  --builder vibe \
-  --reviewer codex \
-  --max-price 0.25
-```
+Le sens inverse est pris en charge : Vibe builder et Codex reviewer.
 
 ## Pipeline contrôlé
 
@@ -114,7 +105,7 @@ approbation humaine
 
 Le reviewer ne démarre pas si le builder, le périmètre Git ou les validations échouent.
 
-### Suivre et reprendre
+### Reprise
 
 ```bash
 superia pipeline status TASK-0001
@@ -131,11 +122,9 @@ superia pipeline run TASK-0001 \
 .superia/pipelines/TASK-0001.json
 ```
 
-Une reprise ne relance pas une étape déjà terminée. Super IA refuse de relancer silencieusement un builder si aucun checkpoint builder complet n'existe.
+Une étape terminée n'est pas relancée.
 
-### Corriger une review
-
-Une nouvelle tentative n'est jamais automatique :
+### Correction bornée
 
 ```bash
 superia pipeline run TASK-0001 \
@@ -144,7 +133,7 @@ superia pipeline run TASK-0001 \
   --retry
 ```
 
-Le retry est accepté uniquement après `changes-requested`. La review précédente est transmise au builder par fichier et n'apparaît pas dans la ligne de commande.
+Le retry exige une review `changes-requested`. La review précédente est transmise au builder par fichier et n'apparaît pas dans `argv`.
 
 Les plafonds sont figés au premier lancement :
 
@@ -154,9 +143,9 @@ maxTotalPriceUsd
 reservedPerAttemptUsd
 ```
 
-Chaque builder terminé consomme une tentative. Chaque patch reçoit une empreinte SHA-256. Un patch déjà produit arrête la boucle avant une nouvelle validation ou review.
+Chaque builder terminé consomme une tentative. Chaque patch reçoit une empreinte SHA-256. Un patch déjà vu arrête la boucle avant une nouvelle validation ou review.
 
-Causes d'arrêt possibles :
+Causes d'arrêt :
 
 ```text
 approved
@@ -172,9 +161,9 @@ Le prix affiché est un **plafond Vibe réservé**, pas une dépense réelle sup
 
 Voir [Pipeline multi-agent](docs/PIPELINE.md).
 
-## Quatre barrières autour d'un agent
+## Barrières de sécurité
 
-### 1. Gitleaks
+### Gitleaks
 
 ```text
 Gitleaks absent  → agent refusé
@@ -182,14 +171,12 @@ finding          → agent refusé
 scan propre      → préflight validé
 ```
 
-### 2. Bubblewrap
+### Bubblewrap
 
-- vrai HOME non monté ;
-- HOME jetable `/home/superia` ;
+- HOME jetable ;
 - système en lecture seule ;
 - plan/review en lecture seule ;
 - build limité au worktree ;
-- état fournisseur limité ;
 - réseau isolable ;
 - dérogation explicite et journalisée.
 
@@ -197,11 +184,11 @@ scan propre      → préflight validé
 superia security sandbox-check --json
 ```
 
-La CI valide la politique avec des mocks. Le test noyau réel reste à exécuter sur le Pi.
+La frontière noyau réelle reste à vérifier sur le Pi cible.
 
-### 3. Change guard
+### Change guard
 
-Un build exige au moins un `--allow-path`. Après le run, Super IA produit :
+Un build exige au moins un `--allow-path`. Après le run :
 
 ```text
 AGENT_CHANGES.patch
@@ -209,29 +196,25 @@ CHANGE_GUARD.json
 AGENT_RESULT.json
 ```
 
-Une modification hors périmètre fait échouer le run, même lorsque l'agent renvoie le code 0.
+Le garde refuse :
+
+- un fichier hors périmètre ;
+- `.env`, `.npmrc`, `.pypirc`, clés privées et `.git-credentials` ;
+- plus de 50 fichiers modifiés ;
+- plus de 1 000 000 octets effectifs.
+
+Le volume compte aussi le contenu complet des fichiers non suivis. Même un glob `**` ne peut pas autoriser les chemins critiques.
 
 Voir [Contrôle des modifications](docs/CHANGE_GUARD.md).
 
-### 4. Reviewer indépendant
+### Reviewer indépendant
 
 - fournisseur différent du builder ;
 - lecture seule ;
 - JSON structuré obligatoire ;
-- sévérité, preuve et recommandation pour chaque finding ;
-- réponse invalide transformée en `blocked` ;
-- approbation incohérente transformée en `changes-requested`.
-
-## Dérogations exceptionnelles
-
-```bash
-superia agent run codex TASK-0001 \
-  --mode plan \
-  --allow-without-gitleaks \
-  --allow-without-bwrap
-```
-
-Elles produisent un état `waived` et des événements durables. Une dérogation ne vaut jamais validation.
+- sévérité, preuve et recommandation ;
+- réponse invalide → `blocked` ;
+- approbation incohérente → `changes-requested`.
 
 ## Suivi des tâches
 
@@ -244,7 +227,7 @@ superia task update TASK-0001 --status blocked --priority critical
 superia task update TASK-0002 --depends TASK-0001
 ```
 
-Une mission conserve : statut, priorité, responsable, fournisseur, échéance, tags, dépendances, critères d'acceptation, chemins autorisés et notes.
+Une mission conserve statut, priorité, responsable, fournisseur, échéance, tags, dépendances, critères d'acceptation, chemins autorisés et notes.
 
 ## Contrôle global
 
@@ -258,7 +241,7 @@ superia daemon --once
 superia matrix
 ```
 
-## Sauvegardes et receipts
+## Sauvegardes et preuves
 
 ```bash
 superia backup create
@@ -268,18 +251,19 @@ superia receipt create <RUN-ID>
 superia receipt verify ~/.superia/runs/<RUN-ID>/RECEIPT.json
 ```
 
-Les receipts incluent les logs, le contexte, le change guard, le patch, les validations et la review indépendante. L'approbation humaine reste obligatoire. Super IA ne fusionne jamais automatiquement.
+L'approbation humaine reste obligatoire. Super IA ne fusionne jamais automatiquement.
 
 ## État de la feuille de route
 
 | État | Nombre |
 |---|---:|
-| Terminé | 11 |
+| Terminé | 12 |
 | En cours | 1 |
 | Planifié | 9 |
 | Bloqué | 2 |
+| **Total** | **24** |
 
-Le milestone pipeline multi-agent est terminé. `SIA-203` — Bubblewrap — attend encore la preuve noyau réelle du Pi.
+Le pipeline multi-agent et le durcissement des diffs sont terminés. Bubblewrap attend encore la preuve noyau réelle du Pi.
 
 ## Prochaines priorités
 
@@ -288,9 +272,9 @@ Le milestone pipeline multi-agent est terminé. `SIA-203` — Bubblewrap — att
 3. tester reprise et restauration matérielles ;
 4. tester Codex et Vibe réels ;
 5. intégrer Restic ;
-6. renforcer les tailles de diff et chemins toujours interdits ;
-7. construire le routeur coût/qualité ;
-8. construire le DAG de missions.
+6. construire le routeur coût/qualité ;
+7. construire le DAG de missions ;
+8. ajouter l'interface web locale et les notifications.
 
 ## Documentation
 
