@@ -11,6 +11,7 @@ import { runManagedProcess } from "../runtime/process-runner.js";
 import { findExecutable } from "../utils/command.js";
 import type { AgentExecutionOptions, AgentExecutionPreview, AgentExecutionResult, AgentMode } from "./types.js";
 import { assertSafeVibeInvocation, buildVibeInvocation } from "./vibe-adapter.js";
+import { runAgentSecurityPreflight } from "./security-preflight.js";
 
 function parseJsonLines(content: string): { events: unknown[]; invalid: number } {
   const events: unknown[] = [];
@@ -80,6 +81,15 @@ export async function executeVibeTask(
     budget,
   });
   assertSafeVibeInvocation(invocation);
+  const securityPreflight = await runAgentSecurityPreflight({
+    cwd,
+    projectId: synchronized.project.id,
+    taskId: task.id,
+    provider: invocation.provider,
+    dryRun: options.dryRun,
+    allowWithoutGitleaks: options.allowWithoutGitleaks,
+  });
+  invocation.metadata.securityPreflight = securityPreflight;
   const preview: AgentExecutionPreview = {
     provider: invocation.provider,
     mode,
@@ -88,6 +98,7 @@ export async function executeVibeTask(
     cwd,
     stdinBytes: Buffer.byteLength(invocation.stdin, "utf8"),
     context,
+    securityPreflight,
   };
   if (options.dryRun) return preview;
 
@@ -140,6 +151,7 @@ export async function executeVibeTask(
       contextId: context.manifest.id,
       contextHash: context.manifest.contextHash,
       baseCommit: context.manifest.baseCommit,
+      securityPreflight,
       parsedEvents: result.parsedEvents,
       invalidEventLines: result.invalidEventLines,
       budget,
