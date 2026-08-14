@@ -1,7 +1,7 @@
 # Feuille de route Super IA
 
-Version courante : **0.10.0**  
-Registre détaillé et validé par la CI : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json)  
+Version courante : **0.11.0**  
+Registre détaillé validé par la CI : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json)  
 Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 
 ## Lecture rapide
@@ -10,7 +10,7 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 
 - plan de contrôle SQLite WAL multi-projets ;
 - scanner Git, missions et worktrees ;
-- contexte ciblé avec SHA-256 et première barrière anti-secrets ;
+- contexte ciblé avec SHA-256 et barrière anti-secrets ;
 - runner avec logs, heartbeat, timeout et arrêt des descendants ;
 - adaptateurs Codex et Mistral Vibe ;
 - receipts vérifiables ;
@@ -18,7 +18,9 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - daemon et service systemd utilisateur pour le Pi ;
 - console Matrix globale ;
 - suivi enrichi des tâches ;
-- Gitleaks optionnel avec mode bloquant `--required`.
+- Gitleaks avec rapport JSON expurgé ;
+- **préflight Gitleaks obligatoire avant Codex et Vibe réels** ;
+- dérogation de sécurité explicite et journalisée.
 
 ### Bloqué par le matériel ou les comptes
 
@@ -31,81 +33,68 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 
 ### Prochain chantier logiciel
 
-1. rendre Gitleaks obligatoire dans le préflight des agents distants ;
-2. ajouter Bubblewrap avec HOME temporaire et réseau contrôlé ;
-3. vérifier les chemins réellement modifiés par chaque agent ;
-4. intégrer un reviewer indépendant ;
-5. construire le pipeline builder → validation → review → receipt ;
-6. ajouter Restic après le test de restauration local ;
-7. construire le routeur coût/qualité à partir des benchmarks réels.
+1. ajouter Bubblewrap avec HOME temporaire et réseau contrôlé ;
+2. vérifier les chemins réellement modifiés par chaque agent ;
+3. intégrer un reviewer indépendant ;
+4. construire le pipeline builder → validation → review → receipt ;
+5. ajouter Restic après le test de restauration local ;
+6. construire le routeur coût/qualité à partir des benchmarks réels.
 
 ## V0.1 à V0.9 — fondations terminées
 
-- [x] CLI TypeScript ;
-- [x] catalogue multi-fournisseurs et diagnostic ;
-- [x] API génériques désactivées par défaut ;
-- [x] scanner Git ;
-- [x] missions `TASK-XXXX` ;
-- [x] branches et worktrees ;
-- [x] console Matrix ;
-- [x] SQLite WAL et migrations ;
-- [x] registre multi-projets ;
-- [x] runs, heartbeats, événements et reprise ;
+- [x] CLI TypeScript, catalogue et diagnostic ;
+- [x] scanner Git, missions, branches et worktrees ;
+- [x] SQLite WAL, migrations, runs, événements et reprise ;
 - [x] leases exclusifs ;
 - [x] contexte Git ciblé et manifestes SHA-256 ;
 - [x] runner contrôlé ;
-- [x] Codex CLI ;
-- [x] Mistral Vibe ;
+- [x] Codex CLI et Mistral Vibe ;
 - [x] receipts et détection de falsification ;
-- [x] sauvegardes cohérentes ;
-- [x] daemon et paquet Pi non privilégié.
+- [x] sauvegardes, daemon et paquet Pi non privilégié.
 
 ## V0.10 — suivi et sécurité externe
 
-- [x] statut `blocked` ;
-- [x] priorités `low`, `normal`, `high`, `critical` ;
+- [x] statut `blocked` et priorités ;
 - [x] responsable, fournisseur et échéance ;
-- [x] tags et critères d'acceptation ;
-- [x] dépendances vérifiées ;
+- [x] tags, dépendances et critères d'acceptation ;
 - [x] notes horodatées ;
 - [x] tableau `superia task board` ;
 - [x] registre de roadmap JSON validé par la CI ;
-- [x] Gitleaks enregistré dans `superia doctor` ;
 - [x] `superia security scan` ;
-- [x] rapport JSON expurgé ;
-- [x] mode `--required` ;
-- [x] tests scan propre et finding bloquant.
+- [x] Gitleaks avec rapport JSON expurgé ;
+- [x] mode manuel `--required`.
 
 ## V0.11 — préflight de sécurité
 
-- [ ] exécuter Gitleaks avant Codex/Vibe et tout envoi web/API ;
-- [ ] refuser le run si Gitleaks est absent en politique stricte ;
-- [ ] refuser le run lorsqu'un finding est présent ;
-- [ ] journaliser toute dérogation locale ;
-- [ ] conserver le rapport dans le receipt ;
-- [ ] contrôler les fichiers modifiés après le run ;
-- [ ] échouer si un fichier hors périmètre est touché.
+- [x] Gitleaks exécuté avant Codex/Vibe réels ;
+- [x] run refusé si Gitleaks est absent ;
+- [x] run refusé lorsqu'un finding est présent ;
+- [x] rapport et run de scan enregistrés ;
+- [x] préflight inclus dans les métadonnées de l'agent ;
+- [x] dérogation `--allow-without-gitleaks` ;
+- [x] dérogation journalisée par événement durable ;
+- [x] test prouvant que l'agent bloqué ne démarre pas.
 
 ## V0.12 — sandbox commune
 
 - [ ] Bubblewrap sur Linux ;
 - [ ] HOME temporaire par run ;
-- [ ] écriture limitée au worktree et aux artefacts du run ;
+- [ ] écriture limitée au worktree et aux artefacts ;
 - [ ] réseau désactivé par défaut pour les agents génériques ;
 - [ ] liste d'exceptions réseau explicite ;
 - [ ] Podman optionnel pour les tâches à risque élevé ;
 - [ ] tests d'accès hors périmètre.
 
-## V0.13 — pipeline de qualité
+## V0.13 — contrôle des modifications et qualité
 
+- [ ] capturer l'état Git avant/après ;
+- [ ] comparer les fichiers modifiés à une liste autorisée ;
+- [ ] échouer sur modification hors périmètre ;
+- [ ] archiver le diff dans le receipt ;
 - [ ] reviewer différent du builder ;
 - [ ] findings structurés par sévérité ;
-- [ ] relation builder/validator/reviewer ;
-- [ ] pipeline déterministe ;
-- [ ] checkpoints reprenables ;
-- [ ] budgets de retries ;
-- [ ] détection de boucle ;
-- [ ] receipt final regroupant toutes les preuves ;
+- [ ] pipeline déterministe builder → validation → review → receipt ;
+- [ ] checkpoints, retries limités et détection de boucle ;
 - [ ] aucune fusion automatique.
 
 ## V0.14 — validation Raspberry Pi
@@ -127,11 +116,11 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [ ] claim/ack/complete/requeue atomiques ;
 - [ ] déblocage automatique des dépendances ;
 - [ ] détection des conflits de fichiers ;
-- [ ] comparaison de plans ;
-- [ ] audit croisé ;
+- [ ] comparaison de plans et audit croisé ;
 - [ ] routeur coût/capacité/qualité mesurée ;
 - [ ] arrêt d'urgence global ;
-- [ ] reprise automatique contrôlée.
+- [ ] reprise automatique contrôlée ;
+- [ ] interface web locale et notifications.
 
 ## V1.0 — publication stable
 
@@ -140,9 +129,9 @@ La PR ne passe en prête pour revue que lorsque :
 - [ ] le Pi réel est validé ;
 - [ ] la restauration est prouvée ;
 - [ ] Codex et Vibe réels ont produit un receipt valide ;
-- [ ] Gitleaks est obligatoire avant envoi distant ;
+- [x] Gitleaks est obligatoire avant les agents distants intégrés ;
 - [ ] la sandbox commune est validée ;
-- [ ] la CI est verte ;
+- [ ] la CI est verte sur le head final ;
 - [ ] les limites restantes sont documentées ;
 - [ ] une revue humaine autorise la fusion.
 
