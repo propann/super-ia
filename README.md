@@ -1,8 +1,14 @@
 # Super IA
 
-**Un centre de commandement local, multi-fournisseurs et économique pour coder avec plusieurs IA sans dépendre d'une API payante.**
+**Un centre de commandement local, multi-fournisseurs et économique pour coder avec plusieurs IA sans dépendre d'une API d'orchestration payante.**
 
-Super IA détecte les agents disponibles sur la machine, choisit la voie la plus adaptée, isole les modifications dans Git et garde l'utilisateur maître des coûts et de la fusion.
+Super IA détecte les agents disponibles, suit les dépôts et projets, construit un contexte contrôlé, isole les modifications dans Git et conserve les preuves nécessaires à la reprise et à la validation.
+
+## Décision matérielle
+
+Le Raspberry Pi 5 est la **tour de contrôle permanente** : Git, SQLite, missions, contexte, console, tests et sauvegardes. Il ne fait tourner aucun modèle IA dans le MVP. Les programmes Codex, Claude Code, Mistral Vibe, Gemini CLI et autres peuvent s'exécuter sur le Pi tout en utilisant les services officiels de leurs fournisseurs.
+
+Un Pi 4/5 pourra devenir plus tard un laboratoire séparé pour un petit modèle uniquement si un benchmark prouve son utilité.
 
 ## Console Matrix
 
@@ -12,16 +18,16 @@ npm run build
 node dist/index.js matrix
 ```
 
-La console affiche en direct :
+La console affiche :
 
-- le dépôt, la branche et l'état Git ;
-- la stack et les commandes de validation détectées ;
-- les fournisseurs IA présents ou utilisables en mode assisté ;
-- les outils locaux, moteurs, sandboxes et sauvegardes disponibles ;
-- les missions persistantes et leur statut ;
-- le verrou API, le budget et les règles de fusion.
+- dépôt, branche et état Git ;
+- stack et commandes de validation ;
+- fournisseurs IA disponibles ;
+- outils locaux, sandboxes et sauvegardes ;
+- missions persistantes ;
+- verrou API, budget et règles de fusion.
 
-Contrôles : `R` rafraîchit, `Q` quitte. Pour une capture statique :
+Contrôles : `R` rafraîchit, `Q` quitte.
 
 ```bash
 node dist/index.js matrix --once
@@ -31,40 +37,43 @@ node dist/index.js matrix --once
 
 ```text
 Raspberry Pi 5 + NVMe
-├── dépôts Git complets
-├── missions, mémoire et checkpoints
-├── console Matrix
+├── dépôts Git complets et suivi multi-projets
+├── SQLite + journal d'événements
+├── missions, dépendances et checkpoints
+├── constructeur et sauvegarde de contexte
 ├── worktrees isolés
-├── outils locaux légers
-└── adaptateurs vers plusieurs IA
-        ├── Codex
-        ├── Mistral Vibe
+├── gestionnaire de processus et politiques
+├── tests, audits et receipts
+├── console Matrix
+├── sauvegardes chiffrées
+└── adaptateurs vers les agents
+        ├── Codex CLI
         ├── Claude Code
+        ├── Mistral Vibe
         ├── Gemini CLI
         ├── Qwen Code
         ├── Aider / OpenCode / mini-SWE-agent
-        ├── services web assistés
-        └── Ollama / llama.cpp pour fonctions locales légères
+        └── web assisté légitime
 ```
-
-Le Pi 5 est la tour de contrôle permanente. Le dépôt, l'index, les tests, la mémoire et les sauvegardes restent locaux. Les modèles lourds peuvent rester distants ou tourner sur une autre machine du réseau.
 
 ## Philosophie
 
 ```text
 demande
    ↓
-analyse du dépôt
+analyse du dépôt et des instructions
    ↓
-spécification et plan versionnés
+spécification + plan + graphe de tâches
+   ↓
+contexte ciblé, scanné et versionné
    ↓
 choix du fournisseur légitime le moins coûteux
    ↓
 mission isolée dans un worktree
    ↓
-code + tests + audit croisé
+code + tests + audit indépendant
    ↓
-checkpoint et rapport
+checkpoint + receipt de preuve
    ↓
 fusion humaine
 ```
@@ -84,40 +93,81 @@ superia task show TASK-0001
 superia worktree TASK-0001
 ```
 
-`superia local --json` retourne les capacités locales détectées. `superia worktree TASK-0001 --dry-run` affiche la commande sans modifier Git.
+`superia local --json` retourne les capacités détectées. `superia worktree TASK-0001 --dry-run` affiche la commande sans modifier Git.
 
-## Outils locaux détectés
+## Outils locaux suivis
 
-Le registre distingue les fournisseurs IA des briques locales :
+### Cœur recommandé
 
 - Git, ripgrep, jq et SQLite ;
-- Repomix ;
-- Aider, mini-SWE-agent et OpenCode ;
-- Ollama, llama.cpp et LocalAI ;
-- bubblewrap, Podman et Docker ;
-- Restic pour les sauvegardes.
+- Gitleaks pour les secrets ;
+- Restic pour les sauvegardes ;
+- bubblewrap ou Podman pour l'isolation ;
+- Repomix et Tree-sitter pour le contexte ;
+- GitHub CLI lorsque les PR/CI sont utilisées.
 
-## Voies prévues
+### Agents locaux avec modèles distants
 
-- CLI officielles : Codex, Mistral Vibe, Claude Code, Gemini CLI et Qwen Code ;
-- agents ouverts : OpenCode, Aider, mini-SWE-agent et autres backends légitimes ;
-- services web assistés : DeepSeek, Le Chat et autres interfaces autorisées ;
-- modèles locaux ou serveur personnel ;
-- API compatibles uniquement en secours, avec budget strict.
+- Codex CLI ;
+- Claude Code ;
+- Mistral Vibe ;
+- Gemini CLI ;
+- Qwen Code ;
+- Aider ;
+- OpenCode ;
+- mini-SWE-agent.
 
-Aucun faux compte, aucun contournement de quota, aucun scraping interdit.
+### Veille expérimentale hors MVP
+
+- Ollama ;
+- llama.cpp ;
+- LocalAI ;
+- modèles locaux sur Pi.
+
+Ils sont détectables pour la recherche, mais ne sont ni requis ni installés automatiquement.
+
+## Principes de sécurité
+
+- aucun faux compte ou contournement de quota ;
+- aucune fusion automatique sur la branche protégée ;
+- aucun secret transmis silencieusement ;
+- API payantes désactivées par défaut ;
+- worktrees pour l'isolation Git ;
+- sandbox séparée pour l'isolation système ;
+- approbations par type d'action ;
+- événements et artefacts auditables ;
+- arrêt d'urgence et reprise après coupure.
 
 ## État actuel — v0.3
 
 - catalogue et diagnostic multi-fournisseurs ;
-- registre des outils locaux et moteurs d'inférence ;
-- configuration locale avec API désactivées par défaut ;
-- scanner Git et détection des commandes de validation ;
-- missions persistantes `TASK-XXXX` ;
-- branches et worktrees isolés ;
-- console de contrôle Matrix ;
+- registre des outils locaux ;
+- configuration avec API désactivées ;
+- scanner Git et commandes de validation ;
+- missions `TASK-XXXX` ;
+- branches et worktrees ;
+- console Matrix ;
 - tests du flux `scan → mission → worktree` ;
-- étude documentée des IA, agents, mémoire Git et architecture Raspberry Pi 5.
+- étude détaillée des concurrents, agents, protocoles et mémoire ;
+- architecture Pi control-plane-only ;
+- catalogue de recherche machine-lisible.
+
+## Recherche concurrentielle
+
+Super IA est comparé notamment à :
+
+- Shep ;
+- Mozzie ;
+- Agetor ;
+- Agent of Empires ;
+- Claude Squad ;
+- Squad ;
+- The Pair ;
+- Mission Control ;
+- OpenHands Agent Canvas ;
+- Agent Orchestrator.
+
+Le projet récupère les mécanismes éprouvés sans recopier leur lourdeur : SQLite, worktrees, DAG, ACP, reprise, revue indépendante, receipts et sécurité.
 
 ## Développement
 
@@ -129,18 +179,27 @@ npm run matrix
 
 ## Documentation
 
+### Projet
+
 - [Vision](docs/PROJECT_VISION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Fournisseurs](docs/PROVIDERS.md)
 - [Sécurité](docs/SECURITY.md)
 - [Feuille de route](docs/ROADMAP.md)
-- [Base de recherche](docs/research/README.md)
+
+### Recherche approfondie
+
+- [Index de recherche](docs/research/README.md)
+- [Architecture de référence](docs/research/REFERENCE_ARCHITECTURE.md)
+- [Paysage concurrentiel 2026](docs/research/COMPETITOR_LANDSCAPE_2026.md)
+- [Protocoles et interopérabilité](docs/research/PROTOCOLS_RUNTIME_AND_INTEROP.md)
 - [Rôles des IA](docs/research/AI_ROLES_MATRIX.md)
-- [Agents et outils étudiés](docs/research/AGENT_TOOLING_SURVEY.md)
+- [Agents et outils](docs/research/AGENT_TOOLING_SURVEY.md)
 - [Architecture Raspberry Pi 5](docs/research/PI5_LOCAL_FIRST_ARCHITECTURE.md)
 - [Git et mémoire de contexte](docs/research/GIT_CONTEXT_MEMORY.md)
 - [Architecture multi-agent](docs/research/MULTI_AGENT_DESIGN.md)
-- [Benchmark des fournisseurs](docs/research/BENCHMARK_PROTOCOL.md)
+- [Benchmark](docs/research/BENCHMARK_PROTOCOL.md)
+- [Catalogue JSON](docs/research/RESEARCH_CATALOG.json)
 
 ## Licence
 
