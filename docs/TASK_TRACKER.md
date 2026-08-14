@@ -3,38 +3,37 @@
 Source de vérité machine-lisible : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json).
 
 Dernière mise à jour : **14 août 2026**  
-Version suivie : **0.11.0**
+Version suivie : **0.12.0**
 
 ## État global
 
 | État | Nombre |
 |---|---:|
 | Terminé | 7 |
-| En cours | 0 |
-| Planifié | 14 |
+| En cours | 1 |
+| Planifié | 13 |
 | Bloqué | 2 |
 | Différé | 0 |
 | **Total** | **23** |
 
 ## Priorité immédiate
 
+### Sécurité en cours
+
+| ID | État | Tâche | Reste à prouver |
+|---|---|---|---|
+| `SIA-203` | en cours | Sandbox Bubblewrap commune | exécuter l'autotest noyau et Codex/Vibe réels sur le Pi 5 |
+| `SIA-204` | planifié | Contrôler les fichiers modifiés par un agent | diff archivé et hors-périmètre bloqué |
+
 ### Bloqué par une action sur le Raspberry Pi
 
 | ID | Tâche | Sortie attendue |
 |---|---|---|
-| `SIA-101` | Installer v0.11 sur le Pi 5 cible | service actif, base valide, première sauvegarde vérifiée |
+| `SIA-101` | Installer v0.12 sur le Pi 5 cible | service actif, sauvegarde vérifiée, `sandbox-status.json` produit |
 | `SIA-102` | Tester coupure brutale et reprise | run interrompu détecté, aucun doublon, SQLite intact |
 | `SIA-103` | Tester sauvegarde et restauration | restauration dans un nouvel emplacement et état relisible |
-| `SIA-104` | Tester Codex réel | plan terminé, receipt valide, aucune écriture en lecture seule |
-| `SIA-105` | Tester Mistral Vibe réel | budget respecté, shell absent, receipt valide |
-
-### Sécurité à intégrer ensuite
-
-| ID | Priorité | Tâche | Dépendances |
-|---|---|---|---|
-| `SIA-203` | critique | Ajouter la sandbox Bubblewrap commune | `SIA-002` |
-| `SIA-204` | haute | Contrôler les fichiers modifiés par un agent | `SIA-003` |
-| `SIA-205` | haute | Ajouter Restic et la politique de rétention | `SIA-103` |
+| `SIA-104` | Tester Codex réel sous Bubblewrap | plan terminé, receipt valide, aucune écriture hors sortie autorisée |
+| `SIA-105` | Tester Mistral Vibe réel sous Bubblewrap | budget respecté, shell absent, receipt valide |
 
 ### Pipeline multi-agent
 
@@ -56,40 +55,32 @@ Version suivie : **0.11.0**
 ## Terminé dans v0.11
 
 - `SIA-202` : Gitleaks obligatoire avant tout run réel Codex ou Vibe ;
-- absence de Gitleaks = agent refusé ;
-- finding Gitleaks = agent refusé avant lancement ;
+- absence de Gitleaks ou finding = agent refusé avant lancement ;
 - rapport et run Gitleaks liés au préflight ;
-- état du préflight inclus dans les métadonnées et `AGENT_RESULT.json` ;
 - dérogation possible uniquement avec `--allow-without-gitleaks` ;
-- événement durable `security.preflight.waived` ;
-- tests prouvant qu'un Codex bloqué n'est jamais démarré.
+- événement durable `security.preflight.waived`.
+
+## Livré dans v0.12 — validation matérielle restante
+
+- constructeur d'invocation Bubblewrap commun ;
+- HOME jetable supprimé après le run ;
+- système et exécutables montés en lecture seule ;
+- dépôt en lecture seule pour plan/review ;
+- worktree en lecture-écriture pour build ;
+- fichier de réponse Codex monté individuellement en écriture ;
+- état fournisseur persistant limité à `~/.superia/providers/` ;
+- namespaces utilisateur, PID, IPC, UTS et cgroup demandés ;
+- capacités supprimées et nouvelle session ;
+- réseau isolable avec `--unshare-net` ;
+- Bubblewrap obligatoire pour un run réel ;
+- dérogation `--allow-without-bwrap` journalisée ;
+- commande `superia security sandbox-check` ;
+- rapport Pi `~/.superia/sandbox-status.json` ;
+- tests de politique Codex, Vibe et sandbox.
+
+`SIA-203` reste en cours jusqu'à réussite de l'autotest réel sur le Pi et d'un run fournisseur réel.
 
 ## Utilisation quotidienne
-
-Créer et piloter une mission :
-
-```bash
-superia task create "Ajouter la sandbox Bubblewrap"
-
-superia task update TASK-0001 \
-  --status planned \
-  --priority critical \
-  --owner max \
-  --provider codex-cli \
-  --due 2026-08-20 \
-  --tag security \
-  --tag pi \
-  --accept "écriture limitée au worktree" \
-  --accept "réseau désactivé par défaut"
-```
-
-Ajouter une dépendance ou un blocage :
-
-```bash
-superia task update TASK-0002 --depends TASK-0001
-superia task update TASK-0002 --status blocked
-superia task note TASK-0002 "Accès au Pi nécessaire pour continuer."
-```
 
 Voir le tableau :
 
@@ -98,20 +89,30 @@ superia task board
 superia task board --json
 ```
 
-Lancer un agent avec le préflight normal :
+Vérifier la sécurité locale :
+
+```bash
+superia security scan --required
+superia security sandbox-check
+```
+
+Lancer un agent avec les deux préflights obligatoires :
 
 ```bash
 superia agent run codex TASK-0001 --mode plan
 superia agent run vibe TASK-0001 --mode plan --max-price 0.25
 ```
 
-Dérogation exceptionnelle et journalisée :
+Dérogations exceptionnelles et journalisées :
 
 ```bash
 superia agent run codex TASK-0001 \
   --mode plan \
-  --allow-without-gitleaks
+  --allow-without-gitleaks \
+  --allow-without-bwrap
 ```
+
+Une dérogation ne constitue jamais une preuve de validation.
 
 ## Règles de suivi
 
@@ -121,4 +122,5 @@ superia agent run codex TASK-0001 \
 4. Une dépendance doit exister et ne peut pas pointer vers elle-même.
 5. La PR reste en brouillon tant que `SIA-501` est bloquée.
 6. Toute dérogation de sécurité est explicite et journalisée.
-7. Aucune tâche ne supprime l'approbation humaine avant fusion.
+7. Une validation simulée ne remplace pas un test matériel requis.
+8. Aucune tâche ne supprime l'approbation humaine avant fusion.
