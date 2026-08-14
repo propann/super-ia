@@ -22,9 +22,7 @@ const defaultEnvKeys = [
   "CODEX_HOME",
 ];
 
-function safeEnvironment(
-  request: ManagedProcessRequest,
-): Record<string, string> {
+function safeEnvironment(request: ManagedProcessRequest): Record<string, string> {
   const allowed = new Set([...defaultEnvKeys, ...(request.allowedEnvKeys ?? [])]);
   const env: Record<string, string> = {};
   for (const key of allowed) {
@@ -106,6 +104,7 @@ export async function runManagedProcess(
         command: request.command,
         args,
         cwd: resolve(request.cwd),
+        stdinBytes: request.stdin ? Buffer.byteLength(request.stdin, "utf8") : 0,
         ...request.metadata,
       },
     });
@@ -130,9 +129,11 @@ export async function runManagedProcess(
         env: safeEnvironment(request),
         detached: process.platform !== "win32",
         shell: false,
-        stdio: ["ignore", "pipe", "pipe"],
+        stdio: ["pipe", "pipe", "pipe"],
       });
       if (typeof child.pid === "number") control.heartbeatRun(run.id, child.pid);
+      if (request.stdin) child.stdin?.end(request.stdin, "utf8");
+      else child.stdin?.end();
 
       child.stdout?.on("data", (chunk: unknown) => {
         const appended = appendLimited(stdout, chunk, maximumOutputBytes);
