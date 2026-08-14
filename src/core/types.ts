@@ -90,6 +90,7 @@ export interface SuperIaTask {
   dueDate?: string;
   tags: string[];
   dependencies: string[];
+  blockedByDependencies?: boolean;
   acceptanceCriteria: string[];
   allowedPaths: string[];
   createdAt: string;
