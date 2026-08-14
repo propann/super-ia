@@ -33,6 +33,19 @@ const snapshot = {
       installed: true,
     },
   ],
+  localTools: [
+    {
+      id: "repomix",
+      name: "Repomix",
+      commandCandidates: ["repomix"],
+      category: "context",
+      status: "recommended",
+      lightweight: true,
+      notes: "",
+      installed: true,
+      detectedCommand: "repomix",
+    },
+  ],
   tasks: [],
   config: {
     version: 1,
@@ -53,5 +66,6 @@ test("matrix dashboard exposes real control data", () => {
   assert.match(output, /MATRIX CONTROL/);
   assert.match(output, /app/);
   assert.match(output, /Codex/);
+  assert.match(output, /Repomix/);
   assert.match(output, /VERROUILLÉES/);
 });
