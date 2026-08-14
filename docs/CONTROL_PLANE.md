@@ -1,19 +1,25 @@
 # Plan de contrôle durable
 
-Super IA 0.4 introduit un état global et multi-projets indépendant des terminaux et des dépôts individuels.
+Super IA 0.9 conserve l'état global indépendamment des terminaux et des dépôts individuels.
 
 ## Emplacement
-
-Par défaut :
 
 ```text
 ~/.superia/
 ├── control.sqlite
 ├── events/events.jsonl
-└── backups/
+├── runs/<RUN-ID>/
+│   ├── stdout.log
+│   ├── stderr.log
+│   └── RECEIPT.json
+├── backups/backup-.../
+│   ├── control.sqlite
+│   ├── events.jsonl
+│   └── MANIFEST.json
+└── daemon-status.json
 ```
 
-L'emplacement peut être remplacé sans modifier les dépôts :
+Autre emplacement :
 
 ```bash
 export SUPERIA_HOME=/srv/superia
@@ -21,48 +27,117 @@ export SUPERIA_HOME=/srv/superia
 
 ## SQLite
 
-La base utilise :
+Réglages :
 
-- le mode WAL ;
-- les clés étrangères ;
-- un délai d'attente de 5 secondes en cas de verrou ;
+- WAL ;
+- clés étrangères ;
+- `busy_timeout=5000` ;
 - `synchronous=NORMAL` ;
-- des migrations versionnées.
+- migrations versionnées.
 
-Le schéma initial conserve :
+Données :
 
-- les projets ;
-- les missions importées depuis `.superia/tasks/*.json` ;
-- les runs d'agents ;
-- les heartbeats ;
-- les événements auditables.
+- projets ;
+- missions synchronisées depuis `.superia/tasks/*.json` ;
+- runs et métadonnées ;
+- PID, heartbeats et dates ;
+- événements auditables ;
+- leases d'exécution.
 
-Les fichiers JSON par dépôt restent la représentation lisible et compatible de la v0.3. `superia project sync` les importe ou les met à jour dans le registre global.
+Les JSON par dépôt restent la projection lisible. SQLite coordonne plusieurs projets et processus.
+
+## Runs
+
+Un run peut être :
+
+```text
+queued
+running
+completed
+failed
+cancelled
+interrupted
+```
+
+Le runner enregistre le PID et actualise le heartbeat. Un timeout envoie `SIGTERM`, puis `SIGKILL` au groupe si nécessaire.
+
+```bash
+superia run list
+superia recover --stale-minutes 5
+```
+
+La récupération marque un run inactif `interrupted`. Elle ne relance pas automatiquement un agent.
+
+## Leases
+
+Une exécution d'agent prend un lease :
+
+```text
+agent:<project-id>:<task-id>
+```
+
+Un second worker ne peut pas prendre la mission avant libération ou expiration. Les leases évitent les doubles modifications concurrentes ; les clés d'idempotence métier restent à ajouter.
 
 ## Journal JSONL
 
-Chaque événement SQLite possède un miroir append-only dans :
+Chaque événement SQLite est recopié dans :
 
 ```text
 ~/.superia/events/events.jsonl
 ```
 
-Un événement est d'abord persisté dans SQLite avec l'état `journaled=0`, puis recopié dans le journal. Si l'écriture du fichier échoue, l'événement reste en attente et sera rejoué à la prochaine ouverture du plan de contrôle.
+L'événement est d'abord durable en base avec `journaled=0`. En cas d'échec d'écriture, il reste en attente et sera rejoué à la prochaine ouverture.
 
-## Reprise
+## Artefacts
 
-Un run contient un heartbeat. La commande suivante marque les runs trop anciens comme `interrupted` :
+Chaque processus géré possède :
 
-```bash
-superia recover --stale-minutes 5
+```text
+~/.superia/runs/<RUN-ID>/stdout.log
+~/.superia/runs/<RUN-ID>/stderr.log
 ```
 
-Cette étape ne relance aucun agent toute seule. Elle rétablit un état fiable avant une future décision de reprise ou de réexécution.
+Les contextes d'agents restent près de leur dépôt ou worktree :
 
-## Commandes
+```text
+<repo>/.superia/contexts/CTX-.../
+```
+
+Un receipt peut ensuite relier les deux ensembles.
+
+## Daemon
 
 ```bash
-superia control init
+superia daemon --once
+superia daemon --interval-seconds 30 --stale-minutes 5
+```
+
+À chaque tick :
+
+1. récupération des runs inactifs ;
+2. lecture des projets actifs ;
+3. nouveau scan Git ;
+4. synchronisation des missions ;
+5. événement d'erreur par projet ;
+6. écriture de `daemon-status.json`.
+
+Le daemon ne lance aucun agent IA.
+
+## Sauvegardes
+
+```bash
+superia backup create
+superia backup list
+superia backup verify <dossier>
+```
+
+La base est copiée avec `VACUUM INTO`, puis le journal JSONL est ajouté. Le manifeste contient taille et SHA-256 de chaque fichier.
+
+La restauration automatique et Restic restent à construire.
+
+## Commandes globales
+
+```bash
 superia control status --json
 
 superia project add /chemin/du/depot
@@ -70,28 +145,37 @@ superia project sync /chemin/du/depot
 superia project list
 superia project show <PROJECT-ID>
 
-superia run start codex-cli TASK-0001
 superia run list
-superia run heartbeat <RUN-ID>
-superia run finish <RUN-ID> completed
-
-superia events --limit 50
+superia events --limit 100
 superia recover --stale-minutes 5
+
+superia backup create
+superia daemon --once
+superia matrix
 ```
 
-`superia init`, `superia task create` et la création réelle d'un worktree resynchronisent automatiquement le dépôt courant avec le registre global.
+## Intégration avec les agents
 
-## Limites de ce lot
+Codex et Vibe utilisent le même plan de contrôle :
 
-Le plan de contrôle ne lance pas encore Codex, Mistral Vibe ou un autre agent. Il fournit la persistance et la reprise nécessaires au futur runner générique.
+- synchronisation du projet ;
+- construction du contexte ;
+- acquisition du lease ;
+- création du run ;
+- lancement par le runner ;
+- logs, événements et résultat ;
+- libération du lease ;
+- receipt facultatif mais recommandé.
 
-Les éléments suivants restent à construire :
+Voir [Adaptateurs](AGENT_ADAPTERS.md) et [Receipts](RECEIPTS.md).
 
-- leases et clés d'idempotence ;
-- checkpoints ;
-- graphe de dépendances ;
-- runner de processus ;
-- sandbox ;
-- adaptateurs IA ;
-- receipts de validation ;
-- sauvegarde automatisée.
+## Limites
+
+- test matériel Pi non effectué ;
+- `node:sqlite` encore signalé expérimental sous Node 22 ;
+- pas de checkpoint intermédiaire d'agent ;
+- pas de reprise de session automatique ;
+- pas de DAG ;
+- pas de relation de pipeline explicite entre runs ;
+- pas de serveur web ;
+- pas de restauration automatisée.
