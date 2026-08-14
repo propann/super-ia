@@ -1,16 +1,68 @@
 # Super IA
 
-**Un centre de commandement local, multi-fournisseurs et économique pour coder avec plusieurs IA sans dépendre d'une API d'orchestration payante.**
+**Un centre de commandement local, multi-fournisseurs et économique pour piloter plusieurs agents de développement sans dépendre d'une API d'orchestration payante.**
 
-Super IA détecte les agents disponibles, suit les dépôts et projets, construit un contexte contrôlé, isole les modifications dans Git et conserve les preuves nécessaires à la reprise et à la validation.
+Super IA suit les dépôts, conserve les missions, prépare l'isolation Git et maintient désormais un état global durable pour plusieurs projets.
 
-> État public vérifié : **v0.3.0**, build réussi et 10 tests réussis. Les fonctions SQLite, reprise, contexte sécurisé, exécution d'agents et paquet Pi sont encore dans la roadmap. Voir [État vérifié du projet](docs/STATUS.md).
+## État vérifié — v0.4.0
+
+La CI GitHub valide actuellement :
+
+- compilation TypeScript réussie ;
+- 12 tests réussis, 0 échec ;
+- SQLite en mode WAL ;
+- registre global multi-projets ;
+- import des missions JSON existantes ;
+- runs avec heartbeat ;
+- récupération des runs abandonnés ;
+- journal d'événements SQLite + miroir JSONL ;
+- flux Git `scan → mission → worktree` toujours fonctionnel.
+
+Le détail exact est conservé dans [docs/STATUS.md](docs/STATUS.md).
 
 ## Décision matérielle
 
-Le Raspberry Pi 5 est la **tour de contrôle permanente** : Git, SQLite, missions, contexte, console, tests et sauvegardes. Il ne fait tourner aucun modèle IA dans le MVP. Les programmes Codex, Claude Code, Mistral Vibe, Gemini CLI et autres peuvent s'exécuter sur le Pi tout en utilisant les services officiels de leurs fournisseurs.
+Le Raspberry Pi 5 est la **tour de contrôle permanente** : Git, SQLite, missions, contexte, console, tests et sauvegardes. Aucun modèle IA local n'est requis dans le MVP.
 
-Un Pi 4/5 pourra devenir plus tard un laboratoire séparé pour un petit modèle uniquement si un benchmark prouve son utilité.
+Les CLI Codex, Mistral Vibe, Claude Code, Gemini CLI et autres pourront s'exécuter sur le Pi tout en utilisant les services officiels de leurs fournisseurs. Un Pi 4/5 pourra servir plus tard de laboratoire séparé pour un petit modèle uniquement si un benchmark démontre son utilité.
+
+## Plan de contrôle global
+
+Par défaut :
+
+```text
+~/.superia/
+├── control.sqlite
+├── events/events.jsonl
+└── backups/
+```
+
+Un autre emplacement peut être choisi :
+
+```bash
+export SUPERIA_HOME=/srv/superia
+```
+
+Commandes principales :
+
+```bash
+superia control status --json
+
+superia project add /chemin/du/depot
+superia project sync /chemin/du/depot
+superia project list
+superia project show <PROJECT-ID>
+
+superia run start codex-cli TASK-0001
+superia run list
+superia run heartbeat <RUN-ID>
+superia run finish <RUN-ID> completed
+
+superia events --limit 50
+superia recover --stale-minutes 5
+```
+
+Voir [Plan de contrôle durable](docs/CONTROL_PLANE.md).
 
 ## Console Matrix
 
@@ -31,102 +83,41 @@ La console affiche :
 
 Contrôles : `R` rafraîchit, `Q` quitte.
 
-```bash
-node dist/index.js matrix --once
-```
-
-## Architecture cible
-
-```text
-Raspberry Pi 5 + NVMe
-├── dépôts Git complets et suivi multi-projets
-├── SQLite + journal d'événements
-├── missions, dépendances et checkpoints
-├── constructeur et sauvegarde de contexte
-├── worktrees isolés
-├── gestionnaire de processus et politiques
-├── tests, audits et receipts
-├── console Matrix
-├── sauvegardes chiffrées
-└── adaptateurs vers les agents
-        ├── Codex CLI
-        ├── Claude Code
-        ├── Mistral Vibe
-        ├── Gemini CLI
-        ├── Qwen Code
-        ├── Aider / OpenCode / mini-SWE-agent
-        └── web assisté légitime
-```
-
-## Philosophie
-
-```text
-demande
-   ↓
-analyse du dépôt et des instructions
-   ↓
-spécification + plan + graphe de tâches
-   ↓
-contexte ciblé, scanné et versionné
-   ↓
-choix du fournisseur légitime le moins coûteux
-   ↓
-mission isolée dans un worktree
-   ↓
-code + tests + audit indépendant
-   ↓
-checkpoint + receipt de preuve
-   ↓
-fusion humaine
-```
-
-## Commandes actuelles
+## Commandes du dépôt courant
 
 ```bash
-superia matrix
-superia doctor
-superia providers
-superia local
 superia scan
 superia init
 superia task create "Ajouter une authentification"
 superia task list
 superia task show TASK-0001
 superia worktree TASK-0001
+superia worktree TASK-0001 --dry-run
 ```
 
-`superia local --json` retourne les capacités détectées. `superia worktree TASK-0001 --dry-run` affiche la commande sans modifier Git.
+`superia init`, `task create` et la création réelle d'un worktree resynchronisent automatiquement le dépôt avec le registre global.
 
-## Outils locaux suivis
+## Architecture actuelle
 
-### Cœur recommandé
-
-- Git, ripgrep, jq et SQLite ;
-- Gitleaks pour les secrets ;
-- Restic pour les sauvegardes ;
-- bubblewrap ou Podman pour l'isolation ;
-- Repomix et Tree-sitter pour le contexte ;
-- GitHub CLI lorsque les PR/CI sont utilisées.
-
-### Agents locaux avec modèles distants
-
-- Codex CLI ;
-- Claude Code ;
-- Mistral Vibe ;
-- Gemini CLI ;
-- Qwen Code ;
-- Aider ;
-- OpenCode ;
-- mini-SWE-agent.
-
-### Veille expérimentale hors MVP
-
-- Ollama ;
-- llama.cpp ;
-- LocalAI ;
-- modèles locaux sur Pi.
-
-Ils sont détectables pour la recherche, mais ne sont ni requis ni installés automatiquement.
+```text
+Raspberry Pi 5 + NVMe
+├── dépôts Git et worktrees
+├── SQLite WAL global
+│   ├── projets
+│   ├── missions synchronisées
+│   ├── runs et heartbeats
+│   └── événements
+├── journal JSONL append-only
+├── console Matrix
+├── tests et politiques de coût
+└── futurs adaptateurs agents
+        ├── Codex CLI
+        ├── Mistral Vibe
+        ├── Claude Code
+        ├── Gemini CLI
+        ├── Qwen Code
+        └── agents ouverts et web assisté légitime
+```
 
 ## Principes de sécurité
 
@@ -135,57 +126,39 @@ Ils sont détectables pour la recherche, mais ne sont ni requis ni installés au
 - aucun secret transmis silencieusement ;
 - API payantes désactivées par défaut ;
 - worktrees pour l'isolation Git ;
-- sandbox séparée pour l'isolation système ;
-- approbations par type d'action ;
-- événements et artefacts auditables ;
-- arrêt d'urgence et reprise après coupure.
+- sandbox séparée prévue pour l'isolation système ;
+- événements auditables ;
+- récupération explicite après interruption.
 
-## État actuel — v0.3
+## Limites actuelles
 
-- catalogue et diagnostic multi-fournisseurs ;
-- registre des outils locaux ;
-- configuration avec API désactivées ;
-- scanner Git et commandes de validation ;
-- missions `TASK-XXXX` ;
-- branches et worktrees ;
-- console Matrix ;
-- tests du flux `scan → mission → worktree` ;
-- étude détaillée des concurrents, agents, protocoles et mémoire ;
-- architecture Pi control-plane-only ;
-- catalogue de recherche machine-lisible.
+Super IA ne lance pas encore réellement Codex, Mistral ou un autre agent. Le plan de contrôle est prêt, mais les éléments suivants restent à construire :
 
-Le détail de ce qui est livré, testé, conçu ou encore absent est maintenu dans [docs/STATUS.md](docs/STATUS.md).
-
-## Recherche concurrentielle
-
-Super IA est comparé notamment à :
-
-- Shep ;
-- Mozzie ;
-- Agetor ;
-- Agent of Empires ;
-- Claude Squad ;
-- Squad ;
-- The Pair ;
-- Mission Control ;
-- OpenHands Agent Canvas ;
-- Agent Orchestrator.
-
-Le projet récupère les mécanismes éprouvés sans recopier leur lourdeur : SQLite, worktrees, DAG, ACP, reprise, revue indépendante, receipts et sécurité.
+- runner de processus et arrêt des descendants ;
+- contexte Git ciblé et scan Gitleaks ;
+- leases, idempotence et checkpoints ;
+- adaptateurs IA non interactifs ;
+- routeur coût/capacité/qualité ;
+- reviewer indépendant et receipts ;
+- sauvegarde automatisée et service systemd pour le Pi.
 
 ## Développement
 
 ```bash
 npm install
 npm test
+npm run control
 npm run matrix
 ```
+
+Node.js 22.5 ou supérieur est requis pour `node:sqlite`.
 
 ## Documentation
 
 ### Projet
 
 - [État vérifié](docs/STATUS.md)
+- [Plan de contrôle durable](docs/CONTROL_PLANE.md)
 - [Vision](docs/PROJECT_VISION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Fournisseurs](docs/PROVIDERS.md)
