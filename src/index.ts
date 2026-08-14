@@ -3,7 +3,8 @@ import { handleAgentCommand } from "./agents/cli.js";
 import { initializeProject } from "./core/config.js";
 import { inspectLocalTools, inspectProviders } from "./core/doctor.js";
 import { scanRepository } from "./core/repository-scanner.js";
-import { createTask, getTask, listTasks } from "./core/task-store.js";
+import { handleTaskCommand } from "./core/task-cli.js";
+import { getTask } from "./core/task-store.js";
 import { createWorktree } from "./core/worktree-manager.js";
 import { handleControlCommand } from "./control/cli.js";
 import { handleOperationsCommand } from "./control/operations-cli.js";
@@ -12,11 +13,12 @@ import { handleContextCommand } from "./context/cli.js";
 import { providerCatalog } from "./providers/catalog.js";
 import { handleReceiptCommand } from "./quality/cli.js";
 import { handleRuntimeCommand } from "./runtime/cli.js";
+import { handleSecurityCommand } from "./security/cli.js";
 import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.9.0
+  console.log(`Super IA v0.10.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
@@ -32,11 +34,20 @@ Usage:
   superia project show <PROJECT-ID> [--json]    Affiche projet, missions et runs
 
   superia task create <objectif>                Crée une mission
-  superia task list [--json]                    Liste les missions du dépôt
-  superia task show <TASK-ID> [--json]          Affiche une mission
+  superia task list [--json]                    Liste les missions
+  superia task show <TASK-ID> [--json]          Affiche une mission détaillée
+  superia task board [--json]                   Tableau de suivi et progression
+  superia task note <TASK-ID> <texte>           Ajoute une note horodatée
+  superia task update <TASK-ID> [options]       Met à jour le pilotage
+      --status planned|ready|running|blocked|review|done|failed|cancelled
+      --priority low|normal|high|critical
+      --owner <nom> --provider <id> --due YYYY-MM-DD
+      --tag <tag> --depends TASK-XXXX --accept <critère>
   superia worktree <TASK-ID> [--dry-run]        Crée son worktree
 
   superia context build [TASK-ID] [options]     Crée un contexte Git vérifiable
+  superia security scan [options]               Lance Gitleaks si disponible
+      --required --mode dir|git --timeout-minutes 5
   superia validate [--timeout-minutes 15]       Exécute les checks dans le runner
 
   superia agent run codex <TASK-ID> [options]   Lance Codex contrôlé
@@ -66,12 +77,12 @@ Principes:
   - mode agent par défaut : plan en lecture seule
   - mode build uniquement dans un worktree existant
   - une seule exécution possède une mission grâce aux leases
+  - suivi explicite des blocages, dépendances et critères d'acceptation
   - Codex conserve sa sandbox ; Vibe n'obtient aucun shell
-  - plafonds de prix, tokens et tours pour Vibe
+  - Gitleaks externe optionnel, obligatoire avec --required
   - receipts SHA-256 sans jamais supprimer l'approbation humaine
   - aucune fusion automatique
   - API génériques désactivées par défaut
-  - aucun fichier sensible dans un paquet de contexte
   - aucun shell implicite dans le runner
   - daemon et service Pi sans privilèges root
   - état global durable dans SUPERIA_HOME ou ~/.superia
@@ -118,7 +129,9 @@ async function main(): Promise<void> {
 
   if (await handleOperationsCommand(command, args, json)) return;
   if (await handleControlCommand(command, args, json, process.cwd())) return;
+  if (await handleTaskCommand(command, args, json, process.cwd())) return;
   if (await handleContextCommand(command, args, json, process.cwd())) return;
+  if (await handleSecurityCommand(command, args, json, process.cwd())) return;
   if (await handleRuntimeCommand(command, args, json, process.cwd())) return;
   if (await handleAgentCommand(command, args, json, process.cwd())) return;
   if (await handleReceiptCommand(command, args, json)) return;
@@ -189,34 +202,6 @@ async function main(): Promise<void> {
     console.log(result.created ? `Configuration créée : ${result.path}` : `Configuration déjà présente : ${result.path}`);
     console.log(`Projet enregistré : ${control.project.id} (${control.tasksSynced} mission(s) synchronisée(s))`);
     return;
-  }
-
-  if (command === "task") {
-    const [action, ...taskArgs] = args.filter((arg) => arg !== "--json");
-    const scan = await scanRepository(process.cwd());
-    if (action === "create") {
-      const task = await createTask(scan, taskArgs.join(" "));
-      await syncRepositoryToGlobalControl(scan.root);
-      console.log(json ? JSON.stringify(task, null, 2) : `${task.id} créée sur ${task.branchName}`);
-      return;
-    }
-    if (action === "list") {
-      const tasks = await listTasks(scan.root);
-      if (json) console.log(JSON.stringify(tasks, null, 2));
-      else if (!tasks.length) console.log("Aucune mission.");
-      else for (const task of tasks) console.log(`${task.id.padEnd(10)} ${task.status.padEnd(10)} ${task.title}`);
-      return;
-    }
-    if (action === "show") {
-      const task = await getTask(scan.root, taskArgs[0] ?? "");
-      console.log(
-        json
-          ? JSON.stringify(task, null, 2)
-          : `${task.id} — ${task.title}\nStatut : ${task.status}\nBranche : ${task.branchName}\nWorktree : ${task.worktreePath ?? "non créé"}\nChecks : ${task.checks.join(" ; ") || "aucun"}`,
-      );
-      return;
-    }
-    throw new Error("Usage : superia task create|list|show");
   }
 
   if (command === "worktree") {
