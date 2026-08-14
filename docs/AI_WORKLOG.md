@@ -71,18 +71,14 @@ Validation : 20 tests, scripts shell valides et contrôle anti-`sudo`.
 
 ## V0.8 — Mistral Vibe
 
-- étude du code officiel de la CLI ;
-- mode programmatique forcé par `--prompt ""` ;
-- vrai contexte transmis par stdin ;
+- mode programmatique forcé ;
+- contexte transmis par stdin ;
 - plan/review via `plan` ;
 - build via `accept-edits` ;
 - shell désactivé ;
 - outils de fichiers limités ;
 - budgets de prix, tokens et tours ;
-- modèle transmis via `VIBE_ACTIVE_MODEL` ;
 - test de bout en bout avec faux Vibe sans coût.
-
-Une erreur TypeScript de réduction d'union a été détectée par la CI puis corrigée avant publication du statut.
 
 Validation : 21 tests réussis.
 
@@ -93,22 +89,85 @@ Validation : 21 tests réussis.
 - SHA-256 du receipt et de chaque artefact ;
 - vérification ultérieure ;
 - test de falsification d'un log ;
-- verdict distinguant agent, contexte, artefacts et validations ;
 - approbation humaine toujours obligatoire.
+
+Validation : 22 tests réussis.
+
+## V0.10 et v0.11 — suivi et Gitleaks
+
+- priorité, responsable, échéance, tags, dépendances et critères d'acceptation ;
+- tableau `superia task board` ;
+- roadmap JSON contrôlée par la CI ;
+- Gitleaks intégré puis rendu obligatoire avant Codex/Vibe ;
+- absence, finding ou erreur bloquants ;
+- dérogation explicite et journalisée.
+
+Validation : 26 tests réussis.
+
+## V0.12 — sandbox Bubblewrap
+
+- HOME jetable ;
+- système en lecture seule ;
+- worktree monté selon le mode ;
+- état fournisseur limité ;
+- namespaces et capacités réduites ;
+- autotest et rapport Pi ;
+- dérogation explicite et journalisée.
+
+La politique est validée en CI. La frontière noyau réelle reste à vérifier sur le Raspberry Pi cible.
+
+## V0.13 — contrôle des modifications
+
+- chemins autorisés par mission ;
+- build refusé sans périmètre ;
+- snapshot Git avant/après ;
+- patch et rapport archivés ;
+- run marqué `failed` en cas de modification hors périmètre ;
+- correction du parseur Git vers porcelain v2 après détection CI.
+
+Validation intermédiaire : 30 puis 32 tests réussis.
+
+## 15 août 2026 — reviewer indépendant
+
+- builder et reviewer obligatoirement différents ;
+- mode review strictement en lecture seule ;
+- schéma JSON obligatoire ;
+- findings structurés par sévérité, preuve et recommandation ;
+- réponse non structurée transformée en `blocked` ;
+- `approve` avec finding moyen ou supérieur transformé en `changes-requested` ;
+- rapport durable `REVIEW.json`.
+
+## Pipeline multi-agent contrôlé
+
+- ordre déterministe builder → garde Git → validations → reviewer → receipt ;
+- reviewer non lancé si une étape précédente échoue ;
+- validations liées à la mission ;
+- receipt enrichi avec `CHANGE_GUARD.json`, patch et review ;
+- aucune fusion automatique.
+
+## Checkpoints et reprise
+
+- état atomique `.superia/pipelines/TASK-XXXX.json` ;
+- étapes `initialized`, `builder-completed`, `validation-completed`, `review-completed`, `receipt-created` ;
+- commande `superia pipeline status` ;
+- option `--resume` ;
+- reprise après builder sans relancer le builder ;
+- reprise après review en ne recréant que le receipt ;
+- reprise refusée sans checkpoint builder complet.
 
 Validation GitHub :
 
 - Ubuntu 24.04 ;
 - Node 22.23.2 ;
 - npm 10.9.8 ;
-- 22 tests réussis, 0 échec ;
+- **39 tests réussis, 0 échec** ;
 - 0 vulnérabilité npm signalée ;
 - scripts Pi valides ;
 - aucune commande `sudo` dans `install/pi`.
 
 ## État honnête des adaptateurs
 
-Codex et Vibe sont validés par de faux exécutables locaux reproduisant leur transport programmatique. Cela prouve la plomberie Super IA, pas encore :
+Codex et Vibe sont validés par de faux exécutables ou des runners simulés reproduisant leur transport programmatique. Cela prouve la plomberie Super IA, pas encore :
 
 - l'authentification réelle ;
 - la disponibilité du compte ;
@@ -118,12 +177,11 @@ Codex et Vibe sont validés par de faux exécutables locaux reproduisant leur tr
 
 ## Prochaine phase
 
-1. installation sur le Pi 5 ;
-2. test du service, de la coupure et de la sauvegarde/restauration ;
-3. authentification officielle Codex/Vibe ;
-4. benchmark identique en mode plan ;
-5. Gitleaks ;
-6. reviewer indépendant ;
-7. pipeline builder → validation → review → receipt ;
-8. Restic ;
-9. routeur coût/qualité.
+1. budget maximal de retries et détection de boucle ;
+2. installation sur le Pi 5 ;
+3. test du service, de la coupure et de la sauvegarde/restauration ;
+4. authentification officielle Codex/Vibe ;
+5. benchmark identique ;
+6. Restic ;
+7. routeur coût/qualité ;
+8. DAG de missions.
