@@ -5,125 +5,150 @@
 - [x] CLI TypeScript ;
 - [x] catalogue multi-fournisseurs ;
 - [x] diagnostic des outils ;
-- [x] configuration locale avec API désactivées ;
+- [x] configuration avec API désactivées ;
 - [x] scanner Git ;
 - [x] missions `TASK-XXXX` ;
 - [x] branches et worktrees ;
 - [x] console Matrix.
 
-## V0.1.5 — recherche approfondie
-
-- [x] rôles des principales IA de code ;
-- [x] concurrents directs et agents ouverts ;
-- [x] comparaison ACP, MCP, A2A, JSONL, tmux et SQLite ;
-- [x] architecture Pi 5 control-plane-only ;
-- [x] mémoire Git + SQLite + JSONL + artefacts ;
-- [x] pipeline multi-agent déterministe ;
-- [x] protocole de benchmark ;
-- [x] catalogue de veille machine-lisible.
-
 ## V0.2 — état fiable et multi-projets
 
-- [x] répertoire global `SUPERIA_HOME` ;
-- [x] SQLite en WAL ;
-- [x] première migration de schéma ;
-- [x] registre global multi-projets ;
-- [x] import/synchronisation des missions JSON ;
-- [x] table des runs ;
-- [x] heartbeats ;
-- [x] journal d'événements SQLite ;
-- [x] miroir JSONL append-only ;
+- [x] `SUPERIA_HOME` global ;
+- [x] SQLite WAL et migration initiale ;
+- [x] registre multi-projets ;
+- [x] synchronisation des missions JSON ;
+- [x] runs et heartbeats ;
+- [x] journal SQLite + JSONL ;
 - [x] récupération des runs abandonnés ;
-- [ ] leases et clés d'idempotence ;
-- [ ] checkpoints ;
-- [ ] graphe de dépendances ;
+- [x] leases exclusifs et expiration ;
+- [ ] clés d'idempotence explicites ;
+- [ ] checkpoints de mission ;
+- [ ] DAG de dépendances ;
 - [ ] test d'arrêt brutal sur le Pi réel.
 
 ## V0.3 — contexte sécurisé
 
-- [ ] constructeur de contexte Git ciblé ;
-- [ ] support hiérarchique de `AGENTS.md` ;
-- [ ] recherche ripgrep ;
-- [ ] manifeste avec hashes et raisons par fichier ;
-- [ ] budget de tokens ;
-- [ ] scan Gitleaks ;
+- [x] sélection Git ciblée ;
+- [x] instructions et manifests prioritaires ;
+- [x] recherche par mots-clés via Git ;
+- [x] fichiers modifiés et références explicites ;
+- [x] manifeste avec SHA-256 et raisons ;
+- [x] budget de taille ;
+- [x] scanner interne de chemins/secrets ;
+- [x] paquet `MISSION.md` / `CONTEXT.md` / `MANIFEST.json` ;
+- [ ] support hiérarchique complet de plusieurs `AGENTS.md` ;
+- [ ] Gitleaks externe ;
+- [ ] budget de tokens par tokenizer ;
 - [ ] Repomix optionnel ;
-- [ ] index Tree-sitter/symboles optionnel.
+- [ ] index Tree-sitter/symboles.
 
-## V0.4 — exécution agent réelle
+## V0.4 — runner
 
-- [ ] runner de groupes de processus ;
-- [ ] timeout et arrêt des descendants ;
-- [ ] environnement temporaire ;
-- [ ] adaptateur Generic CLI ;
-- [ ] adaptateur Codex CLI ;
-- [ ] adaptateur Mistral Vibe ;
+- [x] processus sans shell implicite ;
+- [x] environnement réduit ;
+- [x] dossier limité au projet/worktree ;
+- [x] stdin contrôlé ;
+- [x] logs persistants ;
+- [x] timeout ;
+- [x] arrêt du groupe de processus ;
+- [x] heartbeats ;
+- [x] validation des checks du dépôt ;
+- [ ] HOME temporaire par run ;
+- [ ] sandbox bubblewrap ;
+- [ ] Podman optionnel ;
+- [ ] réseau désactivé par défaut pour agents génériques.
+
+## V0.5 — agents
+
+- [x] contrat d'adaptateur ;
+- [x] adaptateur Codex CLI ;
+- [x] Codex JSONL et dernière réponse ;
+- [x] sandbox Codex conservée ;
+- [x] adaptateur Mistral Vibe ;
+- [x] Vibe programmatique par stdin ;
+- [x] Vibe sans shell ;
+- [x] plafonds prix/tokens/tours ;
+- [x] faux exécutables de test sans quota ;
+- [ ] mission réelle Codex sur Pi ;
+- [ ] mission réelle Vibe sur Pi ;
+- [ ] reprise de session native ;
 - [ ] adaptateur Claude Code ;
 - [ ] adaptateur Gemini CLI ;
-- [ ] sorties JSON/JSONL normalisées ;
-- [ ] capture versions, modèles, usages et coûts ;
-- [ ] archivage propre des worktrees.
+- [ ] adaptateur Generic CLI ;
+- [ ] Qwen Code ;
+- [ ] OpenCode, Aider et mini-SWE-agent.
 
-## V0.5 — sécurité et qualité
+## V0.6 — preuve et qualité
 
-- [ ] politiques de permissions ;
-- [ ] bubblewrap sur Linux ;
-- [ ] Podman optionnel ;
-- [ ] réseau désactivé par défaut en sandbox ;
-- [ ] validation format/lint/typecheck/test/build ;
-- [ ] contrôle des fichiers autorisés ;
+- [x] artefacts par run ;
+- [x] événements normalisés ;
+- [x] receipt SHA-256 ;
+- [x] vérification des artefacts ;
+- [x] détection de falsification ;
+- [x] état de validation structuré ;
+- [x] approbation humaine obligatoire ;
+- [ ] fingerprint renforcé des fichiers non suivis ;
+- [ ] signature d'identité optionnelle ;
 - [ ] reviewer indépendant ;
-- [ ] budgets de retries ;
 - [ ] findings structurés ;
-- [ ] receipt de fin de mission ;
-- [ ] aucune fusion automatique.
-
-## V0.6 — orchestration multi-agent
-
-- [ ] DAG de missions avec détection de cycles ;
-- [ ] claim/ack/complete/requeue atomiques ;
-- [ ] tâches débloquées automatiquement ;
-- [ ] détection des chevauchements de fichiers ;
-- [ ] rôles planner/builder/reviewer/researcher ;
-- [ ] routeur coût/capacité/qualité mesurée ;
-- [ ] audit croisé ;
-- [ ] comparaison de plans ;
-- [ ] arrêt d'urgence ;
-- [ ] reprise automatique contrôlée.
+- [ ] relation explicite builder/validator/reviewer ;
+- [ ] budgets de retries ;
+- [ ] contrôle des chemins modifiés autorisés.
 
 ## V0.7 — exploitation Raspberry Pi
 
-- [ ] sauvegarde SQLite cohérente ;
-- [ ] sauvegarde Restic ;
+- [x] sauvegarde SQLite cohérente ;
+- [x] manifeste SHA-256 ;
+- [x] détection de corruption ;
+- [x] daemon de synchronisation/récupération ;
+- [x] console Matrix globale ;
+- [x] service systemd utilisateur ;
+- [x] installateur sans `sudo` ;
+- [x] durcissement systemd ;
+- [x] première sauvegarde créée et vérifiée par l'installateur ;
+- [ ] installation sur le Pi 5 réel ;
+- [ ] test d'arrêt brutal ;
 - [ ] test de restauration ;
-- [ ] service systemd non privilégié ;
-- [ ] installateur ARM64 ;
+- [ ] Restic ;
 - [ ] rapport matériel réel ;
-- [ ] tableau de santé local ;
-- [ ] accès distant via VPN/Tailscale ;
+- [ ] interface web locale ;
+- [ ] accès VPN/Tailscale ;
 - [ ] notifications.
 
-## V0.8 — écosystème large
+## V0.8 — orchestration multi-agent
 
-- [ ] Qwen Code ;
-- [ ] GitHub Copilot CLI ;
-- [ ] OpenCode, Aider et mini-SWE-agent ;
+- [ ] rôles planner/builder/reviewer/researcher dans un pipeline ;
+- [ ] DAG avec détection de cycles ;
+- [ ] claim/ack/complete/requeue atomiques ;
+- [ ] tâches débloquées automatiquement ;
+- [ ] détection des conflits de fichiers ;
+- [ ] comparaison de plans ;
+- [ ] audit croisé Codex/Vibe ;
+- [ ] routeur coût/capacité/qualité mesurée ;
+- [ ] arrêt d'urgence global ;
+- [ ] reprise automatique contrôlée.
+
+## V0.9 — écosystème large
+
 - [ ] web assisté légitime ;
-- [ ] import et validation de patches ;
+- [ ] import et validation de patches web ;
+- [ ] GitHub Copilot CLI ;
 - [ ] workers distants ;
-- [ ] A2A uniquement si nécessaire.
+- [ ] MCP lecture seule ;
+- [ ] ACP quand stable et utile ;
+- [ ] A2A uniquement pour workers distants.
 
 ## Laboratoire futur séparé
 
-- [ ] mesurer une fonction locale précise sur Pi 4/5 ;
+- [ ] définir une petite fonction locale précise ;
 - [ ] comparer règle déterministe, service distant et petit modèle local ;
-- [ ] n'installer Ollama/llama.cpp que si le bénéfice est démontré ;
-- [ ] aucun impact fonctionnel si le laboratoire est arrêté.
+- [ ] utiliser Pi 4/5 uniquement si le benchmark est favorable ;
+- [ ] aucun impact si le laboratoire est arrêté.
 
 ## Hors périmètre par défaut
 
 - Kubernetes ;
-- Redis ou PostgreSQL pour le MVP ;
+- Redis ou PostgreSQL dans le MVP ;
 - modèle local obligatoire ;
 - base vectorielle obligatoire ;
 - fusion automatique ;
