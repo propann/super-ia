@@ -1,59 +1,37 @@
 # Super IA
 
-**Un centre de commandement local, multi-projets et multi-fournisseurs pour piloter des agents de développement avec contrôle des coûts, reprise, suivi et preuves.**
+**Centre de commandement local, multi-projets et multi-fournisseurs pour piloter des agents de développement avec contrôle des coûts, sécurité, reprise, suivi et preuves.**
 
-Super IA garde Git, les missions, les contextes, les runs, les logs et les sauvegardes sous contrôle local. Le Raspberry Pi 5 sert de tour de contrôle permanente ; aucun modèle IA local n'est requis.
+Le Raspberry Pi 5 sert de tour de contrôle permanente. Les modèles restent chez leurs fournisseurs officiels ; aucun modèle IA local n'est requis.
 
-## État vérifié — v0.10.0
+## État vérifié — v0.11.0
 
-La dernière CI GitHub valide :
+La CI GitHub valide actuellement :
 
 - Ubuntu 24.04 ;
 - Node.js 22.23.2 et npm 10.9.8 ;
 - compilation TypeScript réussie ;
-- **25 tests réussis, 0 échec** ;
-- 0 vulnérabilité signalée par l'audit npm du job ;
-- syntaxe des scripts Pi valide ;
+- **26 tests réussis, 0 échec** ;
+- 0 vulnérabilité npm signalée ;
+- scripts Pi valides ;
 - aucune commande `sudo` dans le paquet Pi.
 
-Fonctions couvertes :
+Fonctions principales :
 
-- SQLite WAL, projets, missions, runs, événements et reprise ;
-- contextes Git ciblés avec SHA-256 et première barrière anti-secrets ;
-- runner avec logs, heartbeat, timeout et arrêt du groupe de processus ;
-- leases anti-double-lancement ;
-- adaptateurs Codex et Mistral Vibe simulés de bout en bout ;
-- sauvegarde cohérente et détection de corruption ;
-- daemon et console Matrix globale ;
-- receipts vérifiables et détection de falsification ;
-- suivi enrichi des tâches et dépendances ;
-- registre de roadmap validé par la CI ;
-- intégration Gitleaks avec rapport JSON expurgé.
+- SQLite WAL multi-projets ;
+- missions, priorités, blocages, dépendances et tableau de suivi ;
+- Git branches et worktrees ;
+- contexte ciblé avec SHA-256 ;
+- runner avec logs, heartbeat, timeout et arrêt des descendants ;
+- adaptateurs Codex et Mistral Vibe ;
+- **Gitleaks obligatoire avant tout run réel Codex/Vibe** ;
+- receipts vérifiables ;
+- sauvegardes cohérentes ;
+- daemon et service systemd utilisateur ;
+- console Matrix globale ;
+- roadmap machine-lisible contrôlée par la CI.
 
-Les tests d'adaptateurs utilisent des faux exécutables locaux et ne consomment aucun quota. L'authentification et une mission réelle avec Codex/Vibe doivent encore être validées sur le Pi.
-
-Voir [l'état vérifié détaillé](docs/STATUS.md).
-
-## Architecture
-
-```text
-Raspberry Pi 5 + NVMe
-├── dépôts Git et worktrees
-├── ~/.superia/
-│   ├── control.sqlite          SQLite WAL
-│   ├── events/events.jsonl     journal append-only
-│   ├── runs/<RUN-ID>/          logs et receipts
-│   ├── security/               rapports Gitleaks
-│   ├── backups/                snapshots vérifiables
-│   └── daemon-status.json
-├── console Matrix multi-projets
-├── suivi de missions et roadmap
-├── contexte Git ciblé + SHA-256
-├── runner de processus contrôlé
-├── Codex CLI
-├── Mistral Vibe CLI
-└── futurs adaptateurs
-```
+Voir [l'état vérifié](docs/STATUS.md).
 
 ## Installation de développement
 
@@ -66,7 +44,7 @@ npm test
 npm link
 ```
 
-Node.js **22.5 ou supérieur** est requis pour `node:sqlite`.
+Node.js **22.5 ou supérieur** est requis.
 
 ## Installation Raspberry Pi
 
@@ -74,15 +52,14 @@ Node.js **22.5 ou supérieur** est requis pour `node:sqlite`.
 bash install/pi/install.sh
 ```
 
-L'installateur utilisateur compile, teste, initialise `~/.superia`, installe la commande, crée un service systemd utilisateur durci et vérifie la première sauvegarde. Il n'utilise pas `sudo` et n'installe aucun modèle local.
-
-Voir [Installation Raspberry Pi](docs/PI_INSTALL.md).
+L'installateur compile, teste, initialise `~/.superia`, installe `superia`, crée un service systemd utilisateur durci et vérifie la première sauvegarde. Il n'utilise pas `sudo`.
 
 ## Flux principal
 
 ```bash
 superia init
 superia task create "Ajouter une authentification locale"
+
 superia task update TASK-0001 \
   --priority high \
   --owner max \
@@ -94,27 +71,40 @@ superia task update TASK-0001 \
 superia task board
 superia worktree TASK-0001
 superia context build TASK-0001 --max-bytes 300000
-superia security scan --required
-superia agent run codex TASK-0001 --mode plan --dry-run
+superia agent run codex TASK-0001 --mode plan
 superia validate
 superia receipt create <RUN-ID>
 ```
 
+## Préflight de sécurité
+
+Chaque run réel Codex ou Vibe déclenche automatiquement Gitleaks :
+
+```text
+Gitleaks absent  → agent refusé
+finding détecté  → agent refusé
+scan propre      → agent autorisé
+```
+
+Le rapport, les logs et le run Gitleaks sont conservés. L'état du préflight apparaît dans le résultat de l'agent.
+
+Une dérogation exceptionnelle doit être explicite :
+
+```bash
+superia agent run codex TASK-0001 \
+  --mode plan \
+  --allow-without-gitleaks
+```
+
+Cette dérogation produit l'état `waived` et un événement durable `security.preflight.waived`.
+
+Le mode `--dry-run` ne lance ni fournisseur distant ni Gitleaks :
+
+```bash
+superia agent run codex TASK-0001 --mode plan --dry-run
+```
+
 ## Suivi des tâches
-
-Une mission peut maintenant conserver :
-
-- un statut, dont `blocked` ;
-- une priorité ;
-- un responsable ;
-- un fournisseur ;
-- une échéance ;
-- des tags ;
-- des dépendances ;
-- des critères d'acceptation ;
-- des notes horodatées.
-
-Commandes principales :
 
 ```bash
 superia task list
@@ -125,92 +115,86 @@ superia task update TASK-0001 --status blocked --priority critical
 superia task update TASK-0002 --depends TASK-0001
 ```
 
-La feuille de route possède une source machine-lisible contrôlée par la CI :
+Une mission conserve statut, priorité, responsable, fournisseur, échéance, tags, dépendances, critères d'acceptation et notes.
+
+Documentation de pilotage :
 
 - [Feuille de route](docs/ROADMAP.md)
 - [Registre JSON](docs/ROADMAP_TRACKER.json)
 - [Suivi opérationnel](docs/TASK_TRACKER.md)
-
-## Sécurité Gitleaks
-
-```bash
-superia doctor
-superia security scan
-superia security scan --required
-superia security scan --mode git --required
-```
-
-Le scan :
-
-- utilise Gitleaks lorsqu'il est installé ;
-- produit un rapport JSON expurgé ;
-- conserve le run et les logs ;
-- passe en mode bloquant avec `--required` ;
-- échoue lorsqu'un finding est détecté.
-
-L'étape suivante consiste à rendre ce préflight obligatoire avant tout envoi distant.
 
 ## Agents
 
 ### Codex
 
 - plan/review en sandbox `read-only` ;
-- build en `workspace-write` seulement dans un worktree ;
-- prompt transmis par stdin ;
+- build en `workspace-write` uniquement dans un worktree ;
+- prompt par stdin ;
 - sortie JSONL ;
-- options de contournement de sandbox interdites.
+- contournement de sandbox interdit.
 
 ### Mistral Vibe
 
 - plan/review avec le profil `plan` ;
 - build avec `accept-edits` ;
-- aucun shell accordé à Vibe ;
+- aucun shell ;
 - prix, tokens et tours plafonnés ;
-- prompt transmis par stdin et absent d'`argv`.
+- prompt absent d'`argv`.
 
-Voir [Adaptateurs d'agents](docs/AGENT_ADAPTERS.md).
-
-## Contrôle multi-projets
+## Contrôle global
 
 ```bash
 superia control status --json
 superia project add /chemin/du/depot
-superia project sync /chemin/du/depot
 superia project list
-superia project show <PROJECT-ID>
 superia run list
 superia events --limit 100
-superia recover --stale-minutes 5
 superia daemon --once
 superia matrix
+```
+
+Données principales :
+
+```text
+~/.superia/
+├── control.sqlite
+├── events/events.jsonl
+├── runs/
+├── security/
+├── backups/
+└── daemon-status.json
 ```
 
 ## Sauvegardes et receipts
 
 ```bash
 superia backup create
-superia backup list
 superia backup verify ~/.superia/backups/backup-YYYYMMDDHHMMSS
 
 superia receipt create <RUN-ID>
 superia receipt verify ~/.superia/runs/<RUN-ID>/RECEIPT.json
 ```
 
-Une sauvegarde contient une image SQLite cohérente, le journal JSONL et un manifeste SHA-256. Un receipt rassemble le run, les commits, le contexte, les logs, les validations et les artefacts. L'approbation humaine reste obligatoire.
+L'approbation humaine reste obligatoire. Super IA ne fusionne jamais automatiquement.
+
+## Prochaines priorités
+
+1. Bubblewrap, HOME temporaire et contrôle réseau ;
+2. contrôle des fichiers modifiés après chaque agent ;
+3. installation et tests de reprise/restauration sur le Pi 5 ;
+4. tests réels Codex et Vibe ;
+5. reviewer indépendant et pipeline complet ;
+6. Restic ;
+7. routeur coût/qualité mesuré.
 
 ## Limites actuelles
 
-- pas encore de test réel sur le Raspberry Pi 5 ;
-- pas encore de mission réelle authentifiée Codex/Vibe dans cette CI ;
-- `node:sqlite` affiche encore un avertissement expérimental sous Node 22 ;
-- Gitleaks intégré, mais pas encore imposé automatiquement avant chaque agent ;
-- pas encore de sandbox Bubblewrap/Podman commune ;
-- pas encore de contrôle post-run des chemins modifiés ;
-- pas encore de reviewer indépendant ni pipeline multi-agent complet ;
-- pas encore de DAG ni routeur coût/qualité ;
-- sauvegardes locales vérifiées, mais restauration et Restic à ajouter ;
-- aucune interface web locale pour l'instant ;
-- aucune fusion automatique.
+- installation matérielle Pi non encore validée ;
+- fournisseurs réels non encore testés dans ce dépôt ;
+- sandbox commune Bubblewrap/Podman manquante ;
+- contrôle post-run des chemins modifiés manquant ;
+- reviewer, DAG, routeur et interface web non livrés ;
+- restauration automatisée et Restic non livrés.
 
 ## Documentation
 
@@ -218,11 +202,10 @@ Une sauvegarde contient une image SQLite cohérente, le journal JSONL et un mani
 - [Feuille de route](docs/ROADMAP.md)
 - [Suivi des tâches](docs/TASK_TRACKER.md)
 - [Plan de contrôle](docs/CONTROL_PLANE.md)
-- [Adaptateurs Codex et Vibe](docs/AGENT_ADAPTERS.md)
+- [Adaptateurs](docs/AGENT_ADAPTERS.md)
 - [Receipts](docs/RECEIPTS.md)
 - [Installation Pi](docs/PI_INSTALL.md)
 - [Sécurité](docs/SECURITY.md)
-- [Recherche approfondie](docs/research/README.md)
 
 ## Licence
 
