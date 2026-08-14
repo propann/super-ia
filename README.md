@@ -4,6 +4,8 @@
 
 Super IA détecte les agents disponibles, suit les dépôts et projets, construit un contexte contrôlé, isole les modifications dans Git et conserve les preuves nécessaires à la reprise et à la validation.
 
+> État public vérifié : **v0.3.0**, build réussi et 10 tests réussis. Les fonctions SQLite, reprise, contexte sécurisé, exécution d'agents et paquet Pi sont encore dans la roadmap. Voir [État vérifié du projet](docs/STATUS.md).
+
 ## Décision matérielle
 
 Le Raspberry Pi 5 est la **tour de contrôle permanente** : Git, SQLite, missions, contexte, console, tests et sauvegardes. Il ne fait tourner aucun modèle IA dans le MVP. Les programmes Codex, Claude Code, Mistral Vibe, Gemini CLI et autres peuvent s'exécuter sur le Pi tout en utilisant les services officiels de leurs fournisseurs.
@@ -152,6 +154,8 @@ Ils sont détectables pour la recherche, mais ne sont ni requis ni installés au
 - architecture Pi control-plane-only ;
 - catalogue de recherche machine-lisible.
 
+Le détail de ce qui est livré, testé, conçu ou encore absent est maintenu dans [docs/STATUS.md](docs/STATUS.md).
+
 ## Recherche concurrentielle
 
 Super IA est comparé notamment à :
@@ -181,6 +185,7 @@ npm run matrix
 
 ### Projet
 
+- [État vérifié](docs/STATUS.md)
 - [Vision](docs/PROJECT_VISION.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Fournisseurs](docs/PROVIDERS.md)
