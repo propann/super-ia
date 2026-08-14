@@ -6,58 +6,57 @@ Super IA sépare trois choses :
 
 1. l'installation d'un outil ;
 2. la description d'une connexion ;
-3. le secret ou la session qui autorise réellement cette connexion.
+3. le secret, la session ou l'identité cloud qui autorise réellement cette connexion.
 
-Le fichier de connexion ne contient jamais de clé.
+Le fichier de connexion ne contient jamais de clé :
 
 ```text
 ~/.superia/connections.json
 ```
 
-Permissions : `0600`.
-
-Il stocke uniquement :
+Il est créé avec les permissions `0600` et stocke uniquement :
 
 - identifiant et libellé ;
 - type de transport ;
-- commande ou URL ;
-- nom des variables d'environnement attendues ;
-- état activé/désactivé ;
+- commande, hôte ou URL ;
+- noms des variables d'environnement attendues ;
+- état activé ou désactivé ;
 - notes et version de protocole.
 
-## Initialiser
+## Initialisation et migration
 
 ```bash
 superia connection init
 ```
 
-Cela crée également :
+Cette commande crée également un modèle vide :
 
 ```text
 ~/.superia/secrets/providers.env.example
 ```
 
-Ce fichier est un modèle vide. Il ne doit jamais être rempli puis ajouté à Git.
+Une nouvelle exécution ajoute les connexions apparues dans une version plus récente sans écraser les connexions personnalisées ni leur état activé/désactivé.
 
 ## Connection Matrix
 
 ```bash
 superia connection dashboard
+superia connection doctor
 ```
 
 États :
 
 ```text
 disabled         connexion volontairement inactive
-configured       CLI installée, session à confirmer lors de l'usage
-ready            métadonnées et références de secrets présentes
+configured       CLI ou identité déclarée, session à confirmer
+ready            métadonnées et références nécessaires présentes
 needs-auth       variable ou authentification absente
 missing-command  exécutable absent
 manual           transfert humain requis
 invalid          configuration refusée
 ```
 
-La commande ne contacte aucun serveur.
+Le diagnostic ne contacte aucun serveur, ne lance aucun agent et ne retourne aucune valeur de secret.
 
 ## Transports couverts
 
@@ -79,25 +78,33 @@ La commande ne contacte aucun serveur.
 - Mistral ;
 - Gemini.
 
-### Endpoints compatibles OpenAI
+### Identités cloud
 
+- Azure OpenAI / Microsoft Foundry ;
+- AWS Bedrock ;
+- Google Vertex AI.
+
+Les identités cloud sont décrites sans copier les profils locaux : rôle ou profil AWS, Application Default Credentials Google, identité Microsoft Entra ou clé Azure gérée hors dépôt.
+
+### Passerelles et endpoints compatibles OpenAI
+
+- GitHub Models ;
 - OpenRouter ;
 - DeepSeek ;
 - Groq ;
-- endpoint personnalisé.
+- Hugging Face Inference Providers ;
+- Together AI ;
+- endpoint compatible personnalisé.
 
-### Protocoles
+### Protocoles et workers
 
 - MCP stdio ;
 - MCP HTTP ;
 - ACP stdio ;
-- A2A HTTP.
+- A2A HTTP ;
+- worker distant SSH.
 
-### Machines distantes
-
-- worker SSH ;
-- futur worker A2A ;
-- CLI distante sans copie de la clé privée dans Super IA.
+Les clés SSH restent dans `~/.ssh` ou `ssh-agent`. Elles ne sont pas copiées dans Super IA.
 
 ### Interfaces web assistées
 
@@ -106,7 +113,7 @@ La commande ne contacte aucun serveur.
 - Mistral Le Chat ;
 - DeepSeek.
 
-Le contexte est préparé et expurgé, mais le transfert reste manuel. Super IA ne pilote pas le navigateur et ne tente pas de contourner les limitations d'un service.
+Le paquet de contexte est préparé et expurgé, mais le transfert reste manuel. Aucun navigateur n'est automatisé.
 
 ### Endpoints locaux expérimentaux
 
@@ -114,9 +121,9 @@ Le contexte est préparé et expurgé, mais le transfert reste manuel. Super IA 
 - LM Studio ;
 - LocalAI.
 
-Ils sont présents dans le catalogue pour la compatibilité future, mais désactivés. Aucun modèle n'est installé sur le Pi.
+Ils sont désactivés et présents uniquement pour une compatibilité future. Aucun modèle n'est installé automatiquement.
 
-## Activer une connexion
+## Activation
 
 ```bash
 superia connection enable codex-cli
@@ -124,17 +131,15 @@ superia connection enable openai-api
 superia connection doctor
 ```
 
-Désactiver :
+Désactivation :
 
 ```bash
 superia connection disable openai-api
 ```
 
-L'activation n'autorise pas automatiquement la dépense. Les politiques de budget et les adaptateurs restent des barrières séparées.
+L'activation ne fournit pas de secret, n'envoie aucune requête et n'autorise pas automatiquement une dépense.
 
-## Ajouter un endpoint personnalisé
-
-Exemple compatible OpenAI :
+## Endpoint compatible personnalisé
 
 ```bash
 superia connection add mon-endpoint \
@@ -148,9 +153,9 @@ superia connection add mon-endpoint \
 superia connection enable mon-endpoint
 ```
 
-La commande enregistre `TEAM_AI_API_KEY`, jamais sa valeur.
+Seul le nom `TEAM_AI_API_KEY` est enregistré.
 
-## Ajouter un serveur MCP stdio
+## MCP stdio
 
 ```bash
 superia connection add fichiers-mcp \
@@ -160,9 +165,9 @@ superia connection add fichiers-mcp \
   --auth none
 ```
 
-L'exécution réelle devra ensuite passer par un adaptateur et une politique d'outils. L'enregistrement seul ne lance rien.
+L'enregistrement ne lance rien. L'exécution réelle devra passer par un adaptateur et une politique d'outils.
 
-## Ajouter un serveur MCP HTTP
+## MCP HTTP
 
 ```bash
 superia connection add outils-mcp-http \
@@ -173,7 +178,7 @@ superia connection add outils-mcp-http \
   --secret-env MCP_ACCESS_TOKEN
 ```
 
-## Ajouter un agent ACP
+## Agent ACP
 
 ```bash
 superia connection add agent-acp \
@@ -183,7 +188,7 @@ superia connection add agent-acp \
   --auth none
 ```
 
-## Ajouter un worker A2A
+## Worker A2A
 
 ```bash
 superia connection add worker-a2a \
@@ -194,7 +199,7 @@ superia connection add worker-a2a \
   --secret-env A2A_WORKER_TOKEN
 ```
 
-## Ajouter un worker SSH
+## Worker SSH
 
 ```bash
 superia connection add laptop-worker \
@@ -205,19 +210,15 @@ superia connection add laptop-worker \
   --auth session
 ```
 
-Les clés SSH restent dans `~/.ssh` ou dans `ssh-agent`. Elles ne sont pas copiées dans `~/.superia`.
-
 ## Coffres de secrets
 
 ```bash
 superia connection secret-backends
 ```
 
-Méthodes proposées :
+Méthodes détectées sans lire leurs valeurs :
 
-### Variables de session temporaires
-
-Pour un test ponctuel. La variable disparaît avec le terminal.
+### Variables temporaires
 
 ```bash
 read -rsp "Clé : " OPENAI_API_KEY
@@ -225,19 +226,19 @@ export OPENAI_API_KEY
 printf '\n'
 ```
 
-Cette méthode évite d'écrire la clé dans la commande et donc dans l'historique.
+La clé n'est pas saisie directement dans une ligne de commande conservée par l'historique.
 
 ### Libsecret
 
-Approprié à un poste Linux avec trousseau utilisateur. Super IA détecte `secret-tool`, mais ne lit pas automatiquement le coffre.
+Adapté à un poste Linux avec trousseau de session. Super IA détecte `secret-tool`, mais ne lit pas automatiquement le coffre.
 
 ### Fichier Age chiffré
 
-Approprié à un Pi headless ou à une copie hors machine. L'identité Age doit être séparée de l'archive chiffrée et protégée.
+Adapté à un Pi headless ou à une copie hors machine. L'identité Age doit être stockée séparément et protégée.
 
 ### Credentials systemd
 
-Appropriés au daemon ou à un futur worker systemd. Les secrets sont fournis comme fichiers de credentials plutôt que comme texte dans l'unité.
+Adaptés au daemon et aux futurs workers systemd. Les credentials sont transmis sous forme de fichiers, pas inscrits dans l'unité ou le dépôt.
 
 ## Règles
 
@@ -248,8 +249,8 @@ Appropriés au daemon ou à un futur worker systemd. Les secrets sont fournis co
 - aucun test réseau pendant le diagnostic ;
 - pas de navigateur automatisé ;
 - pas de fusion automatique ;
-- les APIs restent soumises au budget explicite ;
-- un endpoint local n'implique jamais l'installation d'un modèle.
+- API soumise à un budget explicite ;
+- endpoint local sans installation automatique de modèle.
 
 ## Commandes
 
