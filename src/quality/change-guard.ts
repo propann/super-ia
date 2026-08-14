@@ -3,6 +3,30 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { runCommand } from "../utils/command.js";
 
+export const DEFAULT_MAX_CHANGED_FILES = 50;
+export const DEFAULT_MAX_DIFF_BYTES = 1_000_000;
+
+export const DEFAULT_FORBIDDEN_PATHS = [
+  ".env",
+  ".env.*",
+  "**/.env",
+  "**/.env.*",
+  ".npmrc",
+  "**/.npmrc",
+  ".pypirc",
+  "**/.pypirc",
+  "*.pem",
+  "**/*.pem",
+  "*.key",
+  "**/*.key",
+  "id_rsa",
+  "**/id_rsa",
+  "id_ed25519",
+  "**/id_ed25519",
+  ".git-credentials",
+  "**/.git-credentials",
+] as const;
+
 export interface GitWorkspaceSnapshot {
   root: string;
   files: Record<string, { status: string; sha256: string }>;
@@ -12,8 +36,17 @@ export interface ChangeGuardReport {
   schemaVersion: 1;
   passed: boolean;
   allowedPaths: string[];
+  forbiddenPatterns: string[];
   changedFiles: string[];
   outOfScopeFiles: string[];
+  forbiddenFiles: string[];
+  limits: {
+    maxChangedFiles: number;
+    maxDiffBytes: number;
+    changedFiles: number;
+    diffBytes: number;
+  };
+  limitViolations: string[];
   diffPath: string;
   reportPath: string;
 }
@@ -58,6 +91,14 @@ async function fingerprint(root: string, path: string): Promise<string> {
   }
 }
 
+async function fileBytes(root: string, path: string): Promise<number> {
+  try {
+    return (await readFile(join(root, path))).byteLength;
+  } catch {
+    return 0;
+  }
+}
+
 export async function captureGitWorkspace(root: string): Promise<GitWorkspaceSnapshot> {
   const resolved = resolve(root);
   const status = await runCommand("git", ["status", "--porcelain=v2", "-z", "--untracked-files=all"], {
@@ -77,7 +118,7 @@ export async function captureGitWorkspace(root: string): Promise<GitWorkspaceSna
 function globPattern(pattern: string): RegExp {
   const normalized = pattern.replaceAll("\\", "/").replace(/^\.\//, "").replace(/\/$/, "");
   if (!normalized || normalized.startsWith("/") || normalized.split("/").includes("..")) {
-    throw new Error(`Chemin autorisé invalide : ${pattern}`);
+    throw new Error(`Motif de chemin invalide : ${pattern}`);
   }
   const escaped = normalized
     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
@@ -87,9 +128,25 @@ function globPattern(pattern: string): RegExp {
   return new RegExp(`^${escaped}(?:/.*)?$`);
 }
 
+function normalizedPath(path: string): string {
+  return path.replaceAll(sep, "/").replace(/^\.\//, "");
+}
+
+export function pathMatches(path: string, patterns: string[]): boolean {
+  const normalized = normalizedPath(path);
+  return patterns.some((pattern) => globPattern(pattern).test(normalized));
+}
+
 export function pathIsAllowed(path: string, allowedPaths: string[]): boolean {
-  const normalized = path.replaceAll(sep, "/").replace(/^\.\//, "");
-  return allowedPaths.some((pattern) => globPattern(pattern).test(normalized));
+  return pathMatches(path, allowedPaths);
+}
+
+function positiveLimit(value: number | undefined, fallback: number, label: string): number {
+  const resolved = value ?? fallback;
+  if (!Number.isInteger(resolved) || resolved < 1) {
+    throw new Error(`${label} doit être un entier supérieur ou égal à 1.`);
+  }
+  return resolved;
 }
 
 export async function enforceGitChangeScope(input: {
@@ -97,6 +154,9 @@ export async function enforceGitChangeScope(input: {
   afterRoot: string;
   allowedPaths: string[];
   artifactDirectory: string;
+  forbiddenPaths?: string[];
+  maxChangedFiles?: number;
+  maxDiffBytes?: number;
 }): Promise<ChangeGuardReport> {
   const after = await captureGitWorkspace(input.afterRoot);
   if (after.root !== input.before.root) throw new Error("Les snapshots Git ne concernent pas le même workspace.");
@@ -107,9 +167,19 @@ export async function enforceGitChangeScope(input: {
     if (!previous || !current) return true;
     return previous.status !== current.status || previous.sha256 !== current.sha256;
   }).sort();
+
   const allowedPaths = [...new Set(input.allowedPaths.map((path) => path.trim()).filter(Boolean))];
-  for (const pattern of allowedPaths) globPattern(pattern);
+  const forbiddenPatterns = [...new Set([
+    ...DEFAULT_FORBIDDEN_PATHS,
+    ...(input.forbiddenPaths ?? []),
+  ].map((path) => path.trim()).filter(Boolean))];
+  for (const pattern of [...allowedPaths, ...forbiddenPatterns]) globPattern(pattern);
+
   const outOfScopeFiles = changedFiles.filter((path) => !pathIsAllowed(path, allowedPaths));
+  const forbiddenFiles = changedFiles.filter((path) => pathMatches(path, forbiddenPatterns));
+  const maxChangedFiles = positiveLimit(input.maxChangedFiles, DEFAULT_MAX_CHANGED_FILES, "maxChangedFiles");
+  const maxDiffBytes = positiveLimit(input.maxDiffBytes, DEFAULT_MAX_DIFF_BYTES, "maxDiffBytes");
+
   const directory = resolve(input.artifactDirectory);
   await mkdir(directory, { recursive: true });
   const diffPath = join(directory, "AGENT_CHANGES.patch");
@@ -119,14 +189,35 @@ export async function enforceGitChangeScope(input: {
     timeoutMs: 30_000,
   });
   const untracked = changedFiles.filter((path) => after.files[path]?.status === "??");
+  const untrackedBytes = (await Promise.all(untracked.map((path) => fileBytes(after.root, path))))
+    .reduce((total, bytes) => total + bytes, 0);
   const appendix = untracked.length ? `\n# Untracked files\n${untracked.join("\n")}\n` : "";
-  await writeFile(diffPath, `${diff.stdout}${appendix}`, "utf8");
+  const patch = `${diff.stdout}${appendix}`;
+  await writeFile(diffPath, patch, "utf8");
+  const diffBytes = Buffer.byteLength(patch, "utf8") + untrackedBytes;
+  const limitViolations: string[] = [];
+  if (changedFiles.length > maxChangedFiles) {
+    limitViolations.push(`too-many-files:${changedFiles.length}>${maxChangedFiles}`);
+  }
+  if (diffBytes > maxDiffBytes) {
+    limitViolations.push(`diff-too-large:${diffBytes}>${maxDiffBytes}`);
+  }
+
   const report: ChangeGuardReport = {
     schemaVersion: 1,
-    passed: outOfScopeFiles.length === 0,
+    passed: outOfScopeFiles.length === 0 && forbiddenFiles.length === 0 && limitViolations.length === 0,
     allowedPaths,
+    forbiddenPatterns,
     changedFiles,
     outOfScopeFiles,
+    forbiddenFiles,
+    limits: {
+      maxChangedFiles,
+      maxDiffBytes,
+      changedFiles: changedFiles.length,
+      diffBytes,
+    },
+    limitViolations,
     diffPath,
     reportPath,
   };
