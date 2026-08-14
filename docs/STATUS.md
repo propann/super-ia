@@ -4,176 +4,103 @@ Date du contrôle : **14 août 2026**
 Branche : `agent/bootstrap-universal-cli`  
 Pull request : `#1` vers `main`
 
-Ce document distingue ce qui est réellement livré, ce qui est validé sans fournisseur externe et ce qui reste à vérifier sur le Raspberry Pi réel.
-
-## Résultat v0.10.0
+## Résultat v0.11.0
 
 | Élément | Résultat |
 |---|---|
-| Version | `0.10.0` |
+| Version | `0.11.0` |
 | CI GitHub | réussie |
 | Build TypeScript | réussi |
-| Tests | **25 réussis, 0 échec** |
+| Tests | **26 réussis, 0 échec** |
 | Audit npm du job | 0 vulnérabilité signalée |
 | Système CI | Ubuntu 24.04 |
 | Node / npm | 22.23.2 / 10.9.8 |
 | Scripts Pi | syntaxe valide |
 | Commande `sudo` dans `install/pi` | aucune |
 
-La CI exécute :
-
-```bash
-npm install
-npm test
-bash -n install/pi/install.sh
-bash -n install/pi/uninstall.sh
-```
-
 ## Livré et vérifié
 
-### Git, missions et suivi
+### Plan de contrôle et Git
 
-- scanner Git, stack et checks ;
-- missions `TASK-XXXX` lisibles par dépôt ;
-- branches dédiées et worktrees ;
-- mode `--dry-run` ;
-- synchronisation avec le registre global ;
-- statuts `planned`, `ready`, `running`, `blocked`, `review`, `done`, `failed`, `cancelled` ;
-- priorités `low`, `normal`, `high`, `critical` ;
+- SQLite WAL et migrations ;
+- registre multi-projets ;
+- runs, heartbeats, événements et récupération ;
+- journal JSONL append-only ;
+- leases exclusifs ;
+- scanner Git, missions, branches et worktrees ;
+- console Matrix multi-projets.
+
+### Suivi des tâches
+
+- statuts, dont `blocked` ;
+- priorités ;
 - responsable, fournisseur et échéance ;
 - tags, dépendances et critères d'acceptation ;
 - notes horodatées ;
-- tableau `superia task board` avec progression ;
-- validation des dépendances inconnues et auto-dépendances.
+- tableau `superia task board` ;
+- validation des dépendances ;
+- registre de roadmap `SIA-XXX` contrôlé par la CI.
 
-### Feuille de route contrôlée
+### Contexte, runner et preuves
 
-- registre machine-lisible `docs/ROADMAP_TRACKER.json` ;
-- identifiants stables `SIA-XXX` ;
-- milestones, statuts, priorités, dépendances, critères de sortie et preuves ;
-- vue humaine `docs/TASK_TRACKER.md` ;
-- test CI de cohérence du registre ;
-- PR maintenue en brouillon tant que la tâche de release `SIA-501` est bloquée.
-
-### Plan de contrôle global
-
-- `SUPERIA_HOME` ou `~/.superia` ;
-- SQLite WAL ;
-- migrations versionnées ;
-- projets et missions ;
-- runs, PID, heartbeats et statuts ;
-- récupération des runs abandonnés ;
-- événements SQLite ;
-- miroir JSONL append-only ;
-- leases exclusifs avec expiration ;
-- console Matrix multi-projets.
-
-### Contexte sécurisé
-
-- sélection depuis les fichiers suivis par Git ;
-- instructions et manifests prioritaires ;
-- fichiers modifiés, cités et trouvés par mots-clés ;
-- budget maximal en octets ;
-- SHA-256 de chaque fichier et empreinte globale ;
-- `MISSION.md`, `CONTEXT.md` et `MANIFEST.json` ;
-- exclusion des chemins sensibles et binaires ;
-- blocage de formats de secrets à haute confiance.
-
-### Gitleaks externe
-
-- outil détecté par `superia doctor` ;
-- commande `superia security scan` ;
-- modes `dir` et `git` ;
-- rapport JSON avec secrets expurgés ;
-- exécution dans le runner durable ;
-- mode optionnel lorsque Gitleaks est absent ;
-- mode bloquant `--required` ;
-- finding ou code de sortie non nul marque le scan en échec ;
-- tests avec faux scanner propre et faux scanner contenant un finding.
-
-Gitleaks n'est pas encore automatiquement imposé avant chaque agent distant. Cette intégration est suivie par `SIA-202`.
-
-### Runner
-
-- aucun shell implicite ;
-- dossier de travail limité au projet ou à son worktree ;
+- contexte Git ciblé ;
+- manifestes et empreintes SHA-256 ;
+- première barrière interne anti-secrets ;
+- runner sans shell implicite ;
 - environnement réduit ;
-- stdin contrôlé ;
-- logs stdout/stderr persistants ;
-- limite de sortie ;
-- heartbeat ;
-- timeout ;
-- `SIGTERM`, puis `SIGKILL` sur le groupe de processus ;
-- validations du dépôt via `superia validate`.
+- logs persistants ;
+- heartbeat, timeout et arrêt du groupe de processus ;
+- validations du dépôt ;
+- receipts vérifiables ;
+- détection de falsification ;
+- approbation humaine obligatoire.
 
-### Adaptateur Codex
+### Codex et Mistral Vibe
 
-- mode plan/review en lecture seule ;
-- mode build refusé sans worktree ;
-- sandbox officielle `read-only` ou `workspace-write` ;
-- prompt via stdin ;
-- sortie JSONL ;
-- dernière réponse enregistrée ;
-- options dangereuses explicitement refusées ;
-- lease exclusif par mission.
+- modes plan/review en lecture seule ;
+- build refusé sans worktree ;
+- Codex conserve sa sandbox officielle ;
+- Vibe n'obtient aucun shell ;
+- prompt transmis par stdin ;
+- sorties structurées archivées ;
+- plafonds prix/tokens/tours pour Vibe ;
+- options dangereuses refusées.
 
-### Adaptateur Mistral Vibe
+### Préflight Gitleaks obligatoire
 
-- mode programmatique forcé ;
-- prompt via stdin, absent de la liste des processus ;
-- plan/review avec profil `plan` ;
-- build avec `accept-edits` ;
-- `auto-approve` interdit ;
-- shell explicitement désactivé ;
-- outils de fichiers limités ;
-- plafonds de prix, tokens et tours ;
-- sortie streaming JSON archivée ;
-- lease exclusif par mission.
+Avant tout run réel Codex ou Vibe :
 
-### Nature des tests d'agents
+1. Super IA exécute Gitleaks en mode `dir` ;
+2. l'absence de Gitleaks bloque l'agent ;
+3. un finding ou un scan en échec bloque l'agent ;
+4. le rapport et le run de sécurité sont enregistrés ;
+5. l'état du préflight est inclus dans les métadonnées et `AGENT_RESULT.json`.
 
-Les tests Codex et Vibe utilisent de faux exécutables locaux. Ils valident la plomberie, la sécurité, les budgets, le parsing, les logs et les états SQLite. Ils ne prouvent pas encore l'authentification réelle, la disponibilité d'un compte, la qualité d'un modèle ni le coût observé.
+Une dérogation n'est possible qu'avec :
 
-### Sauvegarde, daemon et Raspberry Pi
+```bash
+--allow-without-gitleaks
+```
 
-- image SQLite cohérente avec `VACUUM INTO` ;
-- copie du journal JSONL ;
-- manifeste avec tailles et SHA-256 ;
-- vérification et détection de corruption ;
-- daemon one-shot ou permanent ;
-- resynchronisation des projets ;
-- récupération des runs ;
-- état `daemon-status.json` ;
-- installateur utilisateur ;
-- désinstallateur conservant les données ;
-- wrapper `~/.local/bin/superia` ;
+Elle produit l'état `waived` et l'événement durable `security.preflight.waived`. Le test Codex vérifie qu'après un finding l'exécutable de l'agent n'est jamais lancé.
+
+### Sauvegarde et Raspberry Pi
+
+- sauvegarde SQLite cohérente avec `VACUUM INTO` ;
+- manifeste SHA-256 ;
+- détection de corruption ;
+- daemon de synchronisation/récupération ;
 - service systemd utilisateur durci ;
-- aucune commande `sudo` ;
-- aucun modèle IA local.
+- installateur sans `sudo` ;
+- aucune installation de modèle local.
 
-La CI vérifie le paquet, mais l'installation matérielle complète n'a pas encore été exécutée sur le Pi 5 cible.
-
-### Receipts
-
-- création par run ;
-- projet, mission, provider et mode ;
-- commits et état Git ;
-- contexte et manifeste ;
-- logs et artefacts ;
-- validations associées ;
-- verdict structuré ;
-- SHA-256 du receipt ;
-- vérification des artefacts ;
-- falsification d'un log détectée par test ;
-- approbation humaine toujours obligatoire.
-
-## Liste des 25 tests
+## Liste des 26 tests
 
 1. sauvegarde cohérente et vérifiable ;
 2. unicité des fournisseurs ;
 3. API distantes désactivées ;
 4. transports déclarés ;
-5. adaptateur Codex simulé ;
+5. Codex avec préflight propre et blocage avant lancement ;
 6. contexte ciblé et secret exclu ;
 7. SQLite WAL et persistance multi-projets ;
 8. récupération des runs et journal JSONL ;
@@ -190,36 +117,33 @@ La CI vérifie le paquet, mais l'installation matérielle complète n'a pas enco
 19. runner timeout et arrêt du groupe ;
 20. receipt et détection de falsification ;
 21. catalogue de recherche valide ;
-22. surface de décision de chaque projet étudié ;
+22. surface de décision des projets étudiés ;
 23. registre de roadmap valide ;
-24. suivi des tâches, blocages et progression ;
-25. adaptateur Vibe simulé.
+24. dérogation Gitleaks visible et journalisée ;
+25. suivi des tâches et progression ;
+26. Vibe après préflight propre.
 
-## Limites et risques
+## Limites actuelles
 
-- `node:sqlite` affiche un avertissement expérimental avec Node 22 ;
 - installation Pi réelle non testée ;
-- comptes Codex/Vibe réels non testés par la CI ;
-- Gitleaks intégré mais pas encore obligatoire dans le préflight des agents ;
+- comptes Codex/Vibe réels non testés ;
+- `node:sqlite` affiche encore un avertissement expérimental sous Node 22 ;
+- préflight obligatoire pour Codex/Vibe, mais les futurs transports web/API devront réutiliser le même mécanisme ;
 - sandbox Bubblewrap/Podman commune non intégrée ;
-- métadonnées enrichies des tâches conservées dans les fichiers JSON du dépôt, mais pas encore toutes projetées dans les colonnes SQLite globales ;
 - pas de contrôle post-run des chemins modifiés ;
-- pas de reviewer indépendant ;
-- pas de pipeline builder/validator/reviewer ;
-- pas de DAG ou de sous-missions ;
-- pas de routeur automatique coût/qualité ;
-- pas de Restic ni de test automatique de restauration ;
+- pas de reviewer indépendant ni pipeline complet ;
+- pas de DAG ou routeur automatique coût/qualité ;
+- pas de Restic ni de restauration automatisée ;
 - pas d'interface web locale ;
 - aucune fusion automatique.
 
 ## Suite prioritaire
 
-1. `SIA-202` — imposer Gitleaks avant tout envoi distant ;
-2. `SIA-203` — ajouter Bubblewrap, HOME temporaire et contrôle réseau ;
-3. `SIA-204` — contrôler les fichiers modifiés par les agents ;
-4. `SIA-101` — installer la branche sur le Pi 5 réel ;
-5. `SIA-102` / `SIA-103` — tester reprise et restauration ;
-6. `SIA-104` / `SIA-105` — tester Codex et Vibe réels ;
-7. `SIA-301` / `SIA-302` — reviewer indépendant et pipeline complet ;
-8. `SIA-205` — Restic ;
-9. `SIA-401` — routeur coût/qualité fondé sur des mesures.
+1. `SIA-203` — Bubblewrap, HOME temporaire et contrôle réseau ;
+2. `SIA-204` — contrôle des fichiers modifiés ;
+3. `SIA-101` — installation sur le Pi 5 réel ;
+4. `SIA-102` / `SIA-103` — reprise et restauration ;
+5. `SIA-104` / `SIA-105` — Codex et Vibe réels ;
+6. `SIA-301` / `SIA-302` — reviewer indépendant et pipeline ;
+7. `SIA-205` — Restic ;
+8. `SIA-401` — routeur coût/qualité mesuré.
