@@ -219,7 +219,7 @@ if [ "$PROFILE" = standard ] || [ "$PROFILE" = full ]; then
   npm_tool gemini '@google/gemini-cli@latest'
   npm_tool qwen '@qwen-code/qwen-code@latest'
   npm_tool opencode 'opencode-ai@latest'
-  uv_tool aider 'aider-chat@latest' --python 3.12 --with pip
+  uv_tool aider 'aider-chat' --python 3.12 --with pip
   uv_tool mini 'mini-swe-agent'
 fi
 
