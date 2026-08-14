@@ -1,149 +1,150 @@
-# Feuille de route
+# Feuille de route Super IA
 
-## V0.1 — socle
+Version courante : **0.10.0**  
+Registre détaillé et validé par la CI : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json)  
+Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
+
+## Lecture rapide
+
+### Livré
+
+- plan de contrôle SQLite WAL multi-projets ;
+- scanner Git, missions et worktrees ;
+- contexte ciblé avec SHA-256 et première barrière anti-secrets ;
+- runner avec logs, heartbeat, timeout et arrêt des descendants ;
+- adaptateurs Codex et Mistral Vibe ;
+- receipts vérifiables ;
+- sauvegardes cohérentes ;
+- daemon et service systemd utilisateur pour le Pi ;
+- console Matrix globale ;
+- suivi enrichi des tâches ;
+- Gitleaks optionnel avec mode bloquant `--required`.
+
+### Bloqué par le matériel ou les comptes
+
+- installation sur le Pi 5 réel ;
+- test de coupure brutale ;
+- test de restauration ;
+- authentification Codex réelle ;
+- authentification Vibe réelle ;
+- benchmark commun Codex/Vibe.
+
+### Prochain chantier logiciel
+
+1. rendre Gitleaks obligatoire dans le préflight des agents distants ;
+2. ajouter Bubblewrap avec HOME temporaire et réseau contrôlé ;
+3. vérifier les chemins réellement modifiés par chaque agent ;
+4. intégrer un reviewer indépendant ;
+5. construire le pipeline builder → validation → review → receipt ;
+6. ajouter Restic après le test de restauration local ;
+7. construire le routeur coût/qualité à partir des benchmarks réels.
+
+## V0.1 à V0.9 — fondations terminées
 
 - [x] CLI TypeScript ;
-- [x] catalogue multi-fournisseurs ;
-- [x] diagnostic des outils ;
-- [x] configuration avec API désactivées ;
+- [x] catalogue multi-fournisseurs et diagnostic ;
+- [x] API génériques désactivées par défaut ;
 - [x] scanner Git ;
 - [x] missions `TASK-XXXX` ;
 - [x] branches et worktrees ;
-- [x] console Matrix.
-
-## V0.2 — état fiable et multi-projets
-
-- [x] `SUPERIA_HOME` global ;
-- [x] SQLite WAL et migration initiale ;
+- [x] console Matrix ;
+- [x] SQLite WAL et migrations ;
 - [x] registre multi-projets ;
-- [x] synchronisation des missions JSON ;
-- [x] runs et heartbeats ;
-- [x] journal SQLite + JSONL ;
-- [x] récupération des runs abandonnés ;
-- [x] leases exclusifs et expiration ;
-- [ ] clés d'idempotence explicites ;
-- [ ] checkpoints de mission ;
-- [ ] DAG de dépendances ;
-- [ ] test d'arrêt brutal sur le Pi réel.
+- [x] runs, heartbeats, événements et reprise ;
+- [x] leases exclusifs ;
+- [x] contexte Git ciblé et manifestes SHA-256 ;
+- [x] runner contrôlé ;
+- [x] Codex CLI ;
+- [x] Mistral Vibe ;
+- [x] receipts et détection de falsification ;
+- [x] sauvegardes cohérentes ;
+- [x] daemon et paquet Pi non privilégié.
 
-## V0.3 — contexte sécurisé
+## V0.10 — suivi et sécurité externe
 
-- [x] sélection Git ciblée ;
-- [x] instructions et manifests prioritaires ;
-- [x] recherche par mots-clés via Git ;
-- [x] fichiers modifiés et références explicites ;
-- [x] manifeste avec SHA-256 et raisons ;
-- [x] budget de taille ;
-- [x] scanner interne de chemins/secrets ;
-- [x] paquet `MISSION.md` / `CONTEXT.md` / `MANIFEST.json` ;
-- [ ] support hiérarchique complet de plusieurs `AGENTS.md` ;
-- [ ] Gitleaks externe ;
-- [ ] budget de tokens par tokenizer ;
-- [ ] Repomix optionnel ;
-- [ ] index Tree-sitter/symboles.
+- [x] statut `blocked` ;
+- [x] priorités `low`, `normal`, `high`, `critical` ;
+- [x] responsable, fournisseur et échéance ;
+- [x] tags et critères d'acceptation ;
+- [x] dépendances vérifiées ;
+- [x] notes horodatées ;
+- [x] tableau `superia task board` ;
+- [x] registre de roadmap JSON validé par la CI ;
+- [x] Gitleaks enregistré dans `superia doctor` ;
+- [x] `superia security scan` ;
+- [x] rapport JSON expurgé ;
+- [x] mode `--required` ;
+- [x] tests scan propre et finding bloquant.
 
-## V0.4 — runner
+## V0.11 — préflight de sécurité
 
-- [x] processus sans shell implicite ;
-- [x] environnement réduit ;
-- [x] dossier limité au projet/worktree ;
-- [x] stdin contrôlé ;
-- [x] logs persistants ;
-- [x] timeout ;
-- [x] arrêt du groupe de processus ;
-- [x] heartbeats ;
-- [x] validation des checks du dépôt ;
+- [ ] exécuter Gitleaks avant Codex/Vibe et tout envoi web/API ;
+- [ ] refuser le run si Gitleaks est absent en politique stricte ;
+- [ ] refuser le run lorsqu'un finding est présent ;
+- [ ] journaliser toute dérogation locale ;
+- [ ] conserver le rapport dans le receipt ;
+- [ ] contrôler les fichiers modifiés après le run ;
+- [ ] échouer si un fichier hors périmètre est touché.
+
+## V0.12 — sandbox commune
+
+- [ ] Bubblewrap sur Linux ;
 - [ ] HOME temporaire par run ;
-- [ ] sandbox bubblewrap ;
-- [ ] Podman optionnel ;
-- [ ] réseau désactivé par défaut pour agents génériques.
+- [ ] écriture limitée au worktree et aux artefacts du run ;
+- [ ] réseau désactivé par défaut pour les agents génériques ;
+- [ ] liste d'exceptions réseau explicite ;
+- [ ] Podman optionnel pour les tâches à risque élevé ;
+- [ ] tests d'accès hors périmètre.
 
-## V0.5 — agents
+## V0.13 — pipeline de qualité
 
-- [x] contrat d'adaptateur ;
-- [x] adaptateur Codex CLI ;
-- [x] Codex JSONL et dernière réponse ;
-- [x] sandbox Codex conservée ;
-- [x] adaptateur Mistral Vibe ;
-- [x] Vibe programmatique par stdin ;
-- [x] Vibe sans shell ;
-- [x] plafonds prix/tokens/tours ;
-- [x] faux exécutables de test sans quota ;
-- [ ] mission réelle Codex sur Pi ;
-- [ ] mission réelle Vibe sur Pi ;
-- [ ] reprise de session native ;
-- [ ] adaptateur Claude Code ;
-- [ ] adaptateur Gemini CLI ;
-- [ ] adaptateur Generic CLI ;
-- [ ] Qwen Code ;
-- [ ] OpenCode, Aider et mini-SWE-agent.
-
-## V0.6 — preuve et qualité
-
-- [x] artefacts par run ;
-- [x] événements normalisés ;
-- [x] receipt SHA-256 ;
-- [x] vérification des artefacts ;
-- [x] détection de falsification ;
-- [x] état de validation structuré ;
-- [x] approbation humaine obligatoire ;
-- [ ] fingerprint renforcé des fichiers non suivis ;
-- [ ] signature d'identité optionnelle ;
-- [ ] reviewer indépendant ;
-- [ ] findings structurés ;
-- [ ] relation explicite builder/validator/reviewer ;
+- [ ] reviewer différent du builder ;
+- [ ] findings structurés par sévérité ;
+- [ ] relation builder/validator/reviewer ;
+- [ ] pipeline déterministe ;
+- [ ] checkpoints reprenables ;
 - [ ] budgets de retries ;
-- [ ] contrôle des chemins modifiés autorisés.
+- [ ] détection de boucle ;
+- [ ] receipt final regroupant toutes les preuves ;
+- [ ] aucune fusion automatique.
 
-## V0.7 — exploitation Raspberry Pi
+## V0.14 — validation Raspberry Pi
 
-- [x] sauvegarde SQLite cohérente ;
-- [x] manifeste SHA-256 ;
-- [x] détection de corruption ;
-- [x] daemon de synchronisation/récupération ;
-- [x] console Matrix globale ;
-- [x] service systemd utilisateur ;
-- [x] installateur sans `sudo` ;
-- [x] durcissement systemd ;
-- [x] première sauvegarde créée et vérifiée par l'installateur ;
-- [ ] installation sur le Pi 5 réel ;
-- [ ] test d'arrêt brutal ;
-- [ ] test de restauration ;
-- [ ] Restic ;
-- [ ] rapport matériel réel ;
-- [ ] interface web locale ;
-- [ ] accès VPN/Tailscale ;
-- [ ] notifications.
+- [ ] installation complète sur le Pi 5 ;
+- [ ] service disponible après déconnexion ;
+- [ ] test de coupure et reprise ;
+- [ ] test de sauvegarde/restauration ;
+- [ ] rapport matériel et consommation ;
+- [ ] Codex réel ;
+- [ ] Vibe réel ;
+- [ ] benchmark identique ;
+- [ ] Restic et politique de rétention ;
+- [ ] copie hors machine.
 
-## V0.8 — orchestration multi-agent
+## V0.15 — orchestration multi-agent
 
-- [ ] rôles planner/builder/reviewer/researcher dans un pipeline ;
 - [ ] DAG avec détection de cycles ;
 - [ ] claim/ack/complete/requeue atomiques ;
-- [ ] tâches débloquées automatiquement ;
+- [ ] déblocage automatique des dépendances ;
 - [ ] détection des conflits de fichiers ;
 - [ ] comparaison de plans ;
-- [ ] audit croisé Codex/Vibe ;
+- [ ] audit croisé ;
 - [ ] routeur coût/capacité/qualité mesurée ;
 - [ ] arrêt d'urgence global ;
 - [ ] reprise automatique contrôlée.
 
-## V0.9 — écosystème large
+## V1.0 — publication stable
 
-- [ ] web assisté légitime ;
-- [ ] import et validation de patches web ;
-- [ ] GitHub Copilot CLI ;
-- [ ] workers distants ;
-- [ ] MCP lecture seule ;
-- [ ] ACP quand stable et utile ;
-- [ ] A2A uniquement pour workers distants.
+La PR ne passe en prête pour revue que lorsque :
 
-## Laboratoire futur séparé
-
-- [ ] définir une petite fonction locale précise ;
-- [ ] comparer règle déterministe, service distant et petit modèle local ;
-- [ ] utiliser Pi 4/5 uniquement si le benchmark est favorable ;
-- [ ] aucun impact si le laboratoire est arrêté.
+- [ ] le Pi réel est validé ;
+- [ ] la restauration est prouvée ;
+- [ ] Codex et Vibe réels ont produit un receipt valide ;
+- [ ] Gitleaks est obligatoire avant envoi distant ;
+- [ ] la sandbox commune est validée ;
+- [ ] la CI est verte ;
+- [ ] les limites restantes sont documentées ;
+- [ ] une revue humaine autorise la fusion.
 
 ## Hors périmètre par défaut
 
