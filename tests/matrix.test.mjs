@@ -47,6 +47,41 @@ const snapshot = {
     },
   ],
   tasks: [],
+  control: {
+    schemaVersion: 1,
+    journalMode: "wal",
+    projects: 2,
+    tasks: 4,
+    runs: 3,
+    activeRuns: 1,
+    events: 12,
+    pendingJournalEvents: 0,
+  },
+  projects: [
+    {
+      id: "project-1",
+      root: "/srv/git/app",
+      name: "app-global",
+      defaultBranch: "main",
+      status: "active",
+      createdAt: "2026-08-14T20:00:00Z",
+      updatedAt: "2026-08-14T20:00:00Z",
+      lastScan: {},
+    },
+  ],
+  runs: [
+    {
+      id: "run-123456789",
+      projectId: "project-1",
+      taskId: "TASK-0001",
+      provider: "codex-cli",
+      status: "running",
+      startedAt: "2026-08-14T20:00:00Z",
+      updatedAt: "2026-08-14T20:00:00Z",
+      heartbeatAt: "2026-08-14T20:00:00Z",
+      metadata: {},
+    },
+  ],
   config: {
     version: 1,
     policy: {
@@ -61,11 +96,15 @@ const snapshot = {
   now: new Date("2026-08-14T20:00:00Z"),
 };
 
-test("matrix dashboard exposes real control data", () => {
+test("matrix dashboard exposes local and global control data", () => {
   const output = stripAnsi(renderMatrixDashboard(snapshot, 100));
   assert.match(output, /MATRIX CONTROL/);
   assert.match(output, /app/);
   assert.match(output, /Codex/);
   assert.match(output, /Repomix/);
   assert.match(output, /VERROUILLÉES/);
+  assert.match(output, /WAL \/ schéma 1/);
+  assert.match(output, /app-global/);
+  assert.match(output, /codex-cli/);
+  assert.match(output, /TASK-0001/);
 });
