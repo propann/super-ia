@@ -17,6 +17,7 @@ La console affiche en direct :
 - le dépôt, la branche et l'état Git ;
 - la stack et les commandes de validation détectées ;
 - les fournisseurs IA présents ou utilisables en mode assisté ;
+- les outils locaux, moteurs, sandboxes et sauvegardes disponibles ;
 - les missions persistantes et leur statut ;
 - le verrou API, le budget et les règles de fusion.
 
@@ -74,6 +75,7 @@ fusion humaine
 superia matrix
 superia doctor
 superia providers
+superia local
 superia scan
 superia init
 superia task create "Ajouter une authentification"
@@ -82,7 +84,18 @@ superia task show TASK-0001
 superia worktree TASK-0001
 ```
 
-`superia worktree TASK-0001 --dry-run` affiche la commande sans modifier Git.
+`superia local --json` retourne les capacités locales détectées. `superia worktree TASK-0001 --dry-run` affiche la commande sans modifier Git.
+
+## Outils locaux détectés
+
+Le registre distingue les fournisseurs IA des briques locales :
+
+- Git, ripgrep, jq et SQLite ;
+- Repomix ;
+- Aider, mini-SWE-agent et OpenCode ;
+- Ollama, llama.cpp et LocalAI ;
+- bubblewrap, Podman et Docker ;
+- Restic pour les sauvegardes.
 
 ## Voies prévues
 
@@ -94,9 +107,10 @@ superia worktree TASK-0001
 
 Aucun faux compte, aucun contournement de quota, aucun scraping interdit.
 
-## État actuel
+## État actuel — v0.3
 
 - catalogue et diagnostic multi-fournisseurs ;
+- registre des outils locaux et moteurs d'inférence ;
 - configuration locale avec API désactivées par défaut ;
 - scanner Git et détection des commandes de validation ;
 - missions persistantes `TASK-XXXX` ;
