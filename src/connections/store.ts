@@ -46,16 +46,29 @@ async function writeStore(path: string, store: ConnectionStore): Promise<void> {
   await chmod(path, 0o600);
 }
 
-export async function ensureConnectionStore(): Promise<{ path: string; store: ConnectionStore; created: boolean }> {
+function mergeCatalog(store: ConnectionStore): number {
+  const existing = new Set(store.connections.map((item) => item.id));
+  const additions = defaultConnections().filter((item) => !existing.has(item.id));
+  if (!additions.length) return 0;
+  store.connections.push(...additions);
+  store.connections.sort((a, b) => a.id.localeCompare(b.id));
+  store.updatedAt = new Date().toISOString();
+  return additions.length;
+}
+
+export async function ensureConnectionStore(): Promise<{ path: string; store: ConnectionStore; created: boolean; addedDefaults: number }> {
   const home = await ensureControlHome();
   const path = connectionPath(home.root);
   try {
     await access(path);
-    return { path, store: await loadConnectionStore(), created: false };
+    const store = await loadConnectionStore();
+    const addedDefaults = mergeCatalog(store);
+    if (addedDefaults > 0) await writeStore(path, store);
+    return { path, store, created: false, addedDefaults };
   } catch {
     const store: ConnectionStore = { schemaVersion: 1, updatedAt: new Date().toISOString(), connections: defaultConnections() };
     await writeStore(path, store);
-    return { path, store, created: true };
+    return { path, store, created: true, addedDefaults: store.connections.length };
   }
 }
 
