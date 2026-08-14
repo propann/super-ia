@@ -10,6 +10,7 @@ import { buildGitContext } from "../context/builder.js";
 import { runManagedProcess } from "../runtime/process-runner.js";
 import { findExecutable } from "../utils/command.js";
 import { assertSafeCodexInvocation, buildCodexInvocation } from "./codex-adapter.js";
+import { runAgentSecurityPreflight } from "./security-preflight.js";
 import type {
   AgentExecutionOptions,
   AgentExecutionPreview,
@@ -67,6 +68,15 @@ export async function executeCodexTask(
     model: options.model,
   });
   assertSafeCodexInvocation(invocation);
+  const securityPreflight = await runAgentSecurityPreflight({
+    cwd,
+    projectId: synchronized.project.id,
+    taskId: task.id,
+    provider: invocation.provider,
+    dryRun: options.dryRun,
+    allowWithoutGitleaks: options.allowWithoutGitleaks,
+  });
+  invocation.metadata.securityPreflight = securityPreflight;
   const preview: AgentExecutionPreview = {
     provider: invocation.provider,
     mode,
@@ -75,6 +85,7 @@ export async function executeCodexTask(
     cwd,
     stdinBytes: Buffer.byteLength(invocation.stdin, "utf8"),
     context,
+    securityPreflight,
   };
   if (options.dryRun) return preview;
 
@@ -123,6 +134,7 @@ export async function executeCodexTask(
       contextId: context.manifest.id,
       contextHash: context.manifest.contextHash,
       baseCommit: context.manifest.baseCommit,
+      securityPreflight,
       parsedEvents: result.parsedEvents,
       invalidEventLines: result.invalidEventLines,
       lastMessagePath: result.lastMessagePath,
