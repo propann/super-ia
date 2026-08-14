@@ -65,6 +65,13 @@ function finding(value: unknown): ReviewFinding | undefined {
   };
 }
 
+function safeVerdict(requested: ReviewVerdict, findings: ReviewFinding[]): ReviewVerdict {
+  if (requested === "approve" && findings.some((item) => item.severity !== "low")) {
+    return "changes-requested";
+  }
+  return requested;
+}
+
 export async function normalizeIndependentReview(input: {
   taskId: string;
   builderProvider: PipelineProvider;
@@ -104,6 +111,13 @@ export async function normalizeIndependentReview(input: {
     ? parsed.residualRisks.map(text).filter(Boolean)
     : [];
   const structured = Boolean(parsed && verdicts.has(requestedVerdict));
+  const findings = structured ? parsedFindings : [{
+    severity: "high" as const,
+    category: "review-format",
+    summary: "Le reviewer n'a pas produit un rapport structuré exploitable.",
+    evidence: `Réponse conservée dans ${input.rawResponsePath}`,
+    recommendation: "Relancer la review avec le schéma JSON obligatoire.",
+  }];
   const report: IndependentReviewReport = {
     schemaVersion: 1,
     taskId: input.taskId,
@@ -111,14 +125,8 @@ export async function normalizeIndependentReview(input: {
     reviewerProvider: input.reviewerProvider,
     builderRunId: input.builderRunId,
     reviewerRunId: input.reviewerRunId,
-    verdict: structured ? requestedVerdict : "blocked",
-    findings: structured ? parsedFindings : [{
-      severity: "high",
-      category: "review-format",
-      summary: "Le reviewer n'a pas produit un rapport structuré exploitable.",
-      evidence: `Réponse conservée dans ${input.rawResponsePath}`,
-      recommendation: "Relancer la review avec le schéma JSON obligatoire.",
-    }],
+    verdict: structured ? safeVerdict(requestedVerdict, findings) : "blocked",
+    findings,
     residualRisks,
     structured,
     rawResponsePath: input.rawResponsePath,
