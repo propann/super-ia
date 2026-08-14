@@ -60,13 +60,27 @@
 - Ollama, llama.cpp et LocalAI sont marqués expérimentaux, hors installation par défaut et hors MVP.
 - Un Pi 4/5 pourra servir de laboratoire futur uniquement après benchmark d'un cas d'usage précis.
 
+## 14 août 2026 — audit de livraison
+
+- Mission : vérifier le dépôt plutôt que se fier aux annonces de travail intermédiaires.
+- Branche vérifiée : `agent/bootstrap-universal-cli`.
+- Commit initialement contrôlé : `3c3e19710b73b6743f4368064befbf82f477eada`.
+- PR : ouverte, brouillon et fusionnable.
+- Version réellement publiée : `0.3.0`.
+- CI GitHub : Ubuntu 24.04, Node 22.23.2 et npm 10.9.8.
+- Résultat : compilation TypeScript réussie, 10 tests réussis, 0 échec et 0 vulnérabilité npm signalée pendant le job.
+- Constat : SQLite WAL, serveur web, reprise, receipts, exécution d'agents et paquet systemd Pi n'étaient pas présents dans la branche.
+- Décision : ces éléments restent non livrés tant qu'ils ne sont pas rattachés à un commit et validés par GitHub Actions.
+- Documentation ajoutée : `docs/STATUS.md`, avec séparation stricte entre livré, conçu et restant à implémenter.
+
 ## Prochaine phase
 
-1. SQLite en WAL et migrations ;
-2. journal d'événements et reprise ;
-3. manifeste de contexte + Gitleaks ;
-4. runner de processus ;
-5. Generic CLI Adapter ;
-6. Codex puis Mistral Vibe ;
-7. receipts de validation ;
-8. benchmark sur un dépôt réel.
+1. stockage global SQLite en WAL et migrations ;
+2. registre multi-projets ;
+3. journal d'événements et reprise ;
+4. migration du stockage JSON actuel ;
+5. manifeste de contexte + Gitleaks ;
+6. runner de processus générique ;
+7. Codex puis Mistral Vibe ;
+8. receipts de validation ;
+9. paquet et test sur le Raspberry Pi 5 réel.
