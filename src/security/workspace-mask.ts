@@ -5,7 +5,9 @@ import { runCommand } from "../utils/command.js";
 import type { SandboxMaskedPath } from "../runtime/types.js";
 
 function splitNullDelimited(value: string): string[] {
-  return value.split("\u0000").map((item) => item.trim()).filter(Boolean);
+  const entries = value.split("\u0000");
+  if (entries.at(-1) === "") entries.pop();
+  return entries.filter((item) => item.length > 0);
 }
 
 function insideWorkspace(root: string, candidate: string): boolean {
@@ -13,7 +15,10 @@ function insideWorkspace(root: string, candidate: string): boolean {
 }
 
 async function listGitPaths(root: string, args: string[]): Promise<string[]> {
-  const result = await runCommand("git", ["-C", root, "ls-files", "-z", ...args], { timeoutMs: 15_000 });
+  const result = await runCommand("git", ["-C", root, "ls-files", "-z", ...args], {
+    timeoutMs: 15_000,
+    trimOutput: false,
+  });
   return splitNullDelimited(result.stdout);
 }
 
