@@ -60,6 +60,27 @@ test("existing connection stores receive new defaults without losing user choice
   }
 });
 
+test("invalid connection stores fail closed and are never overwritten", async () => {
+  const previous = process.env.SUPERIA_HOME;
+  const root = await mkdtemp(join(tmpdir(), "superia-connections-invalid-"));
+  process.env.SUPERIA_HOME = root;
+  const path = join(root, "connections.json");
+  const malformed = "{ this is not valid JSON\n";
+  try {
+    await writeFile(path, malformed, "utf8");
+    await assert.rejects(() => ensureConnectionStore(), /JSON|Unexpected|position/i);
+    assert.equal(await readFile(path, "utf8"), malformed);
+
+    const incompatible = JSON.stringify({ schemaVersion: 99, updatedAt: new Date().toISOString(), connections: [] });
+    await writeFile(path, incompatible, "utf8");
+    await assert.rejects(() => ensureConnectionStore(), /invalide|incompatible/);
+    assert.equal(await readFile(path, "utf8"), incompatible);
+  } finally {
+    process.env.SUPERIA_HOME = previous;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("connection doctor does not perform network access and checks command and env references", async () => {
   const now = new Date().toISOString();
   const api = {
