@@ -15,11 +15,13 @@ export async function ensureControlHome(root = resolveSuperIaHome()): Promise<Co
     database: join(resolved, "control.sqlite"),
     events: join(resolved, "events"),
     eventJournal: join(resolved, "events", "events.jsonl"),
+    runs: join(resolved, "runs"),
     backups: join(resolved, "backups"),
   };
   await Promise.all([
     mkdir(paths.root, { recursive: true }),
     mkdir(paths.events, { recursive: true }),
+    mkdir(paths.runs, { recursive: true }),
     mkdir(paths.backups, { recursive: true }),
   ]);
   return paths;
