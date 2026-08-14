@@ -6,6 +6,7 @@ const execFileAsync = promisify(execFile);
 export interface CommandOptions {
   cwd?: string;
   timeoutMs?: number;
+  trimOutput?: boolean;
 }
 
 export interface CommandResult {
@@ -20,9 +21,12 @@ export async function runCommand(command: string, args: string[] = [], options: 
     windowsHide: true,
     maxBuffer: 4 * 1024 * 1024,
   });
+  const trimOutput = options.trimOutput !== false;
+  const stdout = String(result.stdout ?? "");
+  const stderr = String(result.stderr ?? "");
   return {
-    stdout: result.stdout.trim(),
-    stderr: (result.stderr ?? "").trim(),
+    stdout: trimOutput ? stdout.trim() : stdout,
+    stderr: trimOutput ? stderr.trim() : stderr,
   };
 }
 
