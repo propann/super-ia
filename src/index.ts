@@ -15,10 +15,10 @@ import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.7.0
+  console.log(`Super IA v0.8.0
 
 Usage:
-  superia matrix [--once]                       Ouvre la console Matrix
+  superia matrix [--once]                       Console Matrix multi-projets
   superia doctor [--json]                       Détecte les IA et outils locaux
   superia providers [--json]                    Affiche les fournisseurs
   superia local [--json]                        Affiche les outils locaux
@@ -38,9 +38,11 @@ Usage:
   superia context build [TASK-ID] [options]     Crée un contexte Git vérifiable
   superia validate [--timeout-minutes 15]       Exécute les checks dans le runner
 
-  superia agent run codex <TASK-ID> [options]   Lance Codex via le plan de contrôle
+  superia agent run codex <TASK-ID> [options]   Lance Codex contrôlé
+  superia agent run vibe <TASK-ID> [options]    Lance Mistral Vibe contrôlé
       --mode plan|build|review --model <nom> --dry-run
       --timeout-minutes 60 --max-context-bytes 300000
+      Vibe : --max-turns 8 --max-tokens 50000 --max-price 0.25
 
   superia backup create                         Crée une sauvegarde cohérente
   superia backup list                           Liste les sauvegardes
@@ -60,9 +62,10 @@ Principes:
   - mode agent par défaut : plan en lecture seule
   - mode build uniquement dans un worktree existant
   - une seule exécution possède une mission grâce aux leases
-  - aucun drapeau de contournement de sandbox
+  - Codex conserve sa sandbox ; Vibe n'obtient aucun shell
+  - plafonds de prix, tokens et tours pour Vibe
   - aucune fusion automatique sans validation humaine
-  - API désactivées par défaut
+  - API génériques désactivées par défaut
   - aucun fichier sensible dans un paquet de contexte
   - aucun shell implicite dans le runner
   - daemon et service Pi sans privilèges root
