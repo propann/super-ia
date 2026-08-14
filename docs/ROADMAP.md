@@ -7,9 +7,10 @@
 - [x] catalogue multi-fournisseurs ;
 - [x] commande `doctor` ;
 - [x] configuration locale avec API désactivée ;
-- [ ] détecter le dépôt Git et ses commandes de test ;
-- [ ] créer une mission persistante ;
-- [ ] créer et supprimer un worktree sécurisé.
+- [x] détecter le dépôt Git et ses commandes de test ;
+- [x] créer une mission persistante ;
+- [x] créer un worktree sécurisé ;
+- [x] console de contrôle Matrix.
 
 ## V0.2 — première mission réelle
 
@@ -17,7 +18,8 @@
 - [ ] adaptateur Mistral Vibe ;
 - [ ] exécution non interactive contrôlée ;
 - [ ] capture des sorties, diffs et coûts ;
-- [ ] validation TypeScript, tests et build.
+- [ ] validation TypeScript, tests et build ;
+- [ ] suppression et archivage propres des worktrees.
 
 ## V0.3 — écosystème large
 
@@ -41,5 +43,6 @@
 - [ ] routeur coût/capacité ;
 - [ ] missions parallèles sans fichiers concurrents ;
 - [ ] relecture croisée ;
-- [ ] tableau de bord local ;
+- [ ] console Matrix interactive complète ;
+- [ ] tableau de bord local web ;
 - [ ] métriques de qualité par fournisseur.

@@ -26,3 +26,12 @@ export async function initializeProject(directory: string): Promise<{ path: stri
     return { path, created: true };
   }
 }
+
+export async function loadProjectConfig(directory: string): Promise<SuperIaConfig> {
+  const path = join(directory, ".superia", "config.json");
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as SuperIaConfig;
+  } catch {
+    return defaultConfig;
+  }
+}

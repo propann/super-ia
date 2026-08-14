@@ -3,11 +3,13 @@
 ```text
 CLI superia
    │
+   ├── console Matrix
    ├── registre des fournisseurs
    ├── diagnostic des outils installés
+   ├── scanner du dépôt Git
+   ├── gestionnaire de missions persistantes
+   ├── gestionnaire de worktrees
    ├── configuration et politique de coût
-   ├── futur gestionnaire de missions
-   ├── futur gestionnaire de worktrees
    ├── futur constructeur de contexte
    ├── futur expurgateur de secrets
    └── futurs adaptateurs
@@ -17,6 +19,24 @@ CLI superia
           ├── navigateur assisté
           └── API plafonnée
 ```
+
+## Flux local actuel
+
+```text
+superia scan
+   ↓
+RepositoryScan
+   ↓
+superia task create
+   ↓
+.superia/tasks/TASK-XXXX.json
+   ↓
+superia worktree TASK-XXXX
+   ↓
+branche agent/task-xxxx-* dans un worktree séparé
+```
+
+La console `superia matrix` agrège ce flux et affiche l'état réel du dépôt, des missions, des fournisseurs et de la politique économique.
 
 ## Contrat futur d'un adaptateur
 

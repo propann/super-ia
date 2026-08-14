@@ -1,16 +1,26 @@
 #!/usr/bin/env node
 import { initializeProject } from "./core/config.js";
 import { inspectProviders } from "./core/doctor.js";
+import { scanRepository } from "./core/repository-scanner.js";
+import { createTask, getTask, listTasks } from "./core/task-store.js";
+import { createWorktree } from "./core/worktree-manager.js";
 import { providerCatalog } from "./providers/catalog.js";
+import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.1.0
+  console.log(`Super IA v0.2.0
 
 Usage:
-  superia doctor [--json]      Détecte les outils IA et utilitaires installés
-  superia providers [--json]   Affiche le catalogue des fournisseurs
-  superia init                 Initialise .superia/config.json dans le dépôt courant
-  superia help                 Affiche cette aide
+  superia matrix [--once]                Ouvre la console de contrôle Matrix
+  superia doctor [--json]                Détecte les outils IA installés
+  superia providers [--json]             Affiche le catalogue des fournisseurs
+  superia scan [--json]                  Analyse le dépôt courant
+  superia init                           Initialise .superia/config.json
+  superia task create <objectif>         Crée une mission persistante
+  superia task list [--json]             Liste les missions
+  superia task show <TASK-ID> [--json]   Affiche une mission
+  superia worktree <TASK-ID> [--dry-run] Crée son worktree isolé
+  superia help                           Affiche cette aide
 
 Principes:
   - aucune fusion automatique sans validation humaine
@@ -31,9 +41,27 @@ function compactProvider(provider: typeof providerCatalog[number]) {
   };
 }
 
+function printScan(scan: Awaited<ReturnType<typeof scanRepository>>): void {
+  console.log("Super IA — analyse du dépôt\n");
+  console.log(`Dépôt        ${scan.name}`);
+  console.log(`Racine       ${scan.root}`);
+  console.log(`Git          ${scan.isGitRepository ? "oui" : "non"}`);
+  console.log(`Branche      ${scan.branch ?? "-"}`);
+  console.log(`État         ${scan.dirty ? "modifications locales" : "propre"}`);
+  console.log(`Stack        ${scan.languages.join(", ") || "inconnue"}`);
+  console.log(`Gestionnaire ${scan.packageManager ?? "-"}`);
+  console.log(`Instructions ${scan.instructions.join(", ") || "-"}`);
+  console.log(`Checks       ${scan.recommendedChecks.join(" ; ") || "-"}`);
+}
+
 async function main(): Promise<void> {
   const [command = "help", ...args] = process.argv.slice(2);
   const json = args.includes("--json");
+
+  if (command === "matrix" || command === "cockpit") {
+    await runMatrixConsole(process.cwd(), { once: args.includes("--once") });
+    return;
+  }
 
   if (command === "doctor") {
     const checks = await inspectProviders();
@@ -62,9 +90,54 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === "scan") {
+    const scan = await scanRepository(process.cwd());
+    if (json) console.log(JSON.stringify(scan, null, 2));
+    else printScan(scan);
+    return;
+  }
+
   if (command === "init") {
-    const result = await initializeProject(process.cwd());
+    const scan = await scanRepository(process.cwd());
+    const result = await initializeProject(scan.root);
     console.log(result.created ? `Configuration créée : ${result.path}` : `Configuration déjà présente : ${result.path}`);
+    return;
+  }
+
+  if (command === "task") {
+    const [action, ...taskArgs] = args.filter((arg) => arg !== "--json");
+    const scan = await scanRepository(process.cwd());
+    if (action === "create") {
+      const task = await createTask(scan, taskArgs.join(" "));
+      console.log(json ? JSON.stringify(task, null, 2) : `${task.id} créée sur ${task.branchName}`);
+      return;
+    }
+    if (action === "list") {
+      const tasks = await listTasks(scan.root);
+      if (json) console.log(JSON.stringify(tasks, null, 2));
+      else if (!tasks.length) console.log("Aucune mission.");
+      else for (const task of tasks) console.log(`${task.id.padEnd(10)} ${task.status.padEnd(10)} ${task.title}`);
+      return;
+    }
+    if (action === "show") {
+      const task = await getTask(scan.root, taskArgs[0] ?? "");
+      console.log(
+        json
+          ? JSON.stringify(task, null, 2)
+          : `${task.id} — ${task.title}\nStatut : ${task.status}\nBranche : ${task.branchName}\nWorktree : ${task.worktreePath ?? "non créé"}\nChecks : ${task.checks.join(" ; ") || "aucun"}`,
+      );
+      return;
+    }
+    throw new Error("Usage : superia task create|list|show");
+  }
+
+  if (command === "worktree") {
+    const id = args.find((arg) => !arg.startsWith("--"));
+    if (!id) throw new Error("Usage : superia worktree <TASK-ID> [--dry-run]");
+    const scan = await scanRepository(process.cwd());
+    const task = await getTask(scan.root, id);
+    const result = await createWorktree(task, args.includes("--dry-run"));
+    console.log(args.includes("--dry-run") ? result.command.join(" ") : `Worktree créé : ${result.path}`);
     return;
   }
 
