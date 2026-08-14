@@ -10,6 +10,7 @@ import { buildGitContext } from "../context/builder.js";
 import { runManagedProcess } from "../runtime/process-runner.js";
 import { findExecutable } from "../utils/command.js";
 import { assertSafeCodexInvocation, buildCodexInvocation } from "./codex-adapter.js";
+import { prepareAgentSandbox } from "./sandbox-preflight.js";
 import { runAgentSecurityPreflight } from "./security-preflight.js";
 import type {
   AgentExecutionOptions,
@@ -76,7 +77,16 @@ export async function executeCodexTask(
     dryRun: options.dryRun,
     allowWithoutGitleaks: options.allowWithoutGitleaks,
   });
+  const sandbox = await prepareAgentSandbox({
+    projectId: synchronized.project.id,
+    taskId: task.id,
+    provider: invocation.provider,
+    mode,
+    dryRun: options.dryRun,
+    allowWithoutBubblewrap: options.allowWithoutBubblewrap,
+  });
   invocation.metadata.securityPreflight = securityPreflight;
+  invocation.metadata.sandboxPreflight = sandbox.preflight;
   const preview: AgentExecutionPreview = {
     provider: invocation.provider,
     mode,
@@ -86,6 +96,7 @@ export async function executeCodexTask(
     stdinBytes: Buffer.byteLength(invocation.stdin, "utf8"),
     context,
     securityPreflight,
+    sandboxPreflight: sandbox.preflight,
   };
   if (options.dryRun) return preview;
 
@@ -110,7 +121,9 @@ export async function executeCodexTask(
       stdin: invocation.stdin,
       timeoutMs,
       metadata: invocation.metadata,
-      allowedEnvKeys: ["CODEX_HOME"],
+      env: sandbox.env,
+      allowedEnvKeys: ["CODEX_HOME", ...sandbox.allowedEnvKeys],
+      sandbox: sandbox.sandbox,
     }, control);
     const stdout = await readFile(processResult.stdoutPath, "utf8");
     const parsed = parseJsonLines(stdout);
@@ -135,6 +148,8 @@ export async function executeCodexTask(
       contextHash: context.manifest.contextHash,
       baseCommit: context.manifest.baseCommit,
       securityPreflight,
+      sandboxPreflight: sandbox.preflight,
+      sandboxExecution: processResult.sandbox ?? null,
       parsedEvents: result.parsedEvents,
       invalidEventLines: result.invalidEventLines,
       lastMessagePath: result.lastMessagePath,
