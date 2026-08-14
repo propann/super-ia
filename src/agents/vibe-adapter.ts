@@ -54,6 +54,9 @@ export async function buildVibeInvocation(input: {
   ]);
   const agent = input.mode === "build" ? "accept-edits" : "plan";
   const args = [
+    "--prompt",
+    "",
+    "--trust",
     "--agent",
     agent,
     "--workdir",
@@ -70,7 +73,6 @@ export async function buildVibeInvocation(input: {
     "--disabled-tools",
     "bash*",
   ];
-  if (input.model) args.push("--model", input.model);
 
   const stdin = [
     modeInstructions(input.mode),
@@ -98,6 +100,7 @@ export async function buildVibeInvocation(input: {
       baseCommit: input.context.manifest.baseCommit,
       budget: input.budget,
       shellEnabled: false,
+      programmaticPromptTransport: "stdin",
     },
   };
 }
@@ -106,6 +109,13 @@ export function assertSafeVibeInvocation(invocation: AgentInvocation): void {
   const forbidden = new Set(["--auto-approve", "--yolo"]);
   for (const argument of invocation.args) {
     if (forbidden.has(argument)) throw new Error(`Option Vibe interdite : ${argument}`);
+  }
+  const promptIndex = invocation.args.indexOf("--prompt");
+  if (promptIndex < 0 || invocation.args[promptIndex + 1] !== "") {
+    throw new Error("Vibe doit être forcé en mode programmatique sans exposer le prompt dans argv.");
+  }
+  if (!invocation.args.includes("--trust")) {
+    throw new Error("La confiance Vibe doit être limitée à cette invocation headless.");
   }
   const agentIndex = invocation.args.indexOf("--agent");
   const agent = agentIndex >= 0 ? invocation.args[agentIndex + 1] : undefined;
