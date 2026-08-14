@@ -3,15 +3,15 @@
 Source de vérité machine-lisible : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json).
 
 Dernière mise à jour : **14 août 2026**  
-Version suivie : **0.10.0**
+Version suivie : **0.11.0**
 
 ## État global
 
 | État | Nombre |
 |---|---:|
-| Terminé | 6 |
+| Terminé | 7 |
 | En cours | 0 |
-| Planifié | 15 |
+| Planifié | 14 |
 | Bloqué | 2 |
 | Différé | 0 |
 | **Total** | **23** |
@@ -22,7 +22,7 @@ Version suivie : **0.10.0**
 
 | ID | Tâche | Sortie attendue |
 |---|---|---|
-| `SIA-101` | Installer v0.10 sur le Pi 5 cible | service actif, base valide, première sauvegarde vérifiée |
+| `SIA-101` | Installer v0.11 sur le Pi 5 cible | service actif, base valide, première sauvegarde vérifiée |
 | `SIA-102` | Tester coupure brutale et reprise | run interrompu détecté, aucun doublon, SQLite intact |
 | `SIA-103` | Tester sauvegarde et restauration | restauration dans un nouvel emplacement et état relisible |
 | `SIA-104` | Tester Codex réel | plan terminé, receipt valide, aucune écriture en lecture seule |
@@ -32,7 +32,6 @@ Version suivie : **0.10.0**
 
 | ID | Priorité | Tâche | Dépendances |
 |---|---|---|---|
-| `SIA-202` | critique | Rendre Gitleaks obligatoire avant envoi distant | `SIA-201` |
 | `SIA-203` | critique | Ajouter la sandbox Bubblewrap commune | `SIA-002` |
 | `SIA-204` | haute | Contrôler les fichiers modifiés par un agent | `SIA-003` |
 | `SIA-205` | haute | Ajouter Restic et la politique de rétention | `SIA-103` |
@@ -49,26 +48,29 @@ Version suivie : **0.10.0**
 
 - `SIA-005` : suivi enrichi des missions ;
 - `SIA-201` : intégration Gitleaks avec rapport JSON expurgé ;
-- commande `superia task board` ;
-- commande `superia task update` ;
-- commande `superia task note` ;
+- commandes `superia task board`, `task update`, `task note` ;
 - statut `blocked` ;
 - priorité, responsable, échéance, tags, dépendances et critères d'acceptation ;
-- commande `superia security scan` ;
-- mode `--required` pour rendre Gitleaks bloquant ;
-- tests d'un scan propre et d'un scan contenant un finding.
+- commande `superia security scan` et mode `--required`.
+
+## Terminé dans v0.11
+
+- `SIA-202` : Gitleaks obligatoire avant tout run réel Codex ou Vibe ;
+- absence de Gitleaks = agent refusé ;
+- finding Gitleaks = agent refusé avant lancement ;
+- rapport et run Gitleaks liés au préflight ;
+- état du préflight inclus dans les métadonnées et `AGENT_RESULT.json` ;
+- dérogation possible uniquement avec `--allow-without-gitleaks` ;
+- événement durable `security.preflight.waived` ;
+- tests prouvant qu'un Codex bloqué n'est jamais démarré.
 
 ## Utilisation quotidienne
 
-Créer une mission :
+Créer et piloter une mission :
 
 ```bash
 superia task create "Ajouter la sandbox Bubblewrap"
-```
 
-Définir son pilotage :
-
-```bash
 superia task update TASK-0001 \
   --status planned \
   --priority critical \
@@ -81,15 +83,10 @@ superia task update TASK-0001 \
   --accept "réseau désactivé par défaut"
 ```
 
-Ajouter une dépendance :
+Ajouter une dépendance ou un blocage :
 
 ```bash
 superia task update TASK-0002 --depends TASK-0001
-```
-
-Marquer un blocage :
-
-```bash
 superia task update TASK-0002 --status blocked
 superia task note TASK-0002 "Accès au Pi nécessaire pour continuer."
 ```
@@ -101,18 +98,27 @@ superia task board
 superia task board --json
 ```
 
-Scanner les secrets :
+Lancer un agent avec le préflight normal :
 
 ```bash
-superia security scan
-superia security scan --required
+superia agent run codex TASK-0001 --mode plan
+superia agent run vibe TASK-0001 --mode plan --max-price 0.25
+```
+
+Dérogation exceptionnelle et journalisée :
+
+```bash
+superia agent run codex TASK-0001 \
+  --mode plan \
+  --allow-without-gitleaks
 ```
 
 ## Règles de suivi
 
 1. Une tâche ne passe à `done` qu'avec une preuve citée.
-2. Une tâche `blocked` doit posséder une note expliquant le blocage.
+2. Une tâche `blocked` doit posséder une cause ou une note expliquant le blocage.
 3. Une tâche critique doit avoir des critères d'acceptation explicites.
 4. Une dépendance doit exister et ne peut pas pointer vers elle-même.
 5. La PR reste en brouillon tant que `SIA-501` est bloquée.
-6. Aucune tâche ne supprime l'approbation humaine avant fusion.
+6. Toute dérogation de sécurité est explicite et journalisée.
+7. Aucune tâche ne supprime l'approbation humaine avant fusion.
