@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-08-14",
+  "principles": {
+    "piRole": "control-plane-only",
+    "localInferenceRequired": false,
+    "apiRequired": false,
+    "defaultMergePolicy": "human-approval",
+    "defaultExecutionIsolation": "git-worktree-plus-policy"
+  },
+  "projects": [
+    {
+      "id": "shep",
+      "repository": "shep-ai/shep",
+      "category": "sdlc-orchestrator",
+      "license": "MIT",
+      "languages": ["TypeScript"],
+      "priority": "critical",
+      "features": ["worktrees", "sqlite", "spec-gates", "ci-repair", "draft-pr", "langgraph", "web", "tui"],
+      "adopt": ["typed-state", "bounded-repair", "deterministic-fast-path", "agent-adapter-port"],
+      "avoid": ["permission-bypass-default", "premature-platform-complexity"]
+    },
+    {
+      "id": "mozzie",
+      "repository": "usemozzie/mozzie",
+      "category": "desktop-orchestrator",
+      "license": "MIT",
+      "languages": ["Rust", "TypeScript"],
+      "priority": "critical",
+      "features": ["worktrees", "sqlite", "task-dag", "cycle-detection", "stacked-branches", "acp", "review"],
+      "adopt": ["dependency-graph", "rejection-history", "task-lifecycle", "acp-fallback"],
+      "avoid": ["mandatory-llm-orchestrator-api", "desktop-only-core"]
+    },
+    {
+      "id": "agetor",
+      "repository": "alamops/agetor",
+      "category": "kanban-orchestrator",
+      "license": "MIT",
+      "languages": ["TypeScript"],
+      "priority": "critical",
+      "features": ["worktrees", "sqlite", "tmux", "jsonl-transcripts", "structured-approvals", "daemon", "cli"],
+      "adopt": ["pinned-base-sha", "boot-reconciliation", "structured-user-questions", "isolated-home"],
+      "avoid": ["full-shell-without-sandbox", "dependence-on-private-transcript-format"]
+    },
+    {
+      "id": "agent-of-empires",
+      "repository": "agent-of-empires/agent-of-empires",
+      "category": "session-manager",
+      "license": "MIT",
+      "languages": ["Rust"],
+      "priority": "critical",
+      "features": ["tmux", "worktrees", "web-pwa", "mobile", "acp", "docker", "podman", "diff-view", "http-api"],
+      "adopt": ["agent-status", "mobile-control", "structured-view", "sandbox-wrapper", "multi-repo"],
+      "avoid": ["treating-terminal-session-as-memory"]
+    },
+    {
+      "id": "claude-squad",
+      "repository": "smtg-ai/claude-squad",
+      "category": "session-manager",
+      "license": "AGPL-3.0",
+      "languages": ["Go"],
+      "priority": "high",
+      "features": ["tmux", "worktrees", "tui", "profiles", "diff-view"],
+      "adopt": ["simple-tui", "session-controls", "command-profiles"],
+      "avoid": ["copying-agpl-code", "auto-accept-default"]
+    },
+    {
+      "id": "squad",
+      "repository": "mco-org/squad",
+      "category": "agent-message-bus",
+      "license": "MIT",
+      "languages": ["Rust"],
+      "priority": "critical",
+      "features": ["sqlite", "no-daemon", "roles", "task-ack", "task-requeue", "json-output", "protocol-version"],
+      "adopt": ["sqlite-bus", "capability-metadata", "versioned-protocol", "idempotent-commands", "role-files"],
+      "avoid": ["free-form-agent-chat-as-control-plane"]
+    },
+    {
+      "id": "the-pair",
+      "repository": "timwuhaotian/the-pair",
+      "category": "dual-agent-review",
+      "license": "Apache-2.0",
+      "languages": ["Rust", "TypeScript"],
+      "priority": "high",
+      "features": ["mentor-executor", "cross-review", "session-recovery", "turn-budget", "resource-monitoring", "token-tracking"],
+      "adopt": ["independent-reviewer", "read-only-mentor", "iteration-budget", "evidence-verdict"],
+      "avoid": ["mandatory-two-models-for-trivial-task", "unbounded-agent-dialogue"]
+    },
+    {
+      "id": "mission-control",
+      "repository": "builderz-labs/mission-control",
+      "category": "control-plane",
+      "license": "MIT",
+      "languages": ["TypeScript"],
+      "priority": "critical",
+      "features": ["sqlite", "web", "rest", "openapi", "mcp", "sse", "websocket", "costs", "audit", "memory", "quality-gates"],
+      "adopt": ["completion-receipt", "audit-identity", "cost-events", "quality-approval", "control-runtime-separation"],
+      "avoid": ["enterprise-surface-in-mvp", "network-exposure-by-default"]
+    },
+    {
+      "id": "openhands",
+      "repository": "OpenHands/OpenHands",
+      "category": "agent-platform",
+      "license": "mixed-check-components",
+      "languages": ["Python", "TypeScript"],
+      "priority": "high",
+      "features": ["agent-server", "automation-server", "docker", "vm", "acp", "web"],
+      "adopt": ["remote-backends", "control-execution-separation", "acp-agent-server"],
+      "avoid": ["full-platform-dependency", "unsandboxed-host-access"]
+    },
+    {
+      "id": "agent-orchestrator",
+      "repository": "Untrivial-ai/agent-orchestrator",
+      "category": "agent-ide",
+      "license": "Apache-2.0",
+      "languages": ["TypeScript"],
+      "priority": "high",
+      "features": ["daemon", "worktrees", "pr-ci-review", "reviewer-adapters", "terminal", "browser-preview"],
+      "adopt": ["fresh-reviewer-process", "ci-event-input", "conflict-monitoring", "generic-terminal-adapter"],
+      "avoid": ["host-trusted-reviewer-without-policy", "ide-first-core"]
+    },
+    {
+      "id": "aider",
+      "repository": "Aider-AI/aider",
+      "category": "coding-agent",
+      "license": "Apache-2.0",
+      "languages": ["Python"],
+      "priority": "critical",
+      "features": ["repo-map", "git", "lint", "tests", "multi-model", "web-copy-paste"],
+      "adopt": ["repo-map", "surgical-context", "git-native-edits", "test-loop"],
+      "avoid": ["duplicating-agent-loop"]
+    },
+    {
+      "id": "opencode",
+      "repository": "anomalyco/opencode",
+      "category": "coding-agent",
+      "license": "MIT",
+      "languages": ["TypeScript"],
+      "priority": "high",
+      "features": ["multi-provider", "plan-mode", "build-mode", "subagents", "tui"],
+      "adopt": ["plan-build-separation", "generic-provider-backend"],
+      "avoid": ["coupling-to-session-internals"]
+    },
+    {
+      "id": "mini-swe-agent",
+      "repository": "SWE-agent/mini-swe-agent",
+      "category": "minimal-agent-runtime",
+      "license": "MIT",
+      "languages": ["Python"],
+      "priority": "critical",
+      "features": ["bash-only", "linear-history", "one-shot-subprocess", "sandbox-adapters", "trajectory"],
+      "adopt": ["minimal-loop", "linear-event-history", "independent-actions", "replaceable-environment"],
+      "avoid": ["assuming-bash-is-sufficient-for-policy"]
+    },
+    {
+      "id": "repomix",
+      "repository": "yamadashy/repomix",
+      "category": "context-builder",
+      "license": "MIT",
+      "languages": ["TypeScript"],
+      "priority": "critical",
+      "features": ["git-aware", "token-count", "tree-sitter", "secret-scan", "compression", "git-history"],
+      "adopt": ["context-pack", "token-budget", "structural-compression"],
+      "avoid": ["sending-entire-repository-by-default"]
+    },
+    {
+      "id": "serena",
+      "repository": "oraios/serena",
+      "category": "semantic-code-tools",
+      "license": "MIT",
+      "languages": ["Python"],
+      "priority": "high",
+      "features": ["lsp", "symbol-search", "symbol-edit", "mcp", "memory"],
+      "adopt": ["symbol-level-context", "semantic-navigation"],
+      "avoid": ["making-external-index-authoritative"]
+    },
+    {
+      "id": "codebase-memory-mcp",
+      "repository": "DeusData/codebase-memory-mcp",
+      "category": "code-knowledge-graph",
+      "license": "check-repository",
+      "languages": ["Rust"],
+      "priority": "medium",
+      "features": ["tree-sitter", "sqlite", "mcp", "arm64", "knowledge-graph"],
+      "adopt": ["local-graph-index", "arm64-binary"],
+      "avoid": ["trusting-self-reported-token-benchmarks", "non-rebuildable-memory"]
+    },
+    {
+      "id": "beads",
+      "repository": "gastownhall/beads",
+      "category": "task-memory",
+      "license": "check-repository",
+      "languages": ["Go"],
+      "priority": "medium",
+      "features": ["dependency-graph", "agent-json", "ready-query", "offline"],
+      "adopt": ["dependency-aware-task-memory", "ready-work-query"],
+      "avoid": ["dolt-dependency-in-mvp"]
+    },
+    {
+      "id": "spec-kit",
+      "repository": "github/spec-kit",
+      "category": "spec-driven-workflow",
+      "license": "MIT",
+      "languages": ["Python", "Shell"],
+      "priority": "critical",
+      "features": ["constitution", "spec", "plan", "tasks", "implement", "multi-agent-integrations"],
+      "adopt": ["versioned-specs", "quality-checklists", "convergence"],
+      "avoid": ["forcing-full-process-on-trivial-fixes"]
+    },
+    {
+      "id": "gitleaks",
+      "repository": "gitleaks/gitleaks",
+      "category": "secret-scanner",
+      "license": "MIT",
+      "languages": ["Go"],
+      "priority": "critical",
+      "features": ["filesystem-scan", "git-history-scan", "pre-commit", "ci"],
+      "adopt": ["pre-remote-context-gate", "artifact-scan"],
+      "avoid": ["assuming-zero-findings-means-zero-secrets"]
+    },
+    {
+      "id": "agent-client-protocol",
+      "repository": "agentclientprotocol/agent-client-protocol",
+      "category": "protocol",
+      "license": "Apache-2.0",
+      "languages": ["Rust", "TypeScript"],
+      "priority": "critical",
+      "features": ["agent-client", "capability-negotiation", "local-remote", "registry"],
+      "adopt": ["preferred-structured-agent-transport"],
+      "avoid": ["requiring-experimental-v2"]
+    },
+    {
+      "id": "mcp",
+      "repository": "modelcontextprotocol/modelcontextprotocol",
+      "category": "protocol",
+      "license": "Apache-2.0",
+      "languages": ["Specification"],
+      "priority": "high",
+      "features": ["tools", "resources", "prompts", "stdio", "http", "json-rpc"],
+      "adopt": ["read-only-superia-tools", "context-interoperability"],
+      "avoid": ["using-mcp-as-workflow-engine", "unreviewed-server-auto-install"]
+    },
+    {
+      "id": "a2a",
+      "repository": "a2aproject/A2A",
+      "category": "protocol",
+      "license": "Apache-2.0",
+      "languages": ["Specification"],
+      "priority": "future",
+      "features": ["agent-discovery", "task-lifecycle", "streaming", "remote-agents"],
+      "adopt": ["future-remote-worker-interoperability"],
+      "avoid": ["mvp-network-complexity"]
+    },
+    {
+      "id": "swe-bench",
+      "repository": "SWE-bench/SWE-bench",
+      "category": "benchmark",
+      "license": "MIT",
+      "languages": ["Python"],
+      "priority": "high",
+      "features": ["real-issues", "reproducible-evaluation", "verified-subset"],
+      "adopt": ["external-coding-baseline"],
+      "avoid": ["using-single-benchmark-as-router-truth"]
+    },
+    {
+      "id": "terminal-bench",
+      "repository": "laude-institute/terminal-bench",
+      "category": "benchmark",
+      "license": "check-repository",
+      "languages": ["Python"],
+      "priority": "high",
+      "features": ["terminal-tasks", "sandbox", "reproducibility"],
+      "adopt": ["runner-and-sandbox-tests"],
+      "avoid": ["confusing-terminal-score-with-project-fit"]
+    }
+  ]
+}
