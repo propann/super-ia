@@ -19,6 +19,7 @@
     "sandbox-check": "npm run build --silent && node dist/index.js security sandbox-check",
     "validate": "npm run build --silent && node dist/index.js validate",
     "backup": "npm run build --silent && node dist/index.js backup create",
+    "restic": "npm run build --silent && node dist/index.js restic status",
     "daemon": "npm run build --silent && node dist/index.js daemon",
     "matrix": "npm run build --silent && node dist/index.js matrix"
   },
