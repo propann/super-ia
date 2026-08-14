@@ -35,38 +35,16 @@ async function setup(prefix) {
 function execution(provider, mode, cwd, contextId, runId, lastMessagePath) {
   const directory = join(cwd, ".superia", "contexts", contextId);
   return {
-    provider,
-    mode,
-    command: "fake-agent",
-    args: [],
-    cwd,
-    stdinBytes: 1,
+    provider, mode, command: "fake-agent", args: [], cwd, stdinBytes: 1,
     context: {
-      directory,
-      missionPath: join(directory, "MISSION.md"),
-      contextPath: join(directory, "CONTEXT.md"),
-      manifestPath: join(directory, "MANIFEST.json"),
-      manifest: {
-        schemaVersion: 1, id: contextId, repositoryRoot: cwd, repositoryName: "demo", baseCommit: "abc",
-        dirty: false, taskId: "TASK-0001", createdAt: "2026-08-15T00:00:00Z", maxBytes: 1,
-        includedBytes: 0, contextHash: `hash-${contextId}`, files: [], excluded: [], instructions: [],
-      },
+      directory, missionPath: join(directory, "MISSION.md"), contextPath: join(directory, "CONTEXT.md"), manifestPath: join(directory, "MANIFEST.json"),
+      manifest: { schemaVersion: 1, id: contextId, repositoryRoot: cwd, repositoryName: "demo", baseCommit: "abc", dirty: false, taskId: "TASK-0001", createdAt: "2026-08-15T00:00:00Z", maxBytes: 1, includedBytes: 0, contextHash: `hash-${contextId}`, files: [], excluded: [], instructions: [] },
     },
     securityPreflight: { status: "passed", scanner: "gitleaks", findings: 0 },
     sandboxPreflight: { status: "active", engine: "bubblewrap", network: "isolated", workspaceAccess: mode === "build" ? "read-write" : "read-only", ephemeralHome: true },
-    process: {
-      runId, command: "fake-agent", args: [], cwd, exitCode: 0, signal: null, timedOut: false,
-      durationMs: 1, stdoutPath: join(cwd, `${runId}.out`), stderrPath: join(cwd, `${runId}.err`),
-      stdoutBytes: 0, stderrBytes: 0, truncated: false, status: "completed",
-    },
-    lastMessagePath,
-    normalizedEventsPath: join(directory, "EVENTS.json"),
-    parsedEvents: 1,
-    invalidEventLines: 0,
-    changeGuard: {
-      schemaVersion: 1, passed: true, allowedPaths: mode === "build" ? ["src/**"] : [], changedFiles: [],
-      outOfScopeFiles: [], diffPath: join(directory, "AGENT_CHANGES.patch"), reportPath: join(directory, "CHANGE_GUARD.json"),
-    },
+    process: { runId, command: "fake-agent", args: [], cwd, exitCode: 0, signal: null, timedOut: false, durationMs: 1, stdoutPath: join(cwd, `${runId}.out`), stderrPath: join(cwd, `${runId}.err`), stdoutBytes: 0, stderrBytes: 0, truncated: false, status: "completed" },
+    lastMessagePath, normalizedEventsPath: join(directory, "EVENTS.json"), parsedEvents: 1, invalidEventLines: 0,
+    changeGuard: { schemaVersion: 1, passed: true, allowedPaths: mode === "build" ? ["src/**"] : [], changedFiles: [], outOfScopeFiles: [], diffPath: join(directory, "AGENT_CHANGES.patch"), reportPath: join(directory, "CHANGE_GUARD.json") },
   };
 }
 
@@ -76,10 +54,8 @@ function fakeReceipt(runId, root) {
     receipt: {
       schemaVersion: 1, id: "RCP-TEST", createdAt: "2026-08-15T00:00:00Z",
       run: { id: runId, projectId: "P", provider: "codex-cli", mode: "build", status: "completed", startedAt: "2026-08-15T00:00:00Z" },
-      project: { id: "P", name: "demo", root },
-      git: { cwd: root, dirty: true, changedFiles: [], diffSha256: "hash" }, artifacts: [], validations: [],
-      verdict: { agentCompleted: true, contextVerified: true, artifactsVerified: true, validationState: "passed", reviewState: "approve", humanApprovalRequired: true },
-      receiptHash: "hash",
+      project: { id: "P", name: "demo", root }, git: { cwd: root, dirty: true, changedFiles: [], diffSha256: "hash" }, artifacts: [], validations: [],
+      verdict: { agentCompleted: true, contextVerified: true, artifactsVerified: true, validationState: "passed", reviewState: "approve", humanApprovalRequired: true }, receiptHash: "hash",
     },
   };
 }
@@ -90,7 +66,9 @@ async function builder(task, calls) {
   await mkdir(directory, { recursive: true });
   const message = join(directory, "builder.txt");
   await writeFile(message, "done", "utf8");
-  return execution("codex-cli", "build", task.worktreePath, "CTX-B", "RUN-B", message);
+  const result = execution("codex-cli", "build", task.worktreePath, "CTX-B", "RUN-B", message);
+  await writeFile(result.changeGuard.diffPath, "patch-resume\n", "utf8");
+  return result;
 }
 
 async function reviewer(task, calls) {
@@ -108,8 +86,7 @@ test("pipeline resumes after a completed builder without rerunning it", async ()
   const calls = [];
   try {
     await assert.rejects(runControlledPipeline(env.root, env.task.id, { builder: "codex", reviewer: "vibe" }, {
-      codex: () => builder(env.task, calls),
-      vibe: () => reviewer(env.task, calls),
+      codex: () => builder(env.task, calls), vibe: () => reviewer(env.task, calls),
       validate: async () => { calls.push("validate-crash"); throw new Error("simulated crash"); },
       receipt: async (id) => fakeReceipt(id, env.root),
     }), /simulated crash/);
@@ -119,8 +96,7 @@ test("pipeline resumes after a completed builder without rerunning it", async ()
 
     calls.length = 0;
     const result = await runControlledPipeline(env.root, env.task.id, { builder: "codex", reviewer: "vibe", resume: true }, {
-      codex: async () => { throw new Error("builder must not rerun"); },
-      vibe: () => reviewer(env.task, calls),
+      codex: async () => { throw new Error("builder must not rerun"); }, vibe: () => reviewer(env.task, calls),
       validate: async () => { calls.push("validate"); return { projectId: "P", repositoryRoot: env.task.worktreePath, passed: true, checks: [] }; },
       receipt: async (id) => { calls.push("receipt"); return fakeReceipt(id, env.root); },
     });
@@ -138,8 +114,7 @@ test("pipeline resumes after review and only recreates the receipt", async () =>
   const calls = [];
   try {
     await assert.rejects(runControlledPipeline(env.root, env.task.id, { builder: "codex", reviewer: "vibe" }, {
-      codex: () => builder(env.task, calls),
-      vibe: () => reviewer(env.task, calls),
+      codex: () => builder(env.task, calls), vibe: () => reviewer(env.task, calls),
       validate: async () => ({ projectId: "P", repositoryRoot: env.task.worktreePath, passed: true, checks: [] }),
       receipt: async () => { throw new Error("receipt crash"); },
     }), /receipt crash/);
