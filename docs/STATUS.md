@@ -1,6 +1,6 @@
 # État vérifié du projet
 
-Date du contrôle : **14 août 2026**  
+Date du contrôle : **15 août 2026**  
 Branche : `agent/bootstrap-universal-cli`  
 Pull request : `#1` vers `main`
 
@@ -11,7 +11,7 @@ Pull request : `#1` vers `main`
 | Version | `0.13.0` |
 | CI GitHub | réussie |
 | Build TypeScript | réussi |
-| Tests | **32 réussis, 0 échec** |
+| Tests | **39 réussis, 0 échec** |
 | Audit npm du job | 0 vulnérabilité signalée |
 | Système CI | Ubuntu 24.04 |
 | Node / npm | 22.23.2 / 10.9.8 |
@@ -30,14 +30,18 @@ Pull request : `#1` vers `main`
 - Codex et Mistral Vibe ;
 - Gitleaks obligatoire avant les agents réels ;
 - Bubblewrap obligatoire sous Linux avant les agents réels ;
+- contrôle des fichiers modifiés ;
+- reviewer indépendant ;
+- pipeline builder → validations → review → receipt ;
+- checkpoints et reprise du pipeline ;
 - receipts vérifiables ;
 - sauvegardes cohérentes ;
 - daemon, service Pi utilisateur et console Matrix ;
 - roadmap et suivi de tâches contrôlés par la CI.
 
-## Nouveau dans v0.13 — contrôle des modifications
+## Contrôle des modifications
 
-Chaque mission peut déclarer son périmètre d'écriture :
+Chaque mission déclare son périmètre d'écriture :
 
 ```bash
 superia task update TASK-0001 \
@@ -45,19 +49,7 @@ superia task update TASK-0001 \
   --allow-path "tests/**"
 ```
 
-Un build sans chemin autorisé est refusé avant lancement.
-
-Pour chaque run Codex ou Vibe, Super IA :
-
-1. capture l'état Git avant l'agent ;
-2. exécute l'agent dans son worktree ;
-3. capture l'état Git après ;
-4. compare statuts et empreintes ;
-5. contrôle chaque fichier par rapport aux motifs autorisés ;
-6. archive le diff ;
-7. fait échouer le run si un fichier sort du périmètre.
-
-Artefacts produits :
+Un build sans chemin autorisé est refusé. Après le run, Super IA archive :
 
 ```text
 AGENT_CHANGES.patch
@@ -65,11 +57,118 @@ CHANGE_GUARD.json
 AGENT_RESULT.json
 ```
 
-Une violation transforme le statut SQLite du run en `failed`, même si l'agent a renvoyé le code 0. Une erreur du change guard est également bloquante.
-
-Le test de bout en bout fait modifier à un faux Codex `src/app.ts` autorisé et `README.md` interdit. Il vérifie le rapport, le patch, `AGENT_RESULT.json` et le statut durable du run.
+Une modification hors périmètre transforme le run en `failed`, même si l'agent retourne le code 0.
 
 Voir [`CHANGE_GUARD.md`](CHANGE_GUARD.md).
+
+## Reviewer indépendant
+
+Le reviewer doit utiliser un fournisseur différent du builder :
+
+```text
+Codex builder → Vibe reviewer
+Vibe builder  → Codex reviewer
+```
+
+Le mode review est strictement en lecture seule. Le reviewer doit produire un JSON structuré :
+
+```json
+{
+  "verdict": "approve | changes-requested | blocked",
+  "findings": [
+    {
+      "severity": "critical | high | medium | low",
+      "category": "security",
+      "summary": "...",
+      "evidence": "...",
+      "recommendation": "...",
+      "file": "src/example.ts",
+      "line": 42
+    }
+  ],
+  "residualRisks": []
+}
+```
+
+Une réponse non structurée est automatiquement bloquée. Un verdict `approve` contenant un finding `medium`, `high` ou `critical` est automatiquement transformé en `changes-requested`.
+
+## Pipeline contrôlé
+
+```bash
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe
+```
+
+Ordre déterministe :
+
+```text
+builder
+  ↓
+change guard
+  ↓
+validations locales
+  ↓
+reviewer indépendant
+  ↓
+REVIEW.json
+  ↓
+receipt SHA-256
+  ↓
+approbation humaine
+```
+
+Le reviewer n'est pas lancé si le builder, le garde Git ou les validations échouent. Aucune fusion automatique n'est possible.
+
+## Checkpoints et reprise
+
+Chaque mission possède un état atomique :
+
+```text
+.superia/pipelines/TASK-XXXX.json
+```
+
+Étapes enregistrées :
+
+```text
+initialized
+builder-completed
+validation-completed
+review-completed
+receipt-created
+```
+
+Commandes :
+
+```bash
+superia pipeline status TASK-0001
+
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe \
+  --resume
+```
+
+La reprise ne relance jamais un builder sans checkpoint complet. Les tests prouvent :
+
+- reprise après interruption juste après le builder ;
+- reprise après la review en ne recréant que le receipt ;
+- absence de double exécution des étapes déjà terminées.
+
+## Receipts enrichis
+
+Les receipts incluent désormais :
+
+- `CHANGE_GUARD.json` ;
+- `AGENT_CHANGES.patch` ;
+- `REVIEW.json` ;
+- l'identité du reviewer ;
+- le verdict de review ;
+- le nombre de findings ;
+- l'état des validations ;
+- `humanApprovalRequired: true`.
+
+Toute modification ultérieure d'un artefact invalide sa preuve SHA-256.
 
 ## Sécurité Bubblewrap
 
@@ -79,8 +178,7 @@ La politique validée en CI comprend :
 - système et exécutables en lecture seule ;
 - plan/review en lecture seule ;
 - build limité au worktree ;
-- sortie Codex montée individuellement ;
-- état fournisseur limité à `~/.superia/providers/` ;
+- sorties individuelles autorisées ;
 - capacités supprimées ;
 - namespaces utilisateur, PID, IPC, UTS et cgroup ;
 - réseau isolable ;
@@ -92,9 +190,7 @@ La frontière noyau réelle reste à confirmer sur le Pi :
 superia security sandbox-check --json
 ```
 
-L'installateur conservera le résultat dans `~/.superia/sandbox-status.json`.
-
-## Couverture des 32 tests
+## Couverture des 39 tests
 
 La suite couvre notamment :
 
@@ -103,27 +199,29 @@ La suite couvre notamment :
 - reprise des runs et leases ;
 - contexte ciblé et exclusion de secrets ;
 - Gitleaks propre, finding bloquant et dérogation ;
-- politique Bubblewrap, HOME jetable et refus sans `bwrap` ;
-- Codex et Vibe simulés avec les deux préflights ;
+- politique Bubblewrap et HOME jetable ;
+- Codex et Vibe simulés avec les préflights ;
 - runner, logs, timeout et arrêt du groupe ;
+- garde Git et refus des fichiers hors périmètre ;
+- reviewer distinct et format structuré ;
+- correction des approbations incohérentes ;
+- pipeline complet sans appel IA réel ;
+- reprise après builder et après review ;
 - receipts et falsification ;
 - roadmap et suivi des tâches ;
-- change guard unitaire ;
-- build Codex hors périmètre de bout en bout ;
-- refus d'un build sans `--allow-path` ;
 - scripts d'installation Pi et absence de `sudo`.
 
 ## État de la roadmap
 
 | État | Nombre |
 |---|---:|
-| Terminé | 8 |
+| Terminé | 10 |
 | En cours | 1 |
-| Planifié | 12 |
+| Planifié | 10 |
 | Bloqué | 2 |
 | Total | 23 |
 
-`SIA-204` est terminé. `SIA-203` reste en cours jusqu'à la validation Bubblewrap réelle sur le Pi.
+`SIA-301` et `SIA-302` sont terminés. `SIA-203` reste en cours jusqu'à la validation Bubblewrap réelle sur le Pi.
 
 ## Encore à prouver sur le Pi
 
@@ -137,10 +235,10 @@ La suite couvre notamment :
 
 ## Limites actuelles
 
-- réseau Codex/Vibe autorisé pour joindre leurs services ;
+- réseau Codex/Vibe nécessaire pour joindre leurs services ;
 - filtrage réseau par domaine non livré ;
-- reviewer indépendant non livré ;
-- pipeline builder → validation → review → receipt non livré ;
+- retries limités et détection de boucle non livrés ;
+- correction automatique après review non livrée ;
 - DAG, routeur coût/qualité et interface web non livrés ;
 - Restic et restauration automatisée non livrés ;
 - `node:sqlite` affiche encore un avertissement expérimental sous Node 22 ;
@@ -148,11 +246,11 @@ La suite couvre notamment :
 
 ## Suite prioritaire
 
-1. `SIA-203` — exécuter l'autotest Bubblewrap réel sur le Pi ;
-2. `SIA-101` — installer v0.13 sur le Pi 5 ;
-3. `SIA-301` — reviewer indépendant ;
-4. `SIA-302` — pipeline complet ;
-5. `SIA-102` / `SIA-103` — reprise et restauration ;
-6. `SIA-104` / `SIA-105` — Codex et Vibe réels ;
-7. `SIA-205` — Restic ;
-8. `SIA-401` — routeur coût/qualité mesuré.
+1. `SIA-303` — budget de retries et détection de boucle ;
+2. `SIA-203` — exécuter l'autotest Bubblewrap réel sur le Pi ;
+3. `SIA-101` — installer v0.13 sur le Pi 5 ;
+4. `SIA-102` / `SIA-103` — reprise et restauration ;
+5. `SIA-104` / `SIA-105` — Codex et Vibe réels ;
+6. `SIA-205` — Restic ;
+7. `SIA-401` — routeur coût/qualité mesuré ;
+8. `SIA-402` — DAG de missions.
