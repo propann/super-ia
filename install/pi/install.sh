@@ -14,6 +14,10 @@ fail() {
   exit 1
 }
 
+warn() {
+  printf 'ATTENTION: %s\n' "$1" >&2
+}
+
 command -v git >/dev/null 2>&1 || fail "git est requis"
 command -v npm >/dev/null 2>&1 || fail "npm est requis"
 [ -n "$NODE_BIN" ] || fail "Node.js est requis"
@@ -25,6 +29,18 @@ if (major < 22 || (major === 22 && minor < 5)) {
   process.exit(1);
 }
 '
+
+printf '==> Capacités de sécurité disponibles\n'
+if command -v bwrap >/dev/null 2>&1; then
+  printf 'Bubblewrap : présent\n'
+else
+  warn "Bubblewrap est absent. Le centre de contrôle sera installé, mais Codex et Vibe resteront bloqués par défaut."
+fi
+if command -v gitleaks >/dev/null 2>&1; then
+  printf 'Gitleaks   : présent\n'
+else
+  warn "Gitleaks est absent. Le centre de contrôle sera installé, mais Codex et Vibe resteront bloqués par défaut."
+fi
 
 printf '==> Installation des dépendances\n'
 cd "$REPO_DIR"
@@ -73,6 +89,18 @@ process.stdin.on("end", () => {
 ')
 SUPERIA_HOME="$SUPERIA_HOME" "$NODE_BIN" "$REPO_DIR/dist/index.js" backup verify "$BACKUP_DIR"
 
+SANDBOX_STATUS="$SUPERIA_HOME/sandbox-status.json"
+if command -v bwrap >/dev/null 2>&1; then
+  printf '==> Autotest Bubblewrap réel\n'
+  if SUPERIA_HOME="$SUPERIA_HOME" "$NODE_BIN" "$REPO_DIR/dist/index.js" security sandbox-check --json > "$SANDBOX_STATUS"; then
+    printf 'Sandbox Bubblewrap validée. Rapport : %s\n' "$SANDBOX_STATUS"
+  else
+    warn "Bubblewrap est présent mais son autotest a échoué. Rapport : $SANDBOX_STATUS"
+  fi
+else
+  printf '%s\n' '{"engine":"bubblewrap","available":false,"passed":false,"reason":"absent du PATH"}' > "$SANDBOX_STATUS"
+fi
+
 if command -v systemctl >/dev/null 2>&1 && systemctl --user daemon-reload 2>/dev/null; then
   systemctl --user enable --now superia.service
   printf '\nService démarré. Vérification :\n'
@@ -85,6 +113,7 @@ fi
 printf '\nInstallation terminée.\n'
 printf 'Commande : %s/superia\n' "$BIN_DIR"
 printf 'État     : superia control status\n'
+printf 'Sandbox  : superia security sandbox-check\n'
 printf 'Console  : superia matrix\n'
 printf 'Données  : %s\n' "$SUPERIA_HOME"
 printf '\nPour un fonctionnement après déconnexion, activer le linger une seule fois selon la politique du système :\n'
