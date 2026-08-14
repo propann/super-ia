@@ -54,11 +54,12 @@ export async function runBubblewrapSelfTest(): Promise<SandboxCheckReport> {
   const outside = join(root, "outside-secret.txt");
   const allowed = join(workspace, "allowed.txt");
   const stateProof = join(state, "state.txt");
+  await mkdir(root, { recursive: true });
   await Promise.all([
     mkdir(workspace, { recursive: true }),
     mkdir(state, { recursive: true }),
-    writeFile(outside, "must-not-be-visible\n", "utf8"),
   ]);
+  await writeFile(outside, "must-not-be-visible\n", "utf8");
 
   const checks: SandboxCheck[] = [];
   try {
