@@ -13,6 +13,9 @@ function secretDirectory(root: string): string { return join(root, "secrets"); }
 
 function validId(value: string): boolean { return /^[a-z0-9][a-z0-9._-]{1,63}$/.test(value); }
 function validEnv(value: string): boolean { return /^[A-Z][A-Z0-9_]{1,127}$/.test(value); }
+function isMissingFile(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "ENOENT";
+}
 
 export function validateConnection(connection: AiConnection): void {
   if (!validId(connection.id)) throw new Error(`Identifiant de connexion invalide : ${connection.id}`);
@@ -59,15 +62,17 @@ export async function ensureConnectionStore(): Promise<{ path: string; store: Co
   const path = connectionPath(home.root);
   try {
     await access(path);
-    const store = await loadConnectionStore();
-    const addedDefaults = mergeCatalog(store);
-    if (addedDefaults > 0) await writeStore(path, store);
-    return { path, store, created: false, addedDefaults };
-  } catch {
+  } catch (error) {
+    if (!isMissingFile(error)) throw error;
     const store: ConnectionStore = { schemaVersion: 1, updatedAt: new Date().toISOString(), connections: defaultConnections() };
     await writeStore(path, store);
     return { path, store, created: true, addedDefaults: store.connections.length };
   }
+
+  const store = await loadConnectionStore();
+  const addedDefaults = mergeCatalog(store);
+  if (addedDefaults > 0) await writeStore(path, store);
+  return { path, store, created: false, addedDefaults };
 }
 
 export async function loadConnectionStore(): Promise<ConnectionStore> {
