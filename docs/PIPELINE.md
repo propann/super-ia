@@ -5,10 +5,10 @@
 Exécuter une mission avec deux agents distincts sans conversation libre infinie :
 
 ```text
-builder → contrôles Git → validations → reviewer → receipt → humain
+builder → garde Git → validations → reviewer → receipt → humain
 ```
 
-Le pipeline n'effectue aucune fusion automatique.
+Le pipeline n’effectue aucune fusion automatique.
 
 ## Prérequis
 
@@ -17,8 +17,10 @@ La mission possède :
 - un worktree ;
 - au moins un chemin autorisé ;
 - des commandes de validation détectables ;
+- des dépendances DAG terminées ;
 - Gitleaks et Bubblewrap, sauf dérogation explicite et journalisée ;
-- deux fournisseurs différents.
+- deux fournisseurs différents ;
+- des plafonds explicites pour tout pipeline réel utilisant Vibe.
 
 ```bash
 superia task create "Ajouter une validation de jeton"
@@ -31,7 +33,18 @@ superia task update TASK-0001 \
 superia worktree TASK-0001
 ```
 
-## Premier lancement
+## Prévisualisation
+
+```bash
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe \
+  --dry-run
+```
+
+Le dry-run prépare les deux invocations et les préflights sans démarrer d’agent et sans accès facturable.
+
+## Premier lancement réel
 
 ```bash
 superia pipeline run TASK-0001 \
@@ -42,7 +55,7 @@ superia pipeline run TASK-0001 \
   --max-total-price 0.75
 ```
 
-Ou dans l'autre sens :
+Ou dans l’autre sens :
 
 ```bash
 superia pipeline run TASK-0001 \
@@ -50,20 +63,40 @@ superia pipeline run TASK-0001 \
   --reviewer codex \
   --max-turns 8 \
   --max-tokens 50000 \
-  --max-price 0.25
+  --max-price 0.25 \
+  --max-total-price 0.75
 ```
 
-Le builder et le reviewer identiques sont refusés avant tout lancement.
+Pour un pipeline réel, la CLI refuse l’exécution sans :
+
+- `--max-price` : plafond Vibe réservé par tentative ;
+- `--max-total-price` : plafond cumulé du pipeline.
+
+Aucune valeur facturable n’est autorisée silencieusement. Le builder et le reviewer identiques sont refusés avant tout lancement.
 
 ## Étapes
 
 ### 1. Builder
 
-Le builder travaille en mode `build` dans le worktree. Il passe par Gitleaks, Bubblewrap, le lease exclusif, le contexte vérifiable et les limites propres au fournisseur.
+Le builder travaille en mode `build` dans le worktree. Il passe par :
 
-### 2. Change guard
+- le DAG et le lease exclusif ;
+- le contexte vérifiable ;
+- Gitleaks ;
+- Bubblewrap ;
+- le masquage des fichiers privés suivis, non suivis et ignorés ;
+- les limites propres au fournisseur.
 
-Super IA compare l'état Git avant et après le builder. Tout fichier hors `allowedPaths` fait échouer le run.
+### 2. Garde des modifications
+
+Super IA compare l’état Git avant et après le builder. Le run échoue si :
+
+- un fichier sort de `allowedPaths` ;
+- un chemin critique est touché ;
+- les plafonds de fichiers ou d’octets sont dépassés ;
+- le garde rencontre une erreur.
+
+Artefacts :
 
 ```text
 AGENT_CHANGES.patch
@@ -74,6 +107,8 @@ AGENT_RESULT.json
 ### 3. Validations locales
 
 Les commandes détectées sont exécutées dans le runner local. Un échec empêche le reviewer de démarrer.
+
+Le runner borne le temps d’exécution. Après timeout, il envoie `SIGTERM`, attend la période de grâce puis envoie `SIGKILL` au groupe avant de poursuivre.
 
 ### 4. Reviewer indépendant
 
@@ -97,7 +132,7 @@ Un finding valide contient sévérité, catégorie, résumé, preuve et recomman
 
 ### 5. Receipt
 
-Le receipt inclut contexte, logs, résultat agent, patch, change guard, validations, review, identité du reviewer et empreintes SHA-256. `humanApprovalRequired` reste toujours à `true`.
+Le receipt inclut contexte, logs, résultat agent, patch, garde, validations, review, identité du reviewer et empreintes SHA-256. `humanApprovalRequired` reste toujours à `true`.
 
 ## Checkpoints
 
@@ -107,7 +142,7 @@ Le receipt inclut contexte, logs, résultat agent, patch, change guard, validati
 .superia/pipelines/TASK-XXXX.json
 ```
 
-Étapes possibles :
+Étapes :
 
 ```text
 initialized
@@ -128,6 +163,8 @@ superia pipeline status TASK-0001 --json
 superia pipeline run TASK-0001 \
   --builder codex \
   --reviewer vibe \
+  --max-price 0.25 \
+  --max-total-price 0.75 \
   --resume
 ```
 
@@ -136,7 +173,8 @@ Règles :
 - fournisseurs et worktree identiques au checkpoint ;
 - builder, validations et review déjà terminés non relancés ;
 - receipt manquant recréable ;
-- reprise refusée sans checkpoint builder complet.
+- reprise refusée sans checkpoint builder complet ;
+- plafonds du checkpoint conservés.
 
 ## Correction bornée
 
@@ -146,12 +184,14 @@ Une review `changes-requested` peut être corrigée explicitement :
 superia pipeline run TASK-0001 \
   --builder codex \
   --reviewer vibe \
+  --max-price 0.25 \
+  --max-total-price 0.75 \
   --retry
 ```
 
-`--resume` reprend une interruption technique. `--retry` ouvre une nouvelle tentative de correction. Ils sont incompatibles dans la même commande.
+`--resume` reprend une interruption technique. `--retry` ouvre une nouvelle tentative. Ils sont incompatibles dans la même commande.
 
-La review précédente est transmise au builder via `feedbackPath`. Son contenu ne passe pas dans `argv`.
+La review précédente est transmise au builder via un fichier `feedbackPath`. Son contenu ne passe pas dans `argv`.
 
 ### Budgets immuables
 
@@ -165,7 +205,7 @@ reservedPerAttemptUsd
 
 Une commande de retry ne peut pas augmenter ces plafonds. Chaque builder terminé consomme une tentative et son plafond réservé, même si les validations échouent ensuite.
 
-Le coût enregistré est un **prix maximal réservé pour Vibe**, et non une affirmation de dépense réelle. L'extraction des coûts facturés reste à implémenter après les essais réels.
+Le coût enregistré est un **prix maximal réservé pour Vibe**, et non une affirmation de dépense réelle. L’extraction des coûts facturés reste à implémenter après les essais réels.
 
 ### Détection de boucle
 
@@ -177,9 +217,9 @@ mission    = blocked
 reviewer   = non relancé
 ```
 
-Le système évite ainsi de payer une nouvelle review pour une correction identique.
+Le système évite ainsi une nouvelle review pour une correction identique.
 
-### Causes d'arrêt
+### Causes d’arrêt
 
 ```text
 approved
@@ -191,12 +231,6 @@ loop-detected
 technical-failure
 ```
 
-Ces informations restent visibles avec :
-
-```bash
-superia pipeline status TASK-0001
-```
-
 ## Statuts de mission
 
 ```text
@@ -206,20 +240,12 @@ blocked  si le reviewer demande des changements ou si une boucle est détectée
 failed   si une étape technique échoue
 ```
 
-## Dry-run
-
-```bash
-superia pipeline run TASK-0001 \
-  --builder codex \
-  --reviewer vibe \
-  --dry-run
-```
-
-Le dry-run prépare les deux invocations et préflights sans démarrer d'agent.
-
 ## Garanties testées
 
 - fournisseurs distincts ;
+- budget réel explicite ;
+- dépendances DAG ;
+- fichiers privés masqués dans Bubblewrap ;
 - garde Git avant validation ;
 - reviewer non lancé après échec ;
 - review structurée et cohérente ;
@@ -229,12 +255,13 @@ Le dry-run prépare les deux invocations et préflights sans démarrer d'agent.
 - plafonds immuables ;
 - chaque builder comptabilisé ;
 - patch identique bloquant avant nouvelle review ;
+- descendants arrêtés après timeout ;
 - aucune fusion automatique.
 
 ## Limites actuelles
 
 - correction déclenchée manuellement avec `--retry` ;
-- prix réel non encore extrait des fournisseurs ;
-- taille maximale des diffs à renforcer ;
-- liste globale de fichiers toujours interdits à renforcer ;
-- fournisseurs réels à tester sur le Pi cible.
+- prix réellement facturé non extrait des fournisseurs ;
+- fournisseurs réels à tester sur le Pi cible ;
+- compatibilité noyau Bubblewrap à confirmer sur ARM64 ;
+- approbation et fusion finales toujours humaines.
