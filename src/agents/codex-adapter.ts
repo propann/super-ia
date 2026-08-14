@@ -4,6 +4,16 @@ import type { SuperIaTask } from "../core/types.js";
 import type { ContextBuildResult } from "../context/types.js";
 import type { AgentInvocation, AgentMode } from "./types.js";
 
+function reviewSchemaInstructions(): string[] {
+  return [
+    "Réponds UNIQUEMENT avec un objet JSON valide, sans bloc Markdown ni commentaire.",
+    "Schéma obligatoire :",
+    '{"verdict":"approve|changes-requested|blocked","findings":[{"severity":"critical|high|medium|low","category":"string","summary":"string","evidence":"string","recommendation":"string","file":"string optionnel","line":1}],"residualRisks":["string"]}',
+    "Chaque finding doit être étayé par une preuve précise. N'invente ni fichier ni ligne.",
+    "Utilise approve seulement si aucun finding critical, high ou medium ne subsiste.",
+  ];
+}
+
 function modeInstructions(mode: AgentMode): string {
   if (mode === "build") {
     return [
@@ -15,10 +25,11 @@ function modeInstructions(mode: AgentMode): string {
   }
   if (mode === "review") {
     return [
-      "MODE SUPER IA : REVIEW",
+      "MODE SUPER IA : REVIEW INDÉPENDANTE",
       "Travaille en lecture seule.",
-      "Analyse les risques, les régressions, les tests manquants et les problèmes de sécurité.",
-      "Ne modifie aucun fichier.",
+      "Analyse le diff Git courant, les régressions, les tests manquants, les problèmes de sécurité et le respect de la mission.",
+      "Ne modifie aucun fichier et n'approuve jamais sur la seule déclaration du builder.",
+      ...reviewSchemaInstructions(),
     ].join("\n");
   }
   return [
@@ -66,7 +77,9 @@ export async function buildCodexInvocation(input: {
     "",
     contextText,
     "",
-    "Réponds avec un compte rendu factuel. Ne prétends jamais avoir exécuté une commande absente des événements.",
+    input.mode === "review"
+      ? "Base ton verdict uniquement sur les éléments visibles dans le dépôt et le diff courant."
+      : "Réponds avec un compte rendu factuel. Ne prétends jamais avoir exécuté une commande absente des événements.",
   ].join("\n");
 
   return {
