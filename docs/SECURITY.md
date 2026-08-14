@@ -7,24 +7,22 @@ Super IA utilise plusieurs barrières indépendantes. Aucune barrière ne suffit
 1. dépôt Git comme source de vérité ;
 2. mode plan/review en lecture seule ;
 3. worktree obligatoire avant écriture autonome ;
-4. lease exclusif par mission ;
-5. contexte ciblé avec chemins sensibles exclus ;
-6. Gitleaks obligatoire avant Codex/Vibe réels ;
-7. Bubblewrap obligatoire sous Linux avant Codex/Vibe réels ;
-8. runner sans shell implicite ;
-9. logs, événements et receipts persistants ;
-10. validations séparées de l'agent ;
-11. approbation humaine obligatoire ;
-12. aucune fusion automatique ;
-13. budget API à zéro par défaut.
+4. chemins autorisés obligatoires avant un build ;
+5. lease exclusif par mission ;
+6. contexte ciblé avec chemins sensibles exclus ;
+7. Gitleaks obligatoire avant Codex/Vibe réels ;
+8. Bubblewrap obligatoire sous Linux avant Codex/Vibe réels ;
+9. contrôle Git avant/après chaque agent ;
+10. runner sans shell implicite ;
+11. logs, événements, diffs et receipts persistants ;
+12. validations séparées de l'agent ;
+13. approbation humaine obligatoire ;
+14. aucune fusion automatique ;
+15. budget API à zéro par défaut.
 
 ## Préflight Gitleaks
 
-Un agent distant est refusé lorsque :
-
-- Gitleaks est absent ;
-- le scan échoue ;
-- un finding est présent.
+Un agent distant est refusé lorsque Gitleaks est absent, lorsque le scan échoue ou lorsqu'un finding est présent.
 
 Une dérogation exige `--allow-without-gitleaks` et écrit `security.preflight.waived`.
 
@@ -63,21 +61,47 @@ Le constructeur de contexte exclut notamment :
 
 Le rapport Gitleaks est expurgé avant archivage : les secrets bruts ne doivent pas être recopiés dans les événements ou receipts.
 
+## Contrôle des modifications
+
+Un build est refusé lorsqu'aucun périmètre n'est déclaré :
+
+```bash
+superia task update TASK-0001 \
+  --allow-path "src/**" \
+  --allow-path "tests/**"
+```
+
+Super IA capture l'état Git avant et après l'agent, compare les fichiers aux motifs autorisés et produit :
+
+```text
+AGENT_CHANGES.patch
+CHANGE_GUARD.json
+AGENT_RESULT.json
+```
+
+Une modification hors périmètre fait échouer le run, même lorsque l'agent sort avec le code 0. Une erreur du change guard est elle-même bloquante.
+
+Les modes `plan` et `review` n'autorisent aucune modification.
+
+Voir [`CHANGE_GUARD.md`](CHANGE_GUARD.md).
+
 ## Réseau
 
 Codex et Vibe nécessitent actuellement le réseau de l'hôte pour joindre leurs services officiels.
 
 Les agents locaux, validateurs ou outils ne nécessitant pas Internet doivent utiliser le mode réseau isolé. Un filtrage par domaine pour les fournisseurs distants reste à construire.
 
-## Contrôle des modifications
+## Barrières qui restent nécessaires
 
-Le worktree et Bubblewrap réduisent la zone d'écriture. `SIA-204` doit encore ajouter :
+Le contrôle de chemins ne juge pas la qualité ni la sécurité sémantique du code. Le prochain pipeline doit encore ajouter :
 
-- état Git avant/après ;
-- liste de chemins autorisés ;
-- détection des modifications hors périmètre ;
-- diff archivé ;
-- échec du run en cas de violation.
+- reviewer indépendant du builder ;
+- findings structurés ;
+- taille maximale du diff ;
+- fichiers toujours interdits ;
+- validations obligatoires ;
+- budget de retries ;
+- receipt final réunissant toutes les preuves.
 
 ## Navigateurs assistés
 
