@@ -1,6 +1,11 @@
 import { executeCodexTask } from "./executor.js";
 import { executeVibeTask } from "./vibe-executor.js";
-import type { AgentExecutionOptions, AgentMode } from "./types.js";
+import type {
+  AgentExecutionOptions,
+  AgentExecutionPreview,
+  AgentExecutionResult,
+  AgentMode,
+} from "./types.js";
 
 function flagValue(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -28,6 +33,12 @@ function numberOption(args: string[], flag: string, minimum: number, maximum: nu
     throw new Error(`${flag} doit être compris entre ${minimum} et ${maximum}.`);
   }
   return value;
+}
+
+function isExecutionResult(
+  result: AgentExecutionPreview | AgentExecutionResult,
+): result is AgentExecutionResult {
+  return "process" in result && typeof result.process === "object" && result.process !== null;
 }
 
 export async function handleAgentCommand(
@@ -60,12 +71,12 @@ export async function handleAgentCommand(
     options.maxPriceUsd = numberOption(args, "--max-price", 0.01, 5);
   }
 
-  const result = provider === "codex"
+  const result: AgentExecutionPreview | AgentExecutionResult = provider === "codex"
     ? await executeCodexTask(cwd, taskId, options)
     : await executeVibeTask(cwd, taskId, options);
 
   if (asJson) console.log(JSON.stringify(result, null, 2));
-  else if (!("process" in result)) {
+  else if (!isExecutionResult(result)) {
     console.log(`PRÉVISUALISATION ${result.provider.toUpperCase()}`);
     console.log(`Mode       ${result.mode}`);
     console.log(`Dossier    ${result.cwd}`);
