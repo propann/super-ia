@@ -45,7 +45,7 @@ exit 97
   await chmod(path, 0o755);
 }
 
-test("Vibe keeps safe programmatic mode inside Bubblewrap after Gitleaks", async () => {
+test("Vibe requires an explicit budget and masks ignored secrets inside Bubblewrap", async () => {
   const parent = await mkdtemp(join(tmpdir(), "superia-vibe-"));
   const root = join(parent, "repo");
   const home = join(parent, "home");
@@ -55,7 +55,8 @@ test("Vibe keeps safe programmatic mode inside Bubblewrap after Gitleaks", async
   const oldHome = process.env.SUPERIA_HOME;
   await git(parent, "init", "-b", "main", root);
   await mkdir(bin, { recursive: true });
-  await writeFile(join(root, ".gitignore"), ".superia/\n");
+  await writeFile(join(root, ".gitignore"), ".superia/\n.env\n");
+  await writeFile(join(root, ".env"), "PRIVATE_VALUE=not-recognized-by-fake-gitleaks\n");
   await writeFile(join(root, "README.md"), "# Fake Vibe project\n");
   await git(root, "config", "user.email", "test@example.invalid");
   await git(root, "config", "user.name", "Super IA Test");
@@ -77,7 +78,12 @@ printf '%s\n' '{"type":"assistant","content":"fake-vibe-completed"}'
     const scan = await scanRepository(root);
     const task = await createTask(scan, "Analyser le dépôt avec Vibe sans shell");
 
-    const result = await executeVibeTask(root, task.id, { mode: "plan", timeoutMs: 10_000 });
+    await assert.rejects(
+      () => executeVibeTask(root, task.id, { mode: "plan", timeoutMs: 10_000 }),
+      /plafond explicite --max-price/,
+    );
+
+    const result = await executeVibeTask(root, task.id, { mode: "plan", timeoutMs: 10_000, maxPriceUsd: 0.25 });
     assert.ok("process" in result);
     assert.equal(result.process.status, "completed");
     assert.equal(result.securityPreflight.status, "passed");
@@ -85,6 +91,7 @@ printf '%s\n' '{"type":"assistant","content":"fake-vibe-completed"}'
     assert.equal(result.sandboxPreflight.workspaceAccess, "read-only");
     assert.equal(result.process.sandbox?.engine, "bubblewrap");
     assert.equal(result.process.sandbox?.network, "host");
+    assert.equal(result.process.sandbox?.maskedPaths.some((item) => item.path === join(root, ".env")), true);
     assert.equal(result.securityPreflight.findings, 0);
     assert.ok(result.securityPreflight.reportPath);
     assert.equal(result.parsedEvents, 1);
@@ -103,6 +110,8 @@ printf '%s\n' '{"type":"assistant","content":"fake-vibe-completed"}'
     assert.match(bwrap, /--clearenv/);
     assert.ok(bwrap.includes(root));
     assert.ok(bwrap.includes("/home/superia"));
+    assert.ok(bwrap.includes("/dev/null"));
+    assert.ok(bwrap.includes(join(root, ".env")));
     assert.doesNotMatch(bwrap, /--unshare-net/);
 
     await assert.rejects(
