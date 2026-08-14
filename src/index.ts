@@ -2,6 +2,7 @@
 import { handleAgentCommand } from "./agents/cli.js";
 import { initializeProject } from "./core/config.js";
 import { inspectLocalTools, inspectProviders } from "./core/doctor.js";
+import { buildReadinessReport, renderReadinessReport } from "./core/readiness.js";
 import { scanRepository } from "./core/repository-scanner.js";
 import { handleTaskCommand } from "./core/task-cli.js";
 import { getTask } from "./core/task-store.js";
@@ -19,15 +20,24 @@ import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.14.0
+  console.log(`Super IA v0.15.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
+  superia readiness [--json]                    Verdict global hors ligne
   superia doctor [--json]                       Détecte les IA et outils locaux
   superia providers [--json]                    Affiche les fournisseurs
   superia local [--json]                        Affiche les outils locaux
   superia scan [--json]                         Analyse le dépôt courant
   superia init                                  Initialise dépôt et plan de contrôle
+
+  superia connection init                       Initialise le registre privé
+  superia connection dashboard [--json]         Connection Matrix
+  superia connection doctor [--json]            Diagnostic sans réseau ni secret
+  superia connection policy [--json]            Audit URL statique sans DNS
+  superia connection probe <ID> --network       Sonde explicite sans authentification
+      --timeout-ms 5000                          Délai compris entre 250 et 15000 ms
+  superia connection secret-backends            Détecte les coffres disponibles
 
   superia control init|status [--json]          Inspecte SQLite WAL
   superia project add|sync [path] [--json]      Enregistre ou synchronise un dépôt
@@ -38,6 +48,8 @@ Usage:
   superia task list [--json]                    Liste les missions
   superia task show <TASK-ID> [--json]          Affiche une mission détaillée
   superia task board [--json]                   Tableau de suivi et progression
+  superia task graph [--json]                   Vérifie le DAG et son ordre
+  superia task reconcile [--json]               Bloque/débloque selon les dépendances
   superia task note <TASK-ID> <texte>           Ajoute une note horodatée
   superia task update <TASK-ID> [options]       Met à jour le pilotage
       --status planned|ready|running|blocked|review|done|failed|cancelled
@@ -50,7 +62,7 @@ Usage:
   superia context build [TASK-ID] [options]     Crée un contexte Git vérifiable
   superia security scan [options]               Lance Gitleaks
       --required --mode dir|git --timeout-minutes 5
-  superia security sandbox-check [--json]       Teste Bubblewrap sur la machine
+  superia security sandbox-check [--json]       Teste et persiste la preuve Bubblewrap
   superia validate [--timeout-minutes 15]       Exécute les checks dans le runner
 
   superia agent run codex <TASK-ID> [options]   Lance Codex contrôlé
@@ -93,16 +105,18 @@ Principes:
   - mode agent par défaut : plan en lecture seule
   - mode build uniquement dans un worktree avec chemins autorisés
   - toute modification hors périmètre fait échouer le run et archive le diff
+  - DAG sans cycle ; une mission attend automatiquement ses prérequis
   - pipeline : builder, validations locales, reviewer différent, receipt
   - reviewer strictement en lecture seule et rapport JSON structuré obligatoire
   - corrections uniquement avec --retry, plafonds figés et review précédente injectée
   - patch identique détecté comme boucle avant une nouvelle review
   - coût affiché comme plafond Vibe réservé, jamais comme dépense réelle inventée
   - une seule exécution possède une mission grâce aux leases
-  - suivi explicite des blocages, dépendances et critères d'acceptation
   - Codex conserve sa sandbox ; Vibe n'obtient aucun shell
   - Gitleaks obligatoire avant tout run réel Codex/Vibe
-  - Bubblewrap obligatoire avant tout run réel Codex/Vibe sous Linux
+  - preuve Bubblewrap persistée et exigée sous Linux par readiness
+  - endpoints distants HTTPS publics uniquement ; LAN et métadonnées cloud bloqués
+  - sondes réseau sans authentification, sans redirection et uniquement avec --network
   - HOME jetable et workspace limité par mode
   - toute dérogation de sécurité est explicite, visible et journalisée
   - receipts SHA-256 sans jamais supprimer l'approbation humaine
@@ -161,6 +175,14 @@ async function main(): Promise<void> {
   if (await handleAgentCommand(command, args, json, process.cwd())) return;
   if (await handlePipelineCommand(command, args, json, process.cwd())) return;
   if (await handleReceiptCommand(command, args, json)) return;
+
+  if (command === "readiness") {
+    const report = await buildReadinessReport(process.cwd());
+    if (json) console.log(JSON.stringify(report, null, 2));
+    else console.log(renderReadinessReport(report));
+    if (report.overall === "fail") process.exitCode = 1;
+    return;
+  }
 
   if (command === "matrix" || command === "cockpit") {
     await runMatrixConsole(process.cwd(), { once: args.includes("--once") });
