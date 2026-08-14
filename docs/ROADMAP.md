@@ -1,6 +1,6 @@
 # Feuille de route Super IA
 
-Version courante : **0.11.0**  
+Version courante : **0.12.0**  
 Registre détaillé validé par la CI : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json)  
 Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 
@@ -19,11 +19,17 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - console Matrix globale ;
 - suivi enrichi des tâches ;
 - Gitleaks avec rapport JSON expurgé ;
-- **préflight Gitleaks obligatoire avant Codex et Vibe réels** ;
-- dérogation de sécurité explicite et journalisée.
+- préflight Gitleaks obligatoire ;
+- politique Bubblewrap commune ;
+- HOME jetable ;
+- accès au workspace limité par mode ;
+- sortie Codex montée individuellement ;
+- dérogations de sécurité explicites et journalisées ;
+- autotest Bubblewrap destiné au Pi.
 
 ### Bloqué par le matériel ou les comptes
 
+- exécution noyau réelle de l'autotest Bubblewrap sur le Pi ;
 - installation sur le Pi 5 réel ;
 - test de coupure brutale ;
 - test de restauration ;
@@ -33,12 +39,11 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 
 ### Prochain chantier logiciel
 
-1. ajouter Bubblewrap avec HOME temporaire et réseau contrôlé ;
-2. vérifier les chemins réellement modifiés par chaque agent ;
-3. intégrer un reviewer indépendant ;
-4. construire le pipeline builder → validation → review → receipt ;
-5. ajouter Restic après le test de restauration local ;
-6. construire le routeur coût/qualité à partir des benchmarks réels.
+1. contrôler les fichiers réellement modifiés par chaque agent ;
+2. intégrer un reviewer indépendant ;
+3. construire le pipeline builder → validation → review → receipt ;
+4. ajouter Restic après le test de restauration local ;
+5. construire le routeur coût/qualité à partir des benchmarks réels.
 
 ## V0.1 à V0.9 — fondations terminées
 
@@ -60,30 +65,37 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [x] notes horodatées ;
 - [x] tableau `superia task board` ;
 - [x] registre de roadmap JSON validé par la CI ;
-- [x] `superia security scan` ;
-- [x] Gitleaks avec rapport JSON expurgé ;
-- [x] mode manuel `--required`.
+- [x] Gitleaks avec rapport JSON expurgé.
 
-## V0.11 — préflight de sécurité
+## V0.11 — préflight Gitleaks
 
 - [x] Gitleaks exécuté avant Codex/Vibe réels ;
-- [x] run refusé si Gitleaks est absent ;
-- [x] run refusé lorsqu'un finding est présent ;
+- [x] run refusé si Gitleaks est absent ou détecte un finding ;
 - [x] rapport et run de scan enregistrés ;
-- [x] préflight inclus dans les métadonnées de l'agent ;
-- [x] dérogation `--allow-without-gitleaks` ;
-- [x] dérogation journalisée par événement durable ;
+- [x] préflight inclus dans les métadonnées ;
+- [x] dérogation explicite et journalisée ;
 - [x] test prouvant que l'agent bloqué ne démarre pas.
 
 ## V0.12 — sandbox commune
 
-- [ ] Bubblewrap sur Linux ;
-- [ ] HOME temporaire par run ;
-- [ ] écriture limitée au worktree et aux artefacts ;
-- [ ] réseau désactivé par défaut pour les agents génériques ;
-- [ ] liste d'exceptions réseau explicite ;
+- [x] constructeur Bubblewrap sur Linux ;
+- [x] préflight obligatoire avant Codex/Vibe réels ;
+- [x] HOME temporaire par run ;
+- [x] système et outils montés en lecture seule ;
+- [x] plan/review limités en lecture seule ;
+- [x] build limité au worktree en écriture ;
+- [x] sortie Codex individuelle en écriture ;
+- [x] état fournisseur limité ;
+- [x] réseau désactivable pour les tâches sans Internet ;
+- [x] dérogation Bubblewrap explicite et journalisée ;
+- [x] autotest `superia security sandbox-check` ;
+- [x] rapport `sandbox-status.json` pendant l'installation Pi ;
+- [x] tests de politique avec mocks ;
+- [ ] autotest noyau réussi sur le Pi réel ;
+- [ ] compatibilité réelle Bubblewrap + Codex ;
+- [ ] compatibilité réelle Bubblewrap + Vibe ;
 - [ ] Podman optionnel pour les tâches à risque élevé ;
-- [ ] tests d'accès hors périmètre.
+- [ ] filtrage réseau plus fin pour les agents distants.
 
 ## V0.13 — contrôle des modifications et qualité
 
@@ -104,8 +116,8 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [ ] test de coupure et reprise ;
 - [ ] test de sauvegarde/restauration ;
 - [ ] rapport matériel et consommation ;
-- [ ] Codex réel ;
-- [ ] Vibe réel ;
+- [ ] Codex réel sous Bubblewrap ;
+- [ ] Vibe réel sous Bubblewrap ;
 - [ ] benchmark identique ;
 - [ ] Restic et politique de rétention ;
 - [ ] copie hors machine.
@@ -130,7 +142,7 @@ La PR ne passe en prête pour revue que lorsque :
 - [ ] la restauration est prouvée ;
 - [ ] Codex et Vibe réels ont produit un receipt valide ;
 - [x] Gitleaks est obligatoire avant les agents distants intégrés ;
-- [ ] la sandbox commune est validée ;
+- [ ] la sandbox commune est validée sur le noyau du Pi ;
 - [ ] la CI est verte sur le head final ;
 - [ ] les limites restantes sont documentées ;
 - [ ] une revue humaine autorise la fusion.
