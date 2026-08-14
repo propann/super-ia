@@ -1,7 +1,7 @@
-import { scanRepository } from "./repository-scanner.js";
-import { addTaskNote, createTask, getTask, listTasks, taskCompletion, updateTask } from "./task-store.js";
-import type { SuperIaTask, TaskPriority, TaskStatus } from "./types.js";
 import { syncRepositoryToGlobalControl } from "../control/repository-sync.js";
+import { scanRepository } from "./repository-scanner.js";
+import { addTaskNote, createTask, getTask, getTaskGraph, listTasks, reconcileTaskGraph, taskCompletion, updateTask } from "./task-store.js";
+import type { SuperIaTask, TaskPriority, TaskStatus } from "./types.js";
 
 const statuses: TaskStatus[] = ["planned", "ready", "running", "blocked", "review", "done", "failed", "cancelled"];
 const priorities: TaskPriority[] = ["low", "normal", "high", "critical"];
@@ -54,6 +54,7 @@ function compactTask(task: SuperIaTask): Record<string, unknown> {
     owner: task.owner ?? null,
     dueDate: task.dueDate ?? null,
     dependencies: task.dependencies,
+    blockedByDependencies: Boolean(task.blockedByDependencies),
     tags: task.tags,
     allowedPaths: task.allowedPaths,
     updatedAt: task.updatedAt,
@@ -62,7 +63,7 @@ function compactTask(task: SuperIaTask): Record<string, unknown> {
 
 function printTask(task: SuperIaTask): void {
   console.log(`${task.id} — ${task.title}`);
-  console.log(`Statut      ${task.status}`);
+  console.log(`Statut      ${task.status}${task.blockedByDependencies ? " (dépendances)" : ""}`);
   console.log(`Priorité    ${task.priority}`);
   console.log(`Responsable ${task.owner ?? "-"}`);
   console.log(`Provider    ${task.provider ?? "-"}`);
@@ -87,9 +88,24 @@ function printBoard(tasks: SuperIaTask[]): void {
     for (const task of group) {
       const due = task.dueDate ? ` · ${task.dueDate}` : "";
       const owner = task.owner ? ` · ${task.owner}` : "";
-      console.log(`  ${task.id}  ${task.priority.padEnd(8)} ${task.title}${owner}${due}`);
+      const dependency = task.blockedByDependencies ? " · attente DAG" : "";
+      console.log(`  ${task.id}  ${task.priority.padEnd(8)} ${task.title}${owner}${due}${dependency}`);
     }
     console.log("");
+  }
+}
+
+function printGraph(analysis: Awaited<ReturnType<typeof getTaskGraph>>): void {
+  console.log(`SUPER IA — DAG MISSIONS  ${analysis.valid ? "VALIDE" : "INVALIDE"}`);
+  console.log(`Ordre       ${analysis.order.join(" -> ") || "-"}`);
+  console.log(`Prêtes      ${analysis.ready.join(", ") || "-"}`);
+  if (analysis.blocked.length) {
+    console.log("Bloquées");
+    for (const item of analysis.blocked) console.log(`  ${item.taskId} attend ${item.waitingFor.join(", ")}`);
+  } else console.log("Bloquées    -");
+  if (analysis.cycles.length) console.log(`Cycles      ${analysis.cycles.map((cycle) => cycle.join(" -> ")).join(" ; ")}`);
+  if (analysis.missingDependencies.length) {
+    console.log(`Manquantes  ${analysis.missingDependencies.map((item) => `${item.taskId}:${item.dependencyId}`).join(", ")}`);
   }
 }
 
@@ -124,6 +140,22 @@ export async function handleTaskCommand(command: string, args: string[], asJson:
     else printBoard(tasks);
     return true;
   }
+  if (action === "graph") {
+    const graph = await getTaskGraph(scan.root);
+    if (asJson) console.log(JSON.stringify(graph, null, 2)); else printGraph(graph);
+    if (!graph.valid) process.exitCode = 1;
+    return true;
+  }
+  if (action === "reconcile") {
+    const result = await reconcileTaskGraph(scan.root);
+    await syncRepositoryToGlobalControl(scan.root);
+    if (asJson) console.log(JSON.stringify(result, null, 2));
+    else {
+      printGraph(result.analysis);
+      console.log(`\nStatuts ajustés : ${result.changedIds.join(", ") || "aucun"}`);
+    }
+    return true;
+  }
   if (action === "note" && id) {
     const note = rest.join(" ");
     const task = await addTaskNote(scan.root, id, note);
@@ -153,5 +185,5 @@ export async function handleTaskCommand(command: string, args: string[], asJson:
     return true;
   }
 
-  throw new Error("Usage : superia task create|list|show|board|update|note");
+  throw new Error("Usage : superia task create|list|show|board|graph|reconcile|update|note");
 }
