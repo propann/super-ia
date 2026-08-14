@@ -2,85 +2,128 @@
 
 ## 14 août 2026 — fondation
 
-- Mission : créer le socle universel de Super IA.
 - Branche : `agent/bootstrap-universal-cli`.
-- Décisions : fournisseurs interchangeables, API désactivées par défaut, aucun contournement de quotas, Git et worktrees comme garde-fous.
-- Livré : CLI minimale, catalogue, diagnostic, configuration, documentation et tests initiaux.
+- Socle : CLI TypeScript, catalogue multi-fournisseurs, politiques de coût, scanner Git, missions et worktrees.
+- Règles : API désactivées par défaut, aucun contournement de quota, aucune fusion automatique.
 
-## 14 août 2026 — noyau opérationnel et console Matrix
+## Console Matrix et recherche
 
-- Mission : rendre le socle réellement exploitable depuis un dépôt Git.
-- Livré : scanner Git, détection de stack et de checks, missions persistantes `TASK-XXXX`, création de worktree, console `superia matrix`.
-- Validation locale : compilation TypeScript réussie ; tests du rendu Matrix et du flux complet `scan → mission → worktree` réussis.
-- Sécurité : aucun merge automatique, API toujours verrouillées, `--dry-run` disponible avant création d'un worktree.
+- Console terminal Matrix reliée aux données réelles.
+- Étude des concurrents, agents ouverts, protocoles ACP/MCP/A2A, mémoire, contexte et architecture Pi.
+- Décision : Pi 5 comme plan de contrôle uniquement ; aucun modèle local obligatoire.
+- Catalogue de recherche machine-lisible et protocole de benchmark.
 
-## 14 août 2026 — première étude multi-agent
+## Audit v0.3
 
-- Mission : étudier les IA, agents open source, systèmes de contexte et solutions locales avant de figer l'architecture.
-- Projets initiaux : Codex, Claude Code, Mistral Vibe, Gemini CLI, Qwen Code, Aider, OpenCode, mini-SWE-agent, OpenHands, Spec Kit, Repomix, Pochi et Tabby.
-- Décision mémoire : Git pour la vérité du code, Markdown pour les décisions, SQLite et JSONL pour les missions et événements, transcriptions locales pour les preuves.
-- Décision multi-agent : orchestrateur déterministe, rôles spécialisés, worktrees séparés, contrôleur indépendant et validation humaine.
+- Vérification stricte de ce qui existait réellement dans Git.
+- Résultat de l'époque : 10 tests verts ; stockage JSON par dépôt ; aucun agent lancé.
+- Création de `docs/STATUS.md` pour séparer livré, conçu et restant à faire.
 
-## 14 août 2026 — registre des capacités locales
+## V0.4 — plan de contrôle durable
 
-- Mission : distinguer les fournisseurs IA des outils réellement disponibles sur la machine.
-- Livré : registre de 15 outils locaux couvrant Git, recherche, contexte, agents, inférence expérimentale, sandbox, conteneurs et sauvegarde.
-- Nouvelle commande : `superia local [--json]`.
-- Diagnostic étendu : `superia doctor` affiche fournisseurs et outils locaux.
-- Console Matrix : panneau des capacités locales détectées.
-- Tests : unicité du catalogue, exigences des outils obligatoires et rendu Matrix.
+- `SUPERIA_HOME` global ;
+- SQLite WAL et migration initiale ;
+- projets, missions synchronisées, runs, heartbeats et événements ;
+- miroir JSONL append-only ;
+- récupération des runs abandonnés ;
+- commandes `control`, `project`, `run`, `events` et `recover`.
 
-## 14 août 2026 — étude concurrentielle approfondie
+Validation : 12 tests réussis.
 
-- Mission : analyser le plus largement possible les concurrents, protocoles, architectures, forces, limites et briques réutilisables.
-- Concurrents directs étudiés : Shep, Mozzie, Agetor, Agent of Empires, Claude Squad, Squad, The Pair, Mission Control, OpenHands Agent Canvas et Agent Orchestrator.
-- Projets adjacents ajoutés : Serena, codebase-memory-mcp, Beads, Gitleaks, Cline, Roo Code, Agent Deck, ADHDev et amux.
-- Protocoles étudiés : ACP, MCP, A2A, sorties JSON/JSONL, terminal/tmux, REST/OpenAPI et bus SQLite.
-- Enseignements :
-  - worktree = isolation Git, pas sandbox ;
-  - SQLite + événements append-only = meilleur socle léger ;
-  - mission, run et session doivent être séparés ;
-  - les tâches importantes utilisent un état structuré, pas une conversation libre ;
-  - ACP est le transport préféré lorsqu'il est disponible ;
-  - MCP sert les outils et le contexte, pas l'orchestration globale ;
-  - A2A est différé aux workers distants ;
-  - toute fin de mission doit produire un receipt de preuve.
-- Livré :
-  - `COMPETITOR_LANDSCAPE_2026.md` ;
-  - `PROTOCOLS_RUNTIME_AND_INTEROP.md` ;
-  - `REFERENCE_ARCHITECTURE.md` ;
-  - `RESEARCH_CATALOG.json` ;
-  - index de recherche mis à jour ;
-  - roadmap reconstruite à partir des conclusions.
+## V0.5 — contexte et runner
 
-## 14 août 2026 — correction du rôle du Pi
+- contexte Git ciblé ;
+- manifeste SHA-256 par fichier et empreinte globale ;
+- chemins sensibles, binaires et formats de secrets exclus ;
+- runner sans shell implicite ;
+- environnement réduit ;
+- logs persistants ;
+- timeout et arrêt du groupe de processus ;
+- commande `superia validate`.
 
-- Décision utilisateur : aucun modèle IA sur le Pi dans le MVP.
-- Le Pi 5 devient exclusivement le plan de contrôle : Git, SQLite, contextes, worktrees, agents CLI, tests, receipts et sauvegardes.
-- Ollama, llama.cpp et LocalAI sont marqués expérimentaux, hors installation par défaut et hors MVP.
-- Un Pi 4/5 pourra servir de laboratoire futur uniquement après benchmark d'un cas d'usage précis.
+Validation : 15 tests réussis.
 
-## 14 août 2026 — audit de livraison
+## V0.6 — Codex et leases
 
-- Mission : vérifier le dépôt plutôt que se fier aux annonces de travail intermédiaires.
-- Branche vérifiée : `agent/bootstrap-universal-cli`.
-- Commit initialement contrôlé : `3c3e19710b73b6743f4368064befbf82f477eada`.
-- PR : ouverte, brouillon et fusionnable.
-- Version réellement publiée : `0.3.0`.
-- CI GitHub : Ubuntu 24.04, Node 22.23.2 et npm 10.9.8.
-- Résultat : compilation TypeScript réussie, 10 tests réussis, 0 échec et 0 vulnérabilité npm signalée pendant le job.
-- Constat : SQLite WAL, serveur web, reprise, receipts, exécution d'agents et paquet systemd Pi n'étaient pas présents dans la branche.
-- Décision : ces éléments restent non livrés tant qu'ils ne sont pas rattachés à un commit et validés par GitHub Actions.
-- Documentation ajoutée : `docs/STATUS.md`, avec séparation stricte entre livré, conçu et restant à implémenter.
+- lease SQLite exclusif par mission ;
+- expiration et reprise du lease ;
+- adaptateur Codex `exec` ;
+- plan/review en lecture seule ;
+- build uniquement dans un worktree ;
+- sandbox officielle conservée ;
+- prompt par stdin ;
+- JSONL et dernière réponse archivés ;
+- test de bout en bout avec faux Codex sans quota.
+
+Validation : 18 tests réussis.
+
+## V0.7 — exploitation Pi
+
+- sauvegarde SQLite par `VACUUM INTO` ;
+- manifeste SHA-256 et détection de corruption ;
+- daemon de synchronisation/récupération ;
+- console Matrix multi-projets ;
+- service systemd utilisateur durci ;
+- installateur/désinstallateur sans `sudo` ;
+- première sauvegarde créée et vérifiée lors de l'installation.
+
+Validation : 20 tests, scripts shell valides et contrôle anti-`sudo`.
+
+## V0.8 — Mistral Vibe
+
+- étude du code officiel de la CLI ;
+- mode programmatique forcé par `--prompt ""` ;
+- vrai contexte transmis par stdin ;
+- plan/review via `plan` ;
+- build via `accept-edits` ;
+- shell désactivé ;
+- outils de fichiers limités ;
+- budgets de prix, tokens et tours ;
+- modèle transmis via `VIBE_ACTIVE_MODEL` ;
+- test de bout en bout avec faux Vibe sans coût.
+
+Une erreur TypeScript de réduction d'union a été détectée par la CI puis corrigée avant publication du statut.
+
+Validation : 21 tests réussis.
+
+## V0.9 — receipts de preuve
+
+- receipt par run ;
+- contexte, Git, logs, réponse, événements et validations réunis ;
+- SHA-256 du receipt et de chaque artefact ;
+- vérification ultérieure ;
+- test de falsification d'un log ;
+- verdict distinguant agent, contexte, artefacts et validations ;
+- approbation humaine toujours obligatoire.
+
+Validation GitHub :
+
+- Ubuntu 24.04 ;
+- Node 22.23.2 ;
+- npm 10.9.8 ;
+- 22 tests réussis, 0 échec ;
+- 0 vulnérabilité npm signalée ;
+- scripts Pi valides ;
+- aucune commande `sudo` dans `install/pi`.
+
+## État honnête des adaptateurs
+
+Codex et Vibe sont validés par de faux exécutables locaux reproduisant leur transport programmatique. Cela prouve la plomberie Super IA, pas encore :
+
+- l'authentification réelle ;
+- la disponibilité du compte ;
+- la qualité du modèle ;
+- le coût réel ;
+- le fonctionnement sur le Pi cible.
 
 ## Prochaine phase
 
-1. stockage global SQLite en WAL et migrations ;
-2. registre multi-projets ;
-3. journal d'événements et reprise ;
-4. migration du stockage JSON actuel ;
-5. manifeste de contexte + Gitleaks ;
-6. runner de processus générique ;
-7. Codex puis Mistral Vibe ;
-8. receipts de validation ;
-9. paquet et test sur le Raspberry Pi 5 réel.
+1. installation sur le Pi 5 ;
+2. test du service, de la coupure et de la sauvegarde/restauration ;
+3. authentification officielle Codex/Vibe ;
+4. benchmark identique en mode plan ;
+5. Gitleaks ;
+6. reviewer indépendant ;
+7. pipeline builder → validation → review → receipt ;
+8. Restic ;
+9. routeur coût/qualité.
