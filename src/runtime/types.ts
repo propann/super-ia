@@ -1,3 +1,25 @@
+export type SandboxNetworkMode = "host" | "isolated";
+export type SandboxWorkspaceAccess = "read-only" | "read-write";
+
+export interface ManagedSandboxRequest {
+  engine: "bubblewrap";
+  executable: string;
+  network: SandboxNetworkMode;
+  workspaceAccess: SandboxWorkspaceAccess;
+  statePaths?: string[];
+  readOnlyPaths?: string[];
+}
+
+export interface SandboxExecutionSummary {
+  engine: "bubblewrap";
+  active: true;
+  network: SandboxNetworkMode;
+  workspaceAccess: SandboxWorkspaceAccess;
+  ephemeralHome: true;
+  statePaths: string[];
+  readOnlyPaths: string[];
+}
+
 export interface ManagedProcessRequest {
   projectId: string;
   taskId?: string;
@@ -12,6 +34,7 @@ export interface ManagedProcessRequest {
   metadata?: Record<string, unknown>;
   env?: Record<string, string | undefined>;
   allowedEnvKeys?: string[];
+  sandbox?: ManagedSandboxRequest;
 }
 
 export interface ManagedProcessResult {
@@ -28,6 +51,7 @@ export interface ManagedProcessResult {
   stdoutBytes: number;
   stderrBytes: number;
   truncated: boolean;
+  sandbox?: SandboxExecutionSummary;
   status: "completed" | "failed";
 }
 
