@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 import { initializeProject } from "./core/config.js";
-import { inspectProviders } from "./core/doctor.js";
+import { inspectLocalTools, inspectProviders } from "./core/doctor.js";
 import { scanRepository } from "./core/repository-scanner.js";
 import { createTask, getTask, listTasks } from "./core/task-store.js";
 import { createWorktree } from "./core/worktree-manager.js";
 import { providerCatalog } from "./providers/catalog.js";
+import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.2.0
+  console.log(`Super IA v0.3.0
 
 Usage:
   superia matrix [--once]                Ouvre la console de contrôle Matrix
-  superia doctor [--json]                Détecte les outils IA installés
+  superia doctor [--json]                Détecte les IA et outils locaux
   superia providers [--json]             Affiche le catalogue des fournisseurs
+  superia local [--json]                 Affiche les outils locaux détectés
   superia scan [--json]                  Analyse le dépôt courant
   superia init                           Initialise .superia/config.json
   superia task create <objectif>         Crée une mission persistante
@@ -41,6 +43,16 @@ function compactProvider(provider: typeof providerCatalog[number]) {
   };
 }
 
+function compactLocalTool(tool: typeof localToolCatalog[number]) {
+  return {
+    id: tool.id,
+    name: tool.name,
+    category: tool.category,
+    status: tool.status,
+    lightweight: tool.lightweight,
+  };
+}
+
 function printScan(scan: Awaited<ReturnType<typeof scanRepository>>): void {
   console.log("Super IA — analyse du dépôt\n");
   console.log(`Dépôt        ${scan.name}`);
@@ -64,15 +76,20 @@ async function main(): Promise<void> {
   }
 
   if (command === "doctor") {
-    const checks = await inspectProviders();
+    const [providers, localTools] = await Promise.all([inspectProviders(), inspectLocalTools()]);
     if (json) {
-      console.log(JSON.stringify(checks, null, 2));
+      console.log(JSON.stringify({ providers, localTools }, null, 2));
       return;
     }
     console.log("Super IA — diagnostic des fournisseurs\n");
-    for (const item of checks) {
+    for (const item of providers) {
       const state = item.installed === null ? "ASSISTÉ" : item.installed ? "PRÉSENT" : "ABSENT";
       console.log(`${state.padEnd(8)} ${item.name.padEnd(30)} ${item.transport.padEnd(13)} ${item.cost}`);
+    }
+    console.log("\nSuper IA — outils locaux\n");
+    for (const item of localTools) {
+      const state = item.installed ? "PRÉSENT" : "ABSENT";
+      console.log(`${state.padEnd(8)} ${item.name.padEnd(24)} ${item.category.padEnd(11)} ${item.status}`);
     }
     console.log("\nABSENT signifie seulement que la commande n'est pas disponible dans le PATH actuel.");
     return;
@@ -85,6 +102,21 @@ async function main(): Promise<void> {
       for (const provider of providerCatalog) {
         const p = compactProvider(provider);
         console.log(`${p.id.padEnd(29)} ${p.transport.padEnd(13)} ${p.cost.padEnd(10)} ${p.status}`);
+      }
+    }
+    return;
+  }
+
+  if (command === "local" || command === "tools") {
+    const checks = await inspectLocalTools();
+    if (json) console.log(JSON.stringify(checks, null, 2));
+    else {
+      console.log("Super IA — capacités locales\n");
+      for (const item of checks) {
+        const tool = compactLocalTool(item);
+        const state = item.installed ? "PRÉSENT" : "ABSENT";
+        const commandName = item.detectedCommand ?? tool.id;
+        console.log(`${state.padEnd(8)} ${tool.name.padEnd(24)} ${tool.category.padEnd(11)} ${commandName}`);
       }
     }
     return;
