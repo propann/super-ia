@@ -1,5 +1,6 @@
 import { connectionCatalog } from "./catalog.js";
 import { renderConnectionDashboard } from "./dashboard.js";
+import { inspectSecretBackends } from "./secret-backends.js";
 import { ensureConnectionStore, inspectConnections, removeConnection, saveConnection, setConnectionEnabled, writeSecretsTemplate } from "./store.js";
 import type { AiConnection, ConnectionAuthMode, ConnectionKind } from "./types.js";
 
@@ -53,6 +54,16 @@ export async function handleConnectionCommand(command: string, args: string[], j
     if (json) console.log(JSON.stringify(checks, null, 2)); else console.log(renderConnectionDashboard(checks, process.stdout.columns ?? 112));
     return true;
   }
+  if (subcommand === "secret-backends") {
+    const checks = await inspectSecretBackends();
+    if (json) console.log(JSON.stringify(checks, null, 2));
+    else {
+      console.log("Super IA — coffres de secrets\n");
+      for (const item of checks) console.log(`${item.available ? "PRÉSENT" : "ABSENT"}  ${item.id.padEnd(16)} ${item.persistence.padEnd(15)} ${item.label}`);
+      console.log("\nAucune valeur de secret n'est lue par cette commande.");
+    }
+    return true;
+  }
   if (subcommand === "list" || subcommand === "doctor") {
     const checks = await inspectConnections();
     if (json) console.log(JSON.stringify(checks, null, 2)); else printChecks(checks);
@@ -104,5 +115,5 @@ export async function handleConnectionCommand(command: string, args: string[], j
     if (json) console.log(JSON.stringify(connection, null, 2)); else console.log(`Connexion enregistrée : ${connection.id}`);
     return true;
   }
-  throw new Error("Sous-commande connection inconnue. Utiliser catalog, init, dashboard, list, doctor, add, enable, disable, remove ou secrets-template.");
+  throw new Error("Sous-commande connection inconnue. Utiliser catalog, init, dashboard, list, doctor, secret-backends, add, enable, disable, remove ou secrets-template.");
 }
