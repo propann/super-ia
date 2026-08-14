@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { handleAgentCommand } from "./agents/cli.js";
 import { initializeProject } from "./core/config.js";
 import { inspectLocalTools, inspectProviders } from "./core/doctor.js";
 import { scanRepository } from "./core/repository-scanner.js";
@@ -13,7 +14,7 @@ import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.5.0
+  console.log(`Super IA v0.6.0
 
 Usage:
   superia matrix [--once]                       Ouvre la console Matrix
@@ -37,7 +38,11 @@ Usage:
       --query "mots clés" --max-bytes 300000 --output <dossier>
   superia validate [--timeout-minutes 15]       Exécute les checks dans le runner
 
-  superia run start <provider> [TASK-ID]        Ouvre un run durable
+  superia agent run codex <TASK-ID> [options]   Lance Codex via le plan de contrôle
+      --mode plan|build|review --model <nom> --dry-run
+      --timeout-minutes 60 --max-context-bytes 300000
+
+  superia run start <provider> [TASK-ID]        Ouvre un run durable manuel
   superia run list [--project PROJECT-ID]       Liste les runs
   superia run heartbeat <RUN-ID>                Rafraîchit le heartbeat
   superia run finish <RUN-ID> <statut>          Termine un run
@@ -46,9 +51,12 @@ Usage:
   superia help                                  Affiche cette aide
 
 Principes:
+  - mode agent par défaut : plan en lecture seule
+  - mode build uniquement dans un worktree existant
+  - une seule exécution possède une mission grâce aux leases
+  - aucun drapeau de contournement de sandbox
   - aucune fusion automatique sans validation humaine
   - API désactivées par défaut
-  - agents d'écriture confinés dans des worktrees Git
   - aucun fichier sensible dans un paquet de contexte
   - aucun shell implicite dans le runner
   - état global durable dans SUPERIA_HOME ou ~/.superia
@@ -96,6 +104,7 @@ async function main(): Promise<void> {
   if (await handleControlCommand(command, args, json, process.cwd())) return;
   if (await handleContextCommand(command, args, json, process.cwd())) return;
   if (await handleRuntimeCommand(command, args, json, process.cwd())) return;
+  if (await handleAgentCommand(command, args, json, process.cwd())) return;
 
   if (command === "matrix" || command === "cockpit") {
     await runMatrixConsole(process.cwd(), { once: args.includes("--once") });
