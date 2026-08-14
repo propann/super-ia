@@ -5,6 +5,7 @@ declare module "node:fs" {
 declare module "node:fs/promises" {
   export function access(path: string): Promise<void>;
   export function chmod(path: string, mode: number): Promise<void>;
+  export function lstat(path: string): Promise<{ isDirectory(): boolean }>;
   export function mkdir(path: string, options?: unknown): Promise<unknown>;
   export function readFile(path: string, encoding: string): Promise<string>;
   export function readFile(path: string): Promise<{ byteLength: number }>;
