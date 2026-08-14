@@ -91,6 +91,7 @@ export interface SuperIaTask {
   tags: string[];
   dependencies: string[];
   acceptanceCriteria: string[];
+  allowedPaths: string[];
   createdAt: string;
   updatedAt: string;
   checks: string[];
