@@ -1,0 +1,75 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { openControlPlane } from "../dist/control/control-plane.js";
+import { runManagedProcess } from "../dist/runtime/process-runner.js";
+
+function scan(root) {
+  return {
+    root,
+    name: "runtime-demo",
+    isGitRepository: true,
+    branch: "main",
+    dirty: false,
+    manifests: [],
+    languages: ["JavaScript"],
+    instructions: [],
+    scripts: {},
+    recommendedChecks: [],
+  };
+}
+
+test("managed runner stores output and completes the durable run", async () => {
+  const home = await mkdtemp(join(tmpdir(), "superia-runtime-"));
+  const root = await mkdtemp(join(tmpdir(), "superia-project-"));
+  try {
+    const control = await openControlPlane(home);
+    const project = control.registerProject(scan(root));
+    const result = await runManagedProcess({
+      projectId: project.id,
+      provider: "test-runner",
+      command: process.execPath,
+      args: ["-e", "console.log('managed-ok')"],
+      cwd: root,
+      timeoutMs: 5_000,
+      heartbeatMs: 1_000,
+    }, control);
+
+    assert.equal(result.status, "completed");
+    assert.equal(result.exitCode, 0);
+    assert.equal(control.getRun(result.runId).status, "completed");
+    assert.match(await readFile(result.stdoutPath, "utf8"), /managed-ok/);
+    control.close();
+  } finally {
+    await rm(home, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("managed runner times out and kills the process group", async () => {
+  const home = await mkdtemp(join(tmpdir(), "superia-timeout-"));
+  const root = await mkdtemp(join(tmpdir(), "superia-project-"));
+  try {
+    const control = await openControlPlane(home);
+    const project = control.registerProject(scan(root));
+    const result = await runManagedProcess({
+      projectId: project.id,
+      provider: "test-runner",
+      command: process.execPath,
+      args: ["-e", "setInterval(() => {}, 1000)"],
+      cwd: root,
+      timeoutMs: 1_000,
+      terminateGraceMs: 500,
+    }, control);
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.timedOut, true);
+    assert.equal(control.getRun(result.runId).status, "failed");
+    control.close();
+  } finally {
+    await rm(home, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true });
+  }
+});
