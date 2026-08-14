@@ -46,6 +46,7 @@ export interface AgentExecutionOptions {
   maxTurns?: number;
   maxTokens?: number;
   maxPriceUsd?: number;
+  feedbackPath?: string;
   dryRun?: boolean;
   allowWithoutGitleaks?: boolean;
   allowWithoutBubblewrap?: boolean;
