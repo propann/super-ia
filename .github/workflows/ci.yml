@@ -15,13 +15,28 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm test
-      - name: Validate Pi installer syntax
+      - name: Validate installer syntax
         run: |
           bash -n install/pi/install.sh
           bash -n install/pi/uninstall.sh
+          bash -n install/tools/system-packages-debian.sh
+          bash -n install/tools/bootstrap-user-tools.sh
+          bash -n install/tools/verify-toolchain.sh
+          bash -n install/tools/prepare-machine.sh
       - name: Reject privileged Pi installer commands
         run: |
           if grep -RInE '(^|[[:space:]])sudo([[:space:]]|$)' install/pi; then
             echo "The Pi package must not invoke sudo."
             exit 1
           fi
+      - name: Reject remote pipe to shell installers
+        run: |
+          if grep -RInE '(curl|wget)[^|]*\|[[:space:]]*(ba)?sh' install; then
+            echo "Remote content must never be piped directly into a shell."
+            exit 1
+          fi
+      - name: Validate non-destructive preparation plans
+        run: |
+          bash install/tools/prepare-machine.sh --phase plan --profile full
+          bash install/tools/system-packages-debian.sh --profile full --with-containers --dry-run
+          bash install/tools/bootstrap-user-tools.sh --profile full --dry-run --no-modify-path
