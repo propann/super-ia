@@ -2,8 +2,9 @@ export type ProviderTransport = "cli" | "web-assisted" | "local" | "api";
 export type CostProfile = "included" | "free-tier" | "low-cost" | "local" | "paid" | "unknown";
 export type AutomationLevel = "full" | "assisted" | "manual";
 export type ProviderStatus = "ready" | "planned" | "experimental" | "conditional";
-export type TaskStatus = "planned" | "ready" | "running" | "review" | "done" | "failed" | "cancelled";
-export type LocalToolCategory = "vcs" | "search" | "utility" | "database" | "context" | "agent" | "inference" | "sandbox" | "container" | "backup";
+export type TaskStatus = "planned" | "ready" | "running" | "blocked" | "review" | "done" | "failed" | "cancelled";
+export type TaskPriority = "low" | "normal" | "high" | "critical";
+export type LocalToolCategory = "vcs" | "search" | "utility" | "database" | "context" | "agent" | "inference" | "sandbox" | "container" | "backup" | "security";
 export type LocalToolStatus = "required" | "recommended" | "optional" | "experimental";
 
 export interface ProviderDefinition {
@@ -79,11 +80,17 @@ export interface SuperIaTask {
   title: string;
   goal: string;
   status: TaskStatus;
+  priority: TaskPriority;
   repositoryRoot: string;
   baseBranch: string;
   branchName: string;
   worktreePath?: string;
   provider?: string;
+  owner?: string;
+  dueDate?: string;
+  tags: string[];
+  dependencies: string[];
+  acceptanceCriteria: string[];
   createdAt: string;
   updatedAt: string;
   checks: string[];
