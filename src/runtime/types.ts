@@ -5,6 +5,7 @@ export interface ManagedProcessRequest {
   command: string;
   args?: string[];
   cwd: string;
+  stdin?: string;
   timeoutMs?: number;
   heartbeatMs?: number;
   terminateGraceMs?: number;
