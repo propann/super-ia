@@ -5,7 +5,7 @@ import { findExecutable } from "../utils/command.js";
 import { defaultConnections } from "./catalog.js";
 import type { AiConnection, ConnectionCheck, ConnectionKind, ConnectionState, ConnectionStore } from "./types.js";
 
-const kinds: ConnectionKind[] = ["cli-session", "api-key-env", "openai-compatible", "mcp-stdio", "mcp-http", "acp-stdio", "a2a-http", "ssh-cli", "web-assisted", "local-endpoint"];
+const kinds: ConnectionKind[] = ["cli-session", "api-key-env", "openai-compatible", "cloud-identity", "mcp-stdio", "mcp-http", "acp-stdio", "a2a-http", "ssh-cli", "web-assisted", "local-endpoint"];
 
 function connectionPath(root: string): string { return join(root, "connections.json"); }
 function secretDirectory(root: string): string { return join(root, "secrets"); }
