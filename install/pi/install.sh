@@ -60,7 +60,18 @@ sed \
 
 printf '==> Vérification initiale\n'
 SUPERIA_HOME="$SUPERIA_HOME" "$NODE_BIN" "$REPO_DIR/dist/index.js" daemon --once --json
-SUPERIA_HOME="$SUPERIA_HOME" "$NODE_BIN" "$REPO_DIR/dist/index.js" backup create --json
+BACKUP_JSON=$(SUPERIA_HOME="$SUPERIA_HOME" "$NODE_BIN" "$REPO_DIR/dist/index.js" backup create --json)
+BACKUP_DIR=$(printf '%s' "$BACKUP_JSON" | "$NODE_BIN" -e '
+let data = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", chunk => data += chunk);
+process.stdin.on("end", () => {
+  const parsed = JSON.parse(data);
+  if (!parsed.directory) process.exit(1);
+  process.stdout.write(parsed.directory);
+});
+')
+SUPERIA_HOME="$SUPERIA_HOME" "$NODE_BIN" "$REPO_DIR/dist/index.js" backup verify "$BACKUP_DIR"
 
 if command -v systemctl >/dev/null 2>&1 && systemctl --user daemon-reload 2>/dev/null; then
   systemctl --user enable --now superia.service
