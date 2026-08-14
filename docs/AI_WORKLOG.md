@@ -125,24 +125,17 @@ La politique est validée en CI. La frontière noyau réelle reste à vérifier 
 - run marqué `failed` en cas de modification hors périmètre ;
 - correction du parseur Git vers porcelain v2 après détection CI.
 
-Validation intermédiaire : 30 puis 32 tests réussis.
-
-## 15 août 2026 — reviewer indépendant
+## Reviewer indépendant et pipeline
 
 - builder et reviewer obligatoirement différents ;
-- mode review strictement en lecture seule ;
+- review strictement en lecture seule ;
 - schéma JSON obligatoire ;
 - findings structurés par sévérité, preuve et recommandation ;
-- réponse non structurée transformée en `blocked` ;
-- `approve` avec finding moyen ou supérieur transformé en `changes-requested` ;
-- rapport durable `REVIEW.json`.
-
-## Pipeline multi-agent contrôlé
-
-- ordre déterministe builder → garde Git → validations → reviewer → receipt ;
+- sortie non structurée transformée en `blocked` ;
+- approbation incohérente transformée en `changes-requested` ;
+- ordre builder → garde Git → validations → reviewer → receipt ;
 - reviewer non lancé si une étape précédente échoue ;
-- validations liées à la mission ;
-- receipt enrichi avec `CHANGE_GUARD.json`, patch et review ;
+- receipt enrichi avec change guard, patch et review ;
 - aucune fusion automatique.
 
 ## Checkpoints et reprise
@@ -155,12 +148,49 @@ Validation intermédiaire : 30 puis 32 tests réussis.
 - reprise après review en ne recréant que le receipt ;
 - reprise refusée sans checkpoint builder complet.
 
-Validation GitHub :
+Validation v0.13 : 39 tests réussis.
+
+## V0.14 — corrections bornées
+
+- nouvelle tentative uniquement avec `--retry` ;
+- retry autorisé seulement après une review `changes-requested` ;
+- `--resume` et `--retry` incompatibles ;
+- review précédente injectée au builder via un fichier, jamais dans `argv` ;
+- nombre maximal d'essais figé au premier lancement ;
+- plafond total de prix Vibe réservé figé au premier lancement ;
+- chaque builder terminé consomme une tentative, même si les validations échouent ensuite ;
+- empreinte SHA-256 de chaque patch ;
+- détection d'un patch déjà vu ;
+- arrêt avant une nouvelle validation ou review en cas de boucle ;
+- causes d'arrêt persistées ;
+- tableau `pipeline status` enrichi avec tentatives et prix réservé.
+
+Causes d'arrêt :
+
+```text
+approved
+changes-requested
+review-blocked
+retry-limit
+price-limit
+loop-detected
+technical-failure
+```
+
+Le test d'intégration vérifie qu'une seconde correction identique :
+
+- reçoit la review précédente ;
+- consomme une seconde tentative ;
+- porte le plafond réservé à 0,50 USD ;
+- ne relance pas le reviewer ;
+- termine avec `loop-detected`.
+
+Validation GitHub v0.14 :
 
 - Ubuntu 24.04 ;
 - Node 22.23.2 ;
 - npm 10.9.8 ;
-- **39 tests réussis, 0 échec** ;
+- **44 tests réussis, 0 échec** ;
 - 0 vulnérabilité npm signalée ;
 - scripts Pi valides ;
 - aucune commande `sudo` dans `install/pi`.
@@ -172,16 +202,17 @@ Codex et Vibe sont validés par de faux exécutables ou des runners simulés rep
 - l'authentification réelle ;
 - la disponibilité du compte ;
 - la qualité du modèle ;
-- le coût réel ;
+- le coût réellement facturé ;
 - le fonctionnement sur le Pi cible.
 
 ## Prochaine phase
 
-1. budget maximal de retries et détection de boucle ;
-2. installation sur le Pi 5 ;
-3. test du service, de la coupure et de la sauvegarde/restauration ;
-4. authentification officielle Codex/Vibe ;
+1. installer v0.14 sur le Pi 5 ;
+2. lancer l'autotest Bubblewrap réel ;
+3. tester service, coupure et restauration ;
+4. authentifier Codex et Vibe ;
 5. benchmark identique ;
 6. Restic ;
-7. routeur coût/qualité ;
-8. DAG de missions.
+7. limites de diff et fichiers toujours interdits ;
+8. routeur coût/qualité ;
+9. DAG de missions.
