@@ -10,9 +10,11 @@ Ce paquet installe Super IA comme **plan de contrôle utilisateur**. Il n'instal
 - Git ;
 - Node.js 22.5 ou supérieur ;
 - npm ;
-- systemd utilisateur.
+- systemd utilisateur ;
+- Bubblewrap pour les agents réels ;
+- Gitleaks pour les agents réels.
 
-Le Pi conserve les dépôts, missions, contextes, runs, événements, receipts et sauvegardes. Codex et Mistral Vibe sont installés et authentifiés séparément par leurs méthodes officielles.
+Le centre de contrôle peut être installé sans Bubblewrap ou Gitleaks, mais Codex et Vibe seront alors refusés par défaut.
 
 ## Installation
 
@@ -26,15 +28,17 @@ bash install/pi/install.sh
 L'installateur :
 
 1. vérifie Git, npm et Node ;
-2. installe les dépendances ;
-3. compile et lance tous les tests ;
-4. initialise `~/.superia` ;
-5. installe `~/.local/bin/superia` ;
-6. génère un service systemd utilisateur durci ;
-7. lance un tick du daemon ;
-8. crée la première sauvegarde ;
-9. vérifie immédiatement cette sauvegarde ;
-10. active le daemon lorsque systemd utilisateur est disponible.
+2. détecte Bubblewrap et Gitleaks ;
+3. installe les dépendances npm ;
+4. compile et lance tous les tests ;
+5. initialise `~/.superia` ;
+6. installe `~/.local/bin/superia` ;
+7. génère un service systemd utilisateur durci ;
+8. lance un tick du daemon ;
+9. crée et vérifie la première sauvegarde ;
+10. exécute l'autotest Bubblewrap lorsqu'il est disponible ;
+11. enregistre le résultat dans `~/.superia/sandbox-status.json` ;
+12. active le daemon lorsque systemd utilisateur est disponible.
 
 Aucune commande root n'est exécutée.
 
@@ -47,16 +51,20 @@ Aucune commande root n'est exécutée.
 ├── control.sqlite
 ├── events/events.jsonl
 ├── runs/<RUN-ID>/
+├── providers/
+├── security/
 ├── backups/
+├── sandbox-status.json
 └── daemon-status.json
 ```
-
-Le dépôt cloné reste le code exécutable du service.
 
 ## Vérification initiale
 
 ```bash
 superia control status --json
+superia doctor
+superia security scan --required
+superia security sandbox-check
 superia daemon --once --json
 superia backup list
 superia matrix --once
@@ -64,9 +72,28 @@ systemctl --user status superia.service
 journalctl --user -u superia.service -n 100 --no-pager
 ```
 
-## Fonctionnement après déconnexion
+Le contrôle Bubblewrap doit afficher tous les checks en réussite avant de considérer la sandbox matériellement validée.
 
-Selon la configuration du système, le service utilisateur peut s'arrêter à la fermeture de session. Pour un Pi serveur permanent :
+## Ce que vérifie l'autotest Bubblewrap
+
+```bash
+superia security sandbox-check --json
+```
+
+Le rapport couvre :
+
+- démarrage de Bubblewrap ;
+- espaces de noms demandés ;
+- HOME jetable ;
+- fichier extérieur invisible ;
+- écriture autorisée dans un workspace `read-write` ;
+- écriture dans l'état explicitement autorisé ;
+- refus d'écriture dans un workspace `read-only` ;
+- namespace réseau isolé demandé.
+
+Un échec peut indiquer que les espaces de noms utilisateur sont désactivés par le noyau ou la politique de la distribution.
+
+## Fonctionnement après déconnexion
 
 ```bash
 loginctl enable-linger "$USER"
@@ -85,14 +112,7 @@ Le service applique notamment :
 - interdiction SUID/SGID ;
 - redémarrage seulement en cas d'échec.
 
-Le daemon :
-
-- synchronise les projets ;
-- récupère les runs abandonnés ;
-- écrit son état de santé ;
-- ne lance aucun agent IA.
-
-Les agents sont lancés explicitement par l'utilisateur.
+Le daemon synchronise les projets et récupère les runs abandonnés. Il ne lance aucun agent IA automatiquement.
 
 ## Enregistrer un projet
 
@@ -110,30 +130,32 @@ superia worktree TASK-0001 --dry-run
 superia worktree TASK-0001
 ```
 
-## Installer et contrôler Codex
+## Codex
 
 Après installation et authentification officielles :
 
 ```bash
 superia doctor
+superia security sandbox-check
 superia agent run codex TASK-0001 --mode plan --dry-run
 superia agent run codex TASK-0001 --mode plan
 ```
 
-Le mode build est refusé sans worktree :
+Politique :
 
-```bash
-superia agent run codex TASK-0001 --mode build
-```
+- sandbox native Codex conservée ;
+- Bubblewrap externe obligatoire ;
+- dépôt en lecture seule en mode plan/review ;
+- seul le fichier de dernière réponse est monté en écriture ;
+- build refusé sans worktree.
 
-Codex garde sa sandbox officielle.
-
-## Installer et contrôler Mistral Vibe
+## Mistral Vibe
 
 Après installation et authentification officielles :
 
 ```bash
 superia doctor
+superia security sandbox-check
 superia agent run vibe TASK-0001 --mode plan --dry-run
 superia agent run vibe TASK-0001 \
   --mode plan \
@@ -142,15 +164,20 @@ superia agent run vibe TASK-0001 \
   --max-price 0.25
 ```
 
-Super IA désactive le shell de Vibe. Les validations sont lancées séparément :
+Vibe n'obtient aucun shell. Bubblewrap limite son HOME et l'accès au workspace.
+
+## Dérogations
 
 ```bash
-superia validate
+superia agent run codex TASK-0001 \
+  --mode plan \
+  --allow-without-gitleaks \
+  --allow-without-bwrap
 ```
 
-## Receipts
+Les dérogations sont visibles et journalisées. Elles ne doivent servir qu'au diagnostic et ne valident pas la machine.
 
-Après un run :
+## Receipts
 
 ```bash
 superia receipt create <RUN-ID>
@@ -167,12 +194,6 @@ superia backup list
 superia backup verify ~/.superia/backups/backup-YYYYMMDDHHMMSS
 ```
 
-La sauvegarde contient :
-
-- image SQLite créée avec `VACUUM INTO` ;
-- journal JSONL ;
-- manifeste tailles/SHA-256.
-
 Une copie hors du Pi reste nécessaire. Restic et la restauration automatisée seront ajoutés ultérieurement.
 
 ## Mise à jour
@@ -183,6 +204,7 @@ git pull
 npm install
 npm test
 systemctl --user restart superia.service
+superia security sandbox-check
 ```
 
 Ne pas automatiser `git pull` sur une branche contenant des modifications locales.
@@ -193,20 +215,17 @@ Ne pas automatiser `git pull` sur une branche contenant des modifications locale
 bash install/pi/uninstall.sh
 ```
 
-Le service et le wrapper sont retirés, mais les éléments suivants restent conservés :
-
-- `~/.superia` ;
-- receipts et sauvegardes ;
-- dépôts Git ;
-- worktrees.
+Le service et le wrapper sont retirés. `~/.superia`, les receipts, sauvegardes, dépôts et worktrees restent conservés.
 
 ## Statut de validation
 
 La CI vérifie :
 
 - compilation ;
-- 22 tests ;
+- **28 tests** ;
+- génération de la politique Bubblewrap ;
+- branchement Codex/Vibe ;
 - syntaxe des scripts ;
 - absence de `sudo` dans le paquet.
 
-L'installation complète et les connexions Codex/Vibe doivent encore être testées sur le Pi 5 réel avant de déclarer le paquet matériellement validé.
+La CI utilise des mocks pour Bubblewrap. L'installation, l'autotest noyau et les connexions Codex/Vibe doivent encore être exécutés sur le Pi 5 réel avant validation matérielle.
