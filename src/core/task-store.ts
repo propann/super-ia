@@ -1,5 +1,6 @@
 import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { analyzeTaskGraph, assertValidTaskGraph, reconcileDependencyStatuses, type TaskGraphAnalysis, type TaskGraphReconciliation } from "./task-graph.js";
 import type { RepositoryScan, SuperIaTask, TaskPriority, TaskStatus } from "./types.js";
 
 function taskDirectory(root: string): string {
@@ -45,6 +46,7 @@ function normalizeTask(raw: Partial<SuperIaTask>): SuperIaTask {
     dueDate: raw.dueDate,
     tags: stringArray(raw.tags),
     dependencies: stringArray(raw.dependencies),
+    blockedByDependencies: raw.blockedByDependencies === true,
     acceptanceCriteria: stringArray(raw.acceptanceCriteria),
     allowedPaths: stringArray(raw.allowedPaths),
     createdAt: raw.createdAt ?? now,
@@ -104,6 +106,7 @@ export async function createTask(scan: RepositoryScan, goal: string): Promise<Su
     notes: [],
     tags: [],
     dependencies: [],
+    blockedByDependencies: false,
     acceptanceCriteria: [],
     allowedPaths: [],
   };
@@ -123,26 +126,66 @@ export interface TaskUpdate {
   allowedPaths?: string[];
 }
 
-export async function updateTask(root: string, id: string, update: TaskUpdate): Promise<SuperIaTask> {
-  const task = await getTask(root, id);
-  const tasks = await listTasks(root);
-  if (update.dependencies?.includes(id)) throw new Error("Une mission ne peut pas dépendre d'elle-même.");
-  const known = new Set(tasks.map((item) => item.id));
-  for (const dependency of update.dependencies ?? []) {
-    if (!known.has(dependency)) throw new Error(`Dépendance introuvable : ${dependency}`);
+function applyTaskUpdate(task: SuperIaTask, update: TaskUpdate): SuperIaTask {
+  const next = normalizeTask(task);
+  if (update.status) {
+    next.status = update.status;
+    next.blockedByDependencies = false;
   }
-  if (update.status) task.status = update.status;
-  if (update.priority) task.priority = update.priority;
-  if (update.provider !== undefined) task.provider = update.provider || undefined;
-  if (update.owner !== undefined) task.owner = update.owner || undefined;
-  if (update.dueDate !== undefined) task.dueDate = update.dueDate || undefined;
-  if (update.tags) task.tags = stringArray(update.tags);
-  if (update.dependencies) task.dependencies = stringArray(update.dependencies);
-  if (update.acceptanceCriteria) task.acceptanceCriteria = stringArray(update.acceptanceCriteria);
-  if (update.allowedPaths) task.allowedPaths = stringArray(update.allowedPaths);
-  task.updatedAt = new Date().toISOString();
-  await saveTask(task);
-  return task;
+  if (update.priority) next.priority = update.priority;
+  if (update.provider !== undefined) next.provider = update.provider || undefined;
+  if (update.owner !== undefined) next.owner = update.owner || undefined;
+  if (update.dueDate !== undefined) next.dueDate = update.dueDate || undefined;
+  if (update.tags) next.tags = stringArray(update.tags);
+  if (update.dependencies) next.dependencies = stringArray(update.dependencies);
+  if (update.acceptanceCriteria) next.acceptanceCriteria = stringArray(update.acceptanceCriteria);
+  if (update.allowedPaths) next.allowedPaths = stringArray(update.allowedPaths);
+  return next;
+}
+
+export async function getTaskGraph(root: string): Promise<TaskGraphAnalysis> {
+  return analyzeTaskGraph(await listTasks(root));
+}
+
+export async function reconcileTaskGraph(root: string): Promise<TaskGraphReconciliation> {
+  const current = await listTasks(root);
+  const result = reconcileDependencyStatuses(current);
+  if (!result.changedIds.length) return result;
+  const now = new Date().toISOString();
+  const changed = new Set(result.changedIds);
+  for (const task of result.tasks) {
+    if (!changed.has(task.id)) continue;
+    task.updatedAt = now;
+    await saveTask(task);
+  }
+  return result;
+}
+
+export async function updateTask(root: string, id: string, update: TaskUpdate): Promise<SuperIaTask> {
+  const tasks = await listTasks(root);
+  const existing = tasks.find((task) => task.id === id);
+  if (!existing) throw new Error(`Mission introuvable : ${id}`);
+  if (update.dependencies?.includes(id)) throw new Error("Une mission ne peut pas dépendre d'elle-même.");
+
+  const updated = applyTaskUpdate(existing, update);
+  const candidates = tasks.map((task) => task.id === id ? updated : task);
+  assertValidTaskGraph(candidates);
+
+  const byId = new Map(candidates.map((task) => [task.id, task]));
+  const waitingFor = updated.dependencies.filter((dependencyId) => byId.get(dependencyId)?.status !== "done");
+  if (update.status && ["ready", "running", "review", "done"].includes(update.status) && waitingFor.length) {
+    throw new Error(`Dépendances non terminées pour ${id} : ${waitingFor.join(", ")}.`);
+  }
+
+  const reconciled = reconcileDependencyStatuses(candidates);
+  const changed = new Set([...reconciled.changedIds, id]);
+  const now = new Date().toISOString();
+  for (const task of reconciled.tasks) {
+    if (!changed.has(task.id)) continue;
+    task.updatedAt = now;
+    await saveTask(task);
+  }
+  return reconciled.tasks.find((task) => task.id === id) as SuperIaTask;
 }
 
 export async function addTaskNote(root: string, id: string, note: string): Promise<SuperIaTask> {
