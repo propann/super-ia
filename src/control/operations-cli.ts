@@ -1,6 +1,7 @@
 import { handleConnectionCommand } from "../connections/cli.js";
 import { createControlBackup, listControlBackups, verifyControlBackup } from "./backup-manager.js";
 import { runDaemon, runDaemonTick } from "./daemon.js";
+import { handleResticCommand } from "./restic-cli.js";
 
 function valueAfter(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
@@ -12,7 +13,7 @@ function positionals(args: string[]): string[] {
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
     if (value.startsWith("--")) {
-      if (!["--json", "--once"].includes(value)) index += 1;
+      if (!["--json", "--once", "--network", "--execute"].includes(value)) index += 1;
       continue;
     }
     values.push(value);
@@ -32,6 +33,7 @@ export async function handleOperationsCommand(
   asJson: boolean,
 ): Promise<boolean> {
   if (await handleConnectionCommand(command, args, asJson)) return true;
+  if (await handleResticCommand(command, args, asJson)) return true;
 
   if (command === "backup") {
     const [action = "list", path] = positionals(args);
