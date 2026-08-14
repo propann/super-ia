@@ -15,3 +15,13 @@ jobs:
           node-version: 22
       - run: npm install
       - run: npm test
+      - name: Validate Pi installer syntax
+        run: |
+          bash -n install/pi/install.sh
+          bash -n install/pi/uninstall.sh
+      - name: Reject privileged Pi installer commands
+        run: |
+          if grep -RInE '(^|[[:space:]])sudo([[:space:]]|$)' install/pi; then
+            echo "The Pi package must not invoke sudo."
+            exit 1
+          fi
