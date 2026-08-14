@@ -3,6 +3,8 @@ import { inspectLocalTools, inspectProviders } from "../core/doctor.js";
 import { loadProjectConfig } from "../core/config.js";
 import { scanRepository } from "../core/repository-scanner.js";
 import { listTasks } from "../core/task-store.js";
+import { openControlPlane } from "../control/control-plane.js";
+import type { ControlStatus, ProjectRecord, RunRecord } from "../control/types.js";
 
 const ANSI = {
   reset: "\x1b[0m",
@@ -25,6 +27,9 @@ export interface MatrixSnapshot {
   localTools: LocalToolCheck[];
   tasks: SuperIaTask[];
   config: SuperIaConfig;
+  control?: ControlStatus;
+  projects?: ProjectRecord[];
+  runs?: RunRecord[];
   now: Date;
 }
 
@@ -88,6 +93,22 @@ function taskState(task: SuperIaTask): string {
   return `${symbol[task.status]} ${task.id} ${task.title}`;
 }
 
+function projectState(project: ProjectRecord): string {
+  return `${project.status === "active" ? "●" : "○"} ${project.name}  ${project.defaultBranch ?? "-"}`;
+}
+
+function runState(run: RunRecord): string {
+  const symbol: Record<RunRecord["status"], string> = {
+    queued: "◇",
+    running: "▶",
+    completed: "✓",
+    failed: "!",
+    cancelled: "×",
+    interrupted: "↯",
+  };
+  return `${symbol[run.status]} ${run.provider}  ${run.taskId ?? run.id.slice(0, 8)}`;
+}
+
 function rainLine(width: number, now: Date): string {
   const alphabet = "01ZXCVBNMASDFGHJKLQWERTYUIOP<>[]{}/*+-";
   let seed = now.getTime() >>> 0;
@@ -106,8 +127,11 @@ export function renderMatrixDashboard(snapshot: MatrixSnapshot, width = 100): st
   const assistedProviders = snapshot.providers.filter((item) => item.installed === null).length;
   const readyLocalTools = snapshot.localTools.filter((item) => item.installed).length;
   const activeTasks = snapshot.tasks.filter((task) => !["done", "cancelled"].includes(task.status)).length;
+  const projects = snapshot.projects ?? [];
+  const runs = snapshot.runs ?? [];
+  const control = snapshot.control;
 
-  const repo = box("dépôt", [
+  const repo = box("dépôt courant", [
     `${ANSI.bright}NOM${ANSI.reset}       ${snapshot.scan.name}`,
     `${ANSI.bright}BRANCHE${ANSI.reset}   ${snapshot.scan.branch ?? "hors Git"}`,
     `${ANSI.bright}ÉTAT${ANSI.reset}      ${snapshot.scan.dirty ? "MODIFICATIONS LOCALES" : "PROPRE"}`,
@@ -115,38 +139,45 @@ export function renderMatrixDashboard(snapshot: MatrixSnapshot, width = 100): st
     `${ANSI.bright}CHECKS${ANSI.reset}    ${snapshot.scan.recommendedChecks.length}`,
   ], columnWidth);
 
-  const system = box("noyau", [
+  const system = box("plan de contrôle", [
     `${ANSI.brightGreen}SUPER IA // MATRIX CONTROL${ANSI.reset}`,
-    `IA prêtes      ${readyProviders}`,
-    `IA assistées   ${assistedProviders}`,
-    `Outils locaux  ${readyLocalTools}/${snapshot.localTools.length}`,
-    `Missions       ${snapshot.tasks.length} (${activeTasks} actives)`,
+    `SQLite          ${control ? `${control.journalMode.toUpperCase()} / schéma ${control.schemaVersion}` : "indisponible"}`,
+    `Projets         ${control?.projects ?? projects.length}`,
+    `Missions        ${control?.tasks ?? snapshot.tasks.length} (${activeTasks} locales actives)`,
+    `Runs            ${control?.runs ?? runs.length} (${control?.activeRuns ?? runs.filter((run) => run.status === "running").length} actifs)`,
+    `Événements      ${control?.events ?? 0}`,
   ], columnWidth);
 
   const providers = box("réseau IA", snapshot.providers.slice(0, 8).map((provider) => `${providerState(provider)}  ${provider.name}`), columnWidth);
-  const tasks = box("missions", snapshot.tasks.length ? snapshot.tasks.slice(-8).reverse().map(taskState) : ["Aucune mission enregistrée.", "superia task create \"objectif\""], columnWidth);
+  const tasks = box("missions du dépôt", snapshot.tasks.length ? snapshot.tasks.slice(-8).reverse().map(taskState) : ["Aucune mission enregistrée.", "superia task create \"objectif\""], columnWidth);
+
+  const projectPanel = box("projets globaux", projects.length ? projects.slice(0, 8).map(projectState) : ["Aucun projet global.", "superia project add ."], columnWidth);
+  const runPanel = box("runs récents", runs.length ? runs.slice(0, 8).map(runState) : ["Aucun run enregistré.", "superia agent run codex TASK-0001 --dry-run"], columnWidth);
 
   const localTools = box("outils locaux", snapshot.localTools.slice(0, 8).map((tool) => `${localToolState(tool)}  ${tool.name} [${tool.category}]`), columnWidth);
   const policy = box("politique", [
+    `IA prêtes        ${readyProviders}`,
+    `IA assistées     ${assistedProviders}`,
+    `Outils locaux    ${readyLocalTools}/${snapshot.localTools.length}`,
     `API              ${snapshot.config.policy.allowApi ? "AUTORISÉES" : "VERROUILLÉES"}`,
     `Budget mensuel   ${snapshot.config.policy.monthlyApiBudgetEur.toFixed(2)} €`,
-    `Mode             ${snapshot.config.policy.defaultMode}`,
     `Fusion humaine   ${snapshot.config.policy.requireHumanApprovalBeforeMerge ? "OBLIGATOIRE" : "NON"}`,
     `Secrets          ${snapshot.config.policy.redactSecretsBeforeRemoteSend ? "EXPURGÉS" : "ATTENTION"}`,
   ], columnWidth);
 
   const actions = box("commandes", [
-    `[R] rafraîchir     [Q] quitter`,
-    `superia scan       analyser le dépôt`,
-    `superia task list  voir les missions`,
-    `superia doctor     sonder tout le système`,
-    `superia local      voir les capacités locales`,
-    `superia worktree   isoler une mission`,
+    `[R] rafraîchir       [Q] quitter`,
+    `superia project list voir tous les projets`,
+    `superia run list     voir les exécutions`,
+    `superia events       lire le journal`,
+    `superia backup list  voir les sauvegardes`,
+    `superia daemon --once synchroniser/récupérer`,
+    `superia doctor       sonder les fournisseurs`,
   ], safeWidth);
 
   const header = [
     rainLine(safeWidth, snapshot.now),
-    `${ANSI.greenBg}${ANSI.black}${ANSI.bright} SUPER IA ${ANSI.reset} ${ANSI.brightGreen}CONSOLE DE CONTRÔLE MULTI-IA${ANSI.reset}`,
+    `${ANSI.greenBg}${ANSI.black}${ANSI.bright} SUPER IA ${ANSI.reset} ${ANSI.brightGreen}CONSOLE DE CONTRÔLE MULTI-PROJETS${ANSI.reset}`,
     `${ANSI.dim}Canal local sécurisé // ${snapshot.now.toLocaleString("fr-FR")}${ANSI.reset}`,
     "",
   ];
@@ -156,6 +187,8 @@ export function renderMatrixDashboard(snapshot: MatrixSnapshot, width = 100): st
     ...joinColumns(repo, system),
     "",
     ...joinColumns(providers, tasks),
+    "",
+    ...joinColumns(projectPanel, runPanel),
     "",
     ...joinColumns(localTools, policy),
     "",
@@ -173,7 +206,22 @@ async function captureSnapshot(root: string): Promise<MatrixSnapshot> {
     listTasks(scan.root),
     loadProjectConfig(scan.root),
   ]);
-  return { scan, providers, localTools, tasks, config, now: new Date() };
+  const controlPlane = await openControlPlane();
+  try {
+    return {
+      scan,
+      providers,
+      localTools,
+      tasks,
+      config,
+      control: controlPlane.status(),
+      projects: controlPlane.listProjects(),
+      runs: controlPlane.listRuns().slice(0, 20),
+      now: new Date(),
+    };
+  } finally {
+    controlPlane.close();
+  }
 }
 
 export async function runMatrixConsole(root: string, options: MatrixOptions = {}): Promise<void> {
