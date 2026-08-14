@@ -1,8 +1,13 @@
 import type { ContextBuildResult } from "../context/types.js";
-import type { ManagedProcessResult } from "../runtime/types.js";
+import type {
+  ManagedProcessResult,
+  SandboxNetworkMode,
+  SandboxWorkspaceAccess,
+} from "../runtime/types.js";
 
 export type AgentMode = "plan" | "build" | "review";
 export type SecurityPreflightStatus = "passed" | "waived" | "not-run-dry-run";
+export type SandboxPreflightStatus = "active" | "waived" | "not-run-dry-run";
 
 export interface SecurityPreflightResult {
   status: SecurityPreflightStatus;
@@ -10,6 +15,15 @@ export interface SecurityPreflightResult {
   reportPath?: string;
   runId?: string;
   findings: number;
+  reason?: string;
+}
+
+export interface SandboxPreflightResult {
+  status: SandboxPreflightStatus;
+  engine: "bubblewrap";
+  network: SandboxNetworkMode;
+  workspaceAccess: SandboxWorkspaceAccess;
+  ephemeralHome: true;
   reason?: string;
 }
 
@@ -33,6 +47,7 @@ export interface AgentExecutionOptions {
   maxPriceUsd?: number;
   dryRun?: boolean;
   allowWithoutGitleaks?: boolean;
+  allowWithoutBubblewrap?: boolean;
 }
 
 export interface AgentExecutionPreview {
@@ -44,6 +59,7 @@ export interface AgentExecutionPreview {
   stdinBytes: number;
   context: ContextBuildResult;
   securityPreflight: SecurityPreflightResult;
+  sandboxPreflight: SandboxPreflightResult;
 }
 
 export interface AgentExecutionResult extends AgentExecutionPreview {
