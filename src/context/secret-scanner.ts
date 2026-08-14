@@ -4,15 +4,36 @@ const deniedNames = new Set([
   ".env",
   ".npmrc",
   ".pypirc",
+  ".netrc",
+  ".git-credentials",
+  ".vault-token",
   "auth.json",
   "credentials.json",
   "secrets.json",
+  "terraform.tfstate",
+  "terraform.tfstate.backup",
   "id_rsa",
   "id_ed25519",
   "known_hosts",
 ]);
 
-const deniedExtensions = [".pem", ".key", ".p12", ".pfx", ".jks", ".keystore"];
+const deniedExtensions = [
+  ".pem",
+  ".key",
+  ".p12",
+  ".pfx",
+  ".jks",
+  ".keystore",
+  ".db",
+  ".sqlite",
+  ".sqlite3",
+  ".kdbx",
+  ".age",
+  ".gpg",
+  ".pgp",
+  ".ovpn",
+  ".mobileconfig",
+];
 
 const secretRules: Array<{ name: string; pattern: RegExp; message: string }> = [
   {
@@ -55,11 +76,12 @@ export function sensitivePathReason(path: string): string | undefined {
   const normalized = normalizePath(path);
   const segments = normalized.toLowerCase().split("/");
   const name = segments.at(-1) ?? "";
-  if (segments.includes(".git") || segments.includes(".ssh") || segments.includes(".gnupg")) {
+  const sensitiveDirectories = [".git", ".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker", ".terraform"];
+  if (sensitiveDirectories.some((segment) => segments.includes(segment))) {
     return "répertoire sensible";
   }
   if (deniedNames.has(name) || name.startsWith(".env.")) return "fichier de secrets";
-  if (deniedExtensions.some((extension) => name.endsWith(extension))) return "matériel cryptographique";
+  if (deniedExtensions.some((extension) => name.endsWith(extension))) return "donnée privée ou matériel cryptographique";
   return undefined;
 }
 
