@@ -15,7 +15,7 @@ Super IA s'installe comme **plan de contrôle utilisateur**. Aucun modèle IA lo
 
 Le centre de contrôle reste installable sans Gitleaks ou Bubblewrap, mais Codex et Vibe sont alors bloqués par défaut.
 
-## Installation v0.13
+## Installation v0.14
 
 ```bash
 git clone https://github.com/propann/super-ia.git
@@ -29,7 +29,7 @@ L'installateur :
 1. vérifie Git, npm et Node ;
 2. détecte Bubblewrap et Gitleaks ;
 3. installe les dépendances npm ;
-4. compile et exécute les **32 tests** ;
+4. compile et exécute les **44 tests** ;
 5. initialise `~/.superia` ;
 6. installe `~/.local/bin/superia` ;
 7. crée le service systemd utilisateur ;
@@ -55,9 +55,7 @@ journalctl --user -u superia.service -n 100 --no-pager
 
 Le rapport Bubblewrap doit avoir `passed: true` avant validation matérielle.
 
-## Préparer un vrai build
-
-Un build exige un worktree et un périmètre explicite :
+## Préparer une mission
 
 ```bash
 cd /chemin/du/projet
@@ -65,41 +63,101 @@ superia init
 superia task create "Modifier le module d'authentification"
 
 superia task update TASK-0001 \
-  --provider codex-cli \
   --allow-path "src/auth/**" \
   --allow-path "tests/auth/**" \
-  --accept "tests réussis"
+  --accept "tests réussis" \
+  --accept "review indépendante approuvée"
 
 superia worktree TASK-0001
-superia agent run codex TASK-0001 --mode build
 ```
 
-Après le run, vérifier :
+## Premier pipeline
+
+Commencer sans appel réel :
+
+```bash
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe \
+  --max-attempts 3 \
+  --max-price 0.25 \
+  --max-total-price 0.75 \
+  --dry-run
+```
+
+Après authentification officielle des deux CLI :
+
+```bash
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe \
+  --max-attempts 3 \
+  --max-price 0.25 \
+  --max-total-price 0.75
+```
+
+Le sens inverse est possible : Vibe builder et Codex reviewer.
+
+## Contrôler le pipeline
+
+```bash
+superia pipeline status TASK-0001
+superia task board
+superia run list
+superia events --limit 100
+```
+
+Artefacts attendus :
 
 ```text
 AGENT_CHANGES.patch
 CHANGE_GUARD.json
 AGENT_RESULT.json
+REVIEW.json
+RECEIPT.json
+.superia/pipelines/TASK-0001.json
 ```
 
 Toute modification hors périmètre transforme le run en échec.
 
-## Tester Codex en lecture seule
+## Reprise après interruption
 
 ```bash
-superia doctor
-superia security sandbox-check
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe \
+  --resume
+```
+
+Les étapes déjà terminées ne sont pas relancées.
+
+## Correction après review
+
+Une correction exige un verdict `changes-requested` et une action explicite :
+
+```bash
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe \
+  --retry
+```
+
+Les plafonds du premier lancement sont immuables. La review précédente est injectée au builder. Un patch identique à une tentative antérieure arrête la boucle avant une nouvelle review.
+
+Le prix affiché est le plafond Vibe réservé, pas une dépense réelle supposée.
+
+## Tester les agents séparément
+
+Codex en lecture seule :
+
+```bash
 superia agent run codex TASK-0001 --mode plan --dry-run
 superia agent run codex TASK-0001 --mode plan
 ```
 
-Politique : sandbox native Codex conservée, Bubblewrap externe, dépôt en lecture seule et seule sortie technique montée en écriture.
-
-## Tester Mistral Vibe
+Mistral Vibe en lecture seule :
 
 ```bash
-superia doctor
-superia security sandbox-check
 superia agent run vibe TASK-0001 \
   --mode plan \
   --max-turns 8 \
@@ -107,9 +165,9 @@ superia agent run vibe TASK-0001 \
   --max-price 0.25
 ```
 
-Vibe n'obtient aucun shell. Bubblewrap limite son HOME et son accès au workspace.
+Vibe n'obtient aucun shell. Codex conserve sa sandbox native. Les deux passent par Gitleaks et Bubblewrap.
 
-## Test de reprise
+## Test de coupure et reprise
 
 Après un premier run contrôlé :
 
@@ -159,15 +217,20 @@ Ne pas automatiser `git pull` lorsqu'il existe des modifications locales.
 bash install/pi/uninstall.sh
 ```
 
-Le service et le wrapper sont retirés. `~/.superia`, les receipts, sauvegardes, dépôts et worktrees sont conservés.
+Le service et le wrapper sont retirés. `~/.superia`, receipts, sauvegardes, dépôts et worktrees sont conservés.
 
 ## Ce que la CI prouve
 
 - build TypeScript ;
-- 32 tests ;
+- 44 tests ;
 - préflight Gitleaks ;
 - politique Bubblewrap avec mocks ;
-- contrôle de périmètre Git de bout en bout ;
+- contrôle de périmètre Git ;
+- reviewer indépendant ;
+- pipeline et checkpoints ;
+- reprise sans double exécution ;
+- budgets de retry immuables ;
+- détection de patch identique ;
 - scripts Pi valides ;
 - absence de `sudo`.
 
@@ -176,6 +239,7 @@ Le service et le wrapper sont retirés. `~/.superia`, les receipts, sauvegardes,
 - namespaces Bubblewrap réellement opérationnels ;
 - installation complète ;
 - Codex et Vibe authentifiés ;
+- pipeline réel avec deux fournisseurs ;
 - reprise après coupure ;
 - restauration ;
 - service après déconnexion.
