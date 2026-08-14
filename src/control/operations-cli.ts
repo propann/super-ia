@@ -1,3 +1,4 @@
+import { handleConnectionCommand } from "../connections/cli.js";
 import { createControlBackup, listControlBackups, verifyControlBackup } from "./backup-manager.js";
 import { runDaemon, runDaemonTick } from "./daemon.js";
 
@@ -30,6 +31,8 @@ export async function handleOperationsCommand(
   args: string[],
   asJson: boolean,
 ): Promise<boolean> {
+  if (await handleConnectionCommand(command, args, asJson)) return true;
+
   if (command === "backup") {
     const [action = "list", path] = positionals(args);
     if (action === "create") {
