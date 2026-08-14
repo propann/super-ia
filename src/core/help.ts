@@ -1,0 +1,101 @@
+export function printHelp(): void {
+  console.log(`Super IA v0.15.0
+
+Usage:
+  superia matrix [--once]                       Console Matrix multi-projets
+  superia readiness [--json]                    Verdict global hors ligne
+  superia doctor [--json]                       Détecte les IA et outils locaux
+  superia providers [--json]                    Affiche les fournisseurs
+  superia local [--json]                        Affiche les outils locaux
+  superia scan [--json]                         Analyse le dépôt courant
+  superia init                                  Initialise dépôt et plan de contrôle
+
+  superia connection init                       Initialise le registre privé
+  superia connection dashboard [--json]         Connection Matrix
+  superia connection doctor [--json]            Diagnostic sans réseau ni secret
+  superia connection policy [--json]            Audit URL statique sans DNS
+  superia connection probe <ID> --network       Sonde sans auth ni redirection
+      --timeout-ms 5000                          Délai entre 250 et 15000 ms
+  superia connection secret-backends            Détecte les coffres disponibles
+
+  superia control init|status [--json]          Inspecte SQLite WAL
+  superia project add|sync [path] [--json]      Enregistre ou synchronise un dépôt
+  superia project list [--json]                 Liste tous les projets
+  superia project show <PROJECT-ID> [--json]    Affiche projet, missions et runs
+
+  superia task create <objectif>                Crée une mission
+  superia task list [--json]                    Liste les missions
+  superia task show <TASK-ID> [--json]          Affiche une mission détaillée
+  superia task board [--json]                   Tableau de suivi et progression
+  superia task graph [--json]                   Vérifie le DAG et son ordre
+  superia task reconcile [--json]               Ajuste les blocages du DAG
+  superia task note <TASK-ID> <texte>           Ajoute une note horodatée
+  superia task update <TASK-ID> [options]       Met à jour le pilotage
+      --status planned|ready|running|blocked|review|done|failed|cancelled
+      --priority low|normal|high|critical
+      --owner <nom> --provider <id> --due YYYY-MM-DD
+      --tag <tag> --depends TASK-XXXX --accept <critère>
+      --allow-path <glob>                        Périmètre d'écriture d'un build
+  superia worktree <TASK-ID> [--dry-run]        Crée son worktree
+
+  superia context build [TASK-ID] [options]     Crée un contexte Git vérifiable
+  superia security scan [options]               Lance Gitleaks
+      --required --mode dir|git --timeout-minutes 5
+  superia security sandbox-check [--json]       Teste et persiste Bubblewrap
+  superia validate [--timeout-minutes 15]       Exécute les checks dans le runner
+
+  superia agent run codex <TASK-ID> [options]   Lance Codex contrôlé
+  superia agent run vibe <TASK-ID> [options]    Lance Mistral Vibe contrôlé
+      --mode plan|build|review --model <nom> --dry-run
+      --timeout-minutes 60 --max-context-bytes 300000
+      --allow-without-gitleaks                   Dérogation explicite journalisée
+      --allow-without-bwrap                      Dérogation explicite journalisée
+      Vibe : --max-turns 8 --max-tokens 50000 --max-price 0.25
+
+  superia pipeline run <TASK-ID> [options]      Pipeline contrôlé complet
+  superia pipeline status <TASK-ID> [--json]    État, tentatives et budget
+      --builder codex|vibe --reviewer codex|vibe
+      --builder-model <nom> --reviewer-model <nom> --dry-run
+      --resume                                  Reprend une étape interrompue
+      --retry                                   Corrige une review changes-requested
+      --max-attempts 3                          Plafond figé au premier lancement
+      --max-total-price 0.75                    Prix Vibe maximal réservé cumulé
+
+  superia receipt create <RUN-ID>               Crée la preuve d'un run
+  superia receipt verify <RECEIPT.json>         Vérifie empreinte et artefacts
+
+  superia backup create|list|verify             Sauvegardes locales cohérentes
+  superia restic init|status                    Prépare la sauvegarde chiffrée
+  superia restic backup                         Affiche le plan sans réseau
+  superia restic retention-preview              Prévisualise la rétention sans prune
+  superia restic check                          Affiche le plan de vérification
+      --execute --network                       Exécution réseau volontaire
+
+  superia daemon --once                         Synchronise et récupère une fois
+  superia daemon [--interval-seconds 30]        Lance la boucle permanente
+  superia run start <provider> [TASK-ID]        Ouvre un run durable manuel
+  superia run list [--project PROJECT-ID]       Liste les runs
+  superia run heartbeat <RUN-ID>                Rafraîchit le heartbeat
+  superia run finish <RUN-ID> <statut>          Termine un run
+  superia events [--limit N] [--json]           Consulte les événements
+  superia recover [--stale-minutes N]           Marque les runs abandonnés
+  superia help                                  Affiche cette aide
+
+Principes:
+  - Raspberry Pi 5 utilisé comme plan de contrôle, jamais comme modèle obligatoire
+  - mode agent par défaut en lecture seule
+  - build uniquement dans un worktree avec chemins autorisés
+  - DAG sans cycle et dépendances terminées avant exécution
+  - builder, validations, reviewer différent, receipt et approbation humaine
+  - retries bornés et patch identique détecté comme boucle
+  - Gitleaks obligatoire avant tout run réel distant
+  - preuve Bubblewrap récente exigée sous Linux par readiness
+  - endpoints distants HTTPS publics uniquement
+  - sondes réseau sans authentification et uniquement avec --network
+  - sauvegardes Restic réelles uniquement avec --execute --network
+  - aucune commande Restic destructive générée
+  - aucune fusion automatique
+  - APIs génériques désactivées par défaut
+  - état durable dans SUPERIA_HOME ou ~/.superia
+`);
+}
