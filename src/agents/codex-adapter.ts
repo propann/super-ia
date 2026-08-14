@@ -47,10 +47,12 @@ export async function buildCodexInvocation(input: {
   cwd: string;
   mode: AgentMode;
   model?: string;
+  feedbackPath?: string;
 }): Promise<AgentInvocation> {
-  const [mission, contextText] = await Promise.all([
+  const [mission, contextText, feedback] = await Promise.all([
     readFile(input.context.missionPath, "utf8"),
     readFile(input.context.contextPath, "utf8"),
+    input.feedbackPath ? readFile(input.feedbackPath, "utf8") : Promise.resolve(""),
   ]);
   const lastMessagePath = join(input.context.directory, "CODEX_LAST_MESSAGE.md");
   const sandbox = input.mode === "build" ? "workspace-write" : "read-only";
@@ -70,12 +72,21 @@ export async function buildCodexInvocation(input: {
   if (input.model) args.push("--model", input.model);
   args.push("-");
 
+  const feedbackSection = feedback
+    ? [
+      "",
+      "REVIEW INDÉPENDANTE À CORRIGER",
+      "Traite chaque finding prouvé. Ne modifie rien hors du périmètre autorisé.",
+      feedback,
+    ]
+    : [];
   const stdin = [
     modeInstructions(input.mode),
     "",
     mission,
     "",
     contextText,
+    ...feedbackSection,
     "",
     input.mode === "review"
       ? "Base ton verdict uniquement sur les éléments visibles dans le dépôt et le diff courant."
@@ -92,6 +103,7 @@ export async function buildCodexInvocation(input: {
     metadata: {
       mode: input.mode,
       model: input.model ?? null,
+      feedbackPath: input.feedbackPath ?? null,
       contextId: input.context.manifest.id,
       contextHash: input.context.manifest.contextHash,
       baseCommit: input.context.manifest.baseCommit,
