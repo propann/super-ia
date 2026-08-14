@@ -96,6 +96,7 @@ export interface PipelineCheckpoint {
   updatedAt: string;
   maxAttempts?: number;
   maxTotalPriceUsd?: number;
+  reservedPerAttemptUsd?: number;
   reservedPriceCeilingUsd?: number;
   attempts?: PipelineAttempt[];
   feedbackPath?: string;
