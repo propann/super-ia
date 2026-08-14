@@ -1,4 +1,6 @@
+import { scanRepository } from "../core/repository-scanner.js";
 import { runControlledPipeline } from "./pipeline.js";
+import { loadPipelineCheckpoint, pipelineStatePath } from "./state.js";
 import type { PipelineOptions, PipelineProvider, PipelineResult } from "./types.js";
 
 function flagValue(args: string[], name: string): string | undefined {
@@ -25,6 +27,22 @@ function isResult(value: Awaited<ReturnType<typeof runControlledPipeline>>): val
   return "receipt" in value;
 }
 
+function positionals(args: string[]): string[] {
+  const valueFlags = new Set([
+    "--builder", "--reviewer", "--builder-model", "--reviewer-model", "--timeout-minutes",
+    "--max-context-bytes", "--max-turns", "--max-tokens", "--max-price",
+  ]);
+  const values: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index].startsWith("--")) {
+      if (valueFlags.has(args[index])) index += 1;
+      continue;
+    }
+    values.push(args[index]);
+  }
+  return values;
+}
+
 export async function handlePipelineCommand(
   command: string,
   args: string[],
@@ -32,15 +50,26 @@ export async function handlePipelineCommand(
   cwd: string,
 ): Promise<boolean> {
   if (command !== "pipeline") return false;
-  const action = args.find((value) => !value.startsWith("--"));
-  const positional = args.filter((value, index) => {
-    if (value.startsWith("--")) return false;
-    if (index > 0 && args[index - 1]?.startsWith("--")) return false;
+  const [action, taskId] = positionals(args);
+  if (action === "status" && taskId) {
+    const repository = await scanRepository(cwd);
+    const checkpoint = await loadPipelineCheckpoint(repository.root, taskId);
+    if (!checkpoint) throw new Error(`Aucun checkpoint disponible pour ${taskId}.`);
+    if (asJson) console.log(JSON.stringify(checkpoint, null, 2));
+    else {
+      console.log(`PIPELINE ${checkpoint.taskId}`);
+      console.log(`État      ${checkpoint.status}`);
+      console.log(`Étape     ${checkpoint.stage}`);
+      console.log(`Builder   ${checkpoint.builderProvider}${checkpoint.builder ? ` · ${checkpoint.builder.process.runId}` : ""}`);
+      console.log(`Reviewer  ${checkpoint.reviewerProvider}${checkpoint.reviewer ? ` · ${checkpoint.reviewer.process.runId}` : ""}`);
+      console.log(`Mis à jour ${checkpoint.updatedAt}`);
+      console.log(`Fichier   ${pipelineStatePath(repository.root, taskId)}`);
+      if (checkpoint.error) console.log(`Erreur    ${checkpoint.error}`);
+    }
     return true;
-  });
-  const taskId = positional[1];
+  }
   if (action !== "run" || !taskId) {
-    throw new Error("Usage : superia pipeline run <TASK-ID> --builder codex|vibe --reviewer codex|vibe");
+    throw new Error("Usage : superia pipeline run <TASK-ID> --builder codex|vibe --reviewer codex|vibe [--resume]");
   }
   const options: PipelineOptions = {
     builder: provider(flagValue(args, "--builder"), "--builder"),
@@ -53,6 +82,7 @@ export async function handlePipelineCommand(
     maxTokens: numberOption(args, "--max-tokens", 1, 500_000),
     maxPriceUsd: numberOption(args, "--max-price", 0.01, 5),
     dryRun: args.includes("--dry-run"),
+    resume: args.includes("--resume"),
     allowWithoutGitleaks: args.includes("--allow-without-gitleaks"),
     allowWithoutBubblewrap: args.includes("--allow-without-bwrap"),
   };
