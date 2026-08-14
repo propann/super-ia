@@ -18,7 +18,7 @@ export interface ChangeGuardReport {
   reportPath: string;
 }
 
-function hash(value: string | Buffer): string {
+function hash(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
@@ -39,7 +39,7 @@ async function fingerprint(root: string, path: string): Promise<string> {
   const absolute = join(root, path);
   try {
     await access(absolute);
-    return hash(await readFile(absolute));
+    return hash(await readFile(absolute, "utf8"));
   } catch {
     return "missing";
   }
