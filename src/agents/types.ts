@@ -1,4 +1,5 @@
 import type { ContextBuildResult } from "../context/types.js";
+import type { ChangeGuardReport } from "../quality/change-guard.js";
 import type {
   ManagedProcessResult,
   SandboxNetworkMode,
@@ -68,4 +69,5 @@ export interface AgentExecutionResult extends AgentExecutionPreview {
   normalizedEventsPath: string;
   parsedEvents: number;
   invalidEventLines: number;
+  changeGuard: ChangeGuardReport;
 }
