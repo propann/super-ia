@@ -73,7 +73,7 @@ function killProcessTree(child: any, signal: string): void {
       process.kill(-pid, signal);
       return;
     } catch {
-      // Fall back to the direct child.
+      // Fall back to the direct child. A later SIGKILL retries the process group.
     }
   }
   try {
@@ -127,6 +127,7 @@ export async function runManagedProcess(
         let timedOut = false;
         let settled = false;
         let killTimer: ReturnType<typeof setTimeout> | undefined;
+        let killEscalation: Promise<void> | undefined;
 
         const child = spawn(prepared.command, prepared.args, {
           cwd: resolve(request.cwd),
@@ -163,7 +164,13 @@ export async function runManagedProcess(
         const timeout = setTimeout(() => {
           timedOut = true;
           killProcessTree(child, "SIGTERM");
-          killTimer = setTimeout(() => killProcessTree(child, "SIGKILL"), Math.max(500, request.terminateGraceMs ?? 3_000));
+          const graceMs = Math.max(500, request.terminateGraceMs ?? 3_000);
+          killEscalation = new Promise<void>((resolveEscalation) => {
+            killTimer = setTimeout(() => {
+              killProcessTree(child, "SIGKILL");
+              resolveEscalation();
+            }, graceMs);
+          });
         }, Math.max(1_000, request.timeoutMs ?? 15 * 60_000));
 
         const finish = async (exitCode: number | null, signal: string | null, spawnError?: unknown): Promise<void> => {
@@ -171,7 +178,11 @@ export async function runManagedProcess(
           settled = true;
           clearInterval(heartbeat);
           clearTimeout(timeout);
-          if (killTimer) clearTimeout(killTimer);
+          if (timedOut && killEscalation) {
+            await killEscalation;
+          } else if (killTimer) {
+            clearTimeout(killTimer);
+          }
           try {
             await Promise.all([
               writeFile(stdoutPath, stdout, "utf8"),
