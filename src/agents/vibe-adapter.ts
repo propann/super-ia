@@ -9,6 +9,16 @@ export interface VibeBudget {
   maxPriceUsd: number;
 }
 
+function reviewSchemaInstructions(): string[] {
+  return [
+    "Réponds UNIQUEMENT avec un objet JSON valide, sans bloc Markdown ni commentaire.",
+    "Schéma obligatoire :",
+    '{"verdict":"approve|changes-requested|blocked","findings":[{"severity":"critical|high|medium|low","category":"string","summary":"string","evidence":"string","recommendation":"string","file":"string optionnel","line":1}],"residualRisks":["string"]}',
+    "Chaque finding doit contenir une preuve précise. N'invente ni fichier ni ligne.",
+    "Utilise approve seulement si aucun finding critical, high ou medium ne subsiste.",
+  ];
+}
+
 function modeInstructions(mode: AgentMode): string {
   if (mode === "build") {
     return [
@@ -20,9 +30,11 @@ function modeInstructions(mode: AgentMode): string {
   }
   if (mode === "review") {
     return [
-      "MODE SUPER IA : REVIEW",
+      "MODE SUPER IA : REVIEW INDÉPENDANTE",
       "Travaille strictement en lecture seule.",
-      "Cherche les régressions, risques de sécurité, tests manquants et incohérences.",
+      "Analyse le diff Git courant, les régressions, les risques de sécurité, les tests manquants et le respect de la mission.",
+      "N'approuve jamais sur la seule déclaration du builder.",
+      ...reviewSchemaInstructions(),
     ].join("\n");
   }
   return [
@@ -81,7 +93,9 @@ export async function buildVibeInvocation(input: {
     "",
     contextText,
     "",
-    "Retourne un compte rendu factuel et indique les limites du contexte fourni.",
+    input.mode === "review"
+      ? "Base ton verdict uniquement sur les éléments visibles dans le dépôt et le diff courant."
+      : "Retourne un compte rendu factuel et indique les limites du contexte fourni.",
   ].join("\n");
 
   return {
