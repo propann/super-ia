@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Super IA",
-  "currentVersion": "0.12.0",
+  "currentVersion": "0.13.0",
   "updatedAt": "2026-08-14",
   "statuses": ["done", "in_progress", "planned", "blocked", "deferred"],
   "milestones": [
@@ -96,7 +96,7 @@
     {
       "id": "SIA-101",
       "milestone": "M1",
-      "title": "Installer v0.12 sur le Raspberry Pi 5 cible",
+      "title": "Installer v0.13 sur le Raspberry Pi 5 cible",
       "status": "blocked",
       "priority": "critical",
       "dependencies": ["SIA-005"],
@@ -179,11 +179,11 @@
       "id": "SIA-204",
       "milestone": "M2",
       "title": "Contrôler les fichiers modifiés par un agent",
-      "status": "planned",
+      "status": "done",
       "priority": "high",
       "dependencies": ["SIA-003"],
-      "exitCriteria": ["liste autorisée", "hors-scope détecté", "run marqué failed", "diff archivé"],
-      "evidence": ["test de modification hors périmètre"]
+      "exitCriteria": ["liste autorisée obligatoire pour build", "hors-scope détecté", "run marqué failed", "diff et rapport archivés"],
+      "evidence": ["tests/change-guard.test.mjs", "tests/change-guard-agent.test.mjs", "src/quality/change-guard.ts", "src/agents/executor.ts", "src/agents/vibe-executor.ts"]
     },
     {
       "id": "SIA-205",
