@@ -1,5 +1,5 @@
 import { runGitleaksScan } from "./gitleaks.js";
-import { runBubblewrapSelfTest } from "./sandbox-check.js";
+import { persistSandboxCheckReport, runBubblewrapSelfTest } from "./sandbox-check.js";
 
 function flagValue(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -12,7 +12,8 @@ export async function handleSecurityCommand(command: string, args: string[], asJ
 
   if (action === "sandbox-check") {
     const report = await runBubblewrapSelfTest();
-    if (asJson) console.log(JSON.stringify(report, null, 2));
+    const reportPath = await persistSandboxCheckReport(report);
+    if (asJson) console.log(JSON.stringify({ ...report, reportPath }, null, 2));
     else {
       console.log(report.passed ? "SANDBOX BUBBLEWRAP VALIDÉE" : "SANDBOX BUBBLEWRAP NON VALIDÉE");
       console.log(`Disponible ${report.available ? "oui" : "non"}`);
@@ -21,6 +22,7 @@ export async function handleSecurityCommand(command: string, args: string[], asJ
         console.log(`${check.passed ? "✓" : "✗"} ${check.id} — ${check.detail}`);
       }
       if (report.reason) console.log(`Raison     ${report.reason}`);
+      console.log(`Rapport    ${reportPath}`);
     }
     if (!report.passed) process.exitCode = 1;
     return true;
