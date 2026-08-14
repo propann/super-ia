@@ -85,12 +85,13 @@ function taskState(task: SuperIaTask): string {
     planned: "◇",
     ready: "◆",
     running: "▶",
+    blocked: "⊘",
     review: "◎",
     done: "✓",
     failed: "!",
     cancelled: "×",
   };
-  return `${symbol[task.status]} ${task.id} ${task.title}`;
+  return `${symbol[task.status]} ${task.id} [${task.priority}] ${task.title}`;
 }
 
 function projectState(project: ProjectRecord): string {
@@ -127,6 +128,7 @@ export function renderMatrixDashboard(snapshot: MatrixSnapshot, width = 100): st
   const assistedProviders = snapshot.providers.filter((item) => item.installed === null).length;
   const readyLocalTools = snapshot.localTools.filter((item) => item.installed).length;
   const activeTasks = snapshot.tasks.filter((task) => !["done", "cancelled"].includes(task.status)).length;
+  const blockedTasks = snapshot.tasks.filter((task) => task.status === "blocked").length;
   const projects = snapshot.projects ?? [];
   const runs = snapshot.runs ?? [];
   const control = snapshot.control;
@@ -143,7 +145,7 @@ export function renderMatrixDashboard(snapshot: MatrixSnapshot, width = 100): st
     `${ANSI.brightGreen}SUPER IA // MATRIX CONTROL${ANSI.reset}`,
     `SQLite          ${control ? `${control.journalMode.toUpperCase()} / schéma ${control.schemaVersion}` : "indisponible"}`,
     `Projets         ${control?.projects ?? projects.length}`,
-    `Missions        ${control?.tasks ?? snapshot.tasks.length} (${activeTasks} locales actives)`,
+    `Missions        ${control?.tasks ?? snapshot.tasks.length} (${activeTasks} actives, ${blockedTasks} bloquées)`,
     `Runs            ${control?.runs ?? runs.length} (${control?.activeRuns ?? runs.filter((run) => run.status === "running").length} actifs)`,
     `Événements      ${control?.events ?? 0}`,
   ], columnWidth);
@@ -167,12 +169,12 @@ export function renderMatrixDashboard(snapshot: MatrixSnapshot, width = 100): st
 
   const actions = box("commandes", [
     `[R] rafraîchir       [Q] quitter`,
+    `superia task board   suivi des tâches`,
     `superia project list voir tous les projets`,
     `superia run list     voir les exécutions`,
-    `superia events       lire le journal`,
+    `superia security scan scanner les secrets`,
     `superia backup list  voir les sauvegardes`,
     `superia daemon --once synchroniser/récupérer`,
-    `superia doctor       sonder les fournisseurs`,
   ], safeWidth);
 
   const header = [
