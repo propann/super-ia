@@ -30,11 +30,27 @@ printf '%s\n' '[]' > "$report"
   await chmod(path, 0o755);
 }
 
-test("Vibe adapter forces safe programmatic mode after a clean Gitleaks preflight", async () => {
+async function writeFakeBubblewrap(path, argumentsPath) {
+  await writeFile(path, `#!/bin/sh
+printf '%s\n' "$@" > ${JSON.stringify(argumentsPath)}
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--" ]; then
+    shift
+    exec "$@"
+  fi
+  shift
+done
+exit 97
+`);
+  await chmod(path, 0o755);
+}
+
+test("Vibe keeps safe programmatic mode inside Bubblewrap after Gitleaks", async () => {
   const parent = await mkdtemp(join(tmpdir(), "superia-vibe-"));
   const root = join(parent, "repo");
   const home = join(parent, "home");
   const bin = join(parent, "bin");
+  const bwrapArguments = join(parent, "bwrap-args.txt");
   const oldPath = process.env.PATH;
   const oldHome = process.env.SUPERIA_HOME;
   await git(parent, "init", "-b", "main", root);
@@ -53,6 +69,7 @@ printf '%s\n' '{"type":"assistant","content":"fake-vibe-completed"}'
 `);
   await chmod(fakeVibe, 0o755);
   await writeFakeGitleaks(join(bin, "gitleaks"));
+  await writeFakeBubblewrap(join(bin, "bwrap"), bwrapArguments);
 
   try {
     process.env.PATH = `${bin}${delimiter}${oldPath ?? ""}`;
@@ -64,6 +81,10 @@ printf '%s\n' '{"type":"assistant","content":"fake-vibe-completed"}'
     assert.ok("process" in result);
     assert.equal(result.process.status, "completed");
     assert.equal(result.securityPreflight.status, "passed");
+    assert.equal(result.sandboxPreflight.status, "active");
+    assert.equal(result.sandboxPreflight.workspaceAccess, "read-only");
+    assert.equal(result.process.sandbox?.engine, "bubblewrap");
+    assert.equal(result.process.sandbox?.network, "host");
     assert.equal(result.securityPreflight.findings, 0);
     assert.ok(result.securityPreflight.reportPath);
     assert.equal(result.parsedEvents, 1);
@@ -76,6 +97,13 @@ printf '%s\n' '{"type":"assistant","content":"fake-vibe-completed"}'
     assert.ok(!result.args.includes("--auto-approve"));
     assert.ok(!result.args.includes("--yolo"));
     assert.match(await readFile(result.lastMessagePath, "utf8"), /fake-vibe-completed/);
+
+    const bwrap = await readFile(bwrapArguments, "utf8");
+    assert.match(bwrap, /--new-session/);
+    assert.match(bwrap, /--clearenv/);
+    assert.ok(bwrap.includes(root));
+    assert.ok(bwrap.includes("/home/superia"));
+    assert.doesNotMatch(bwrap, /--unshare-net/);
 
     await assert.rejects(
       () => executeVibeTask(root, task.id, { mode: "build", dryRun: true }),
