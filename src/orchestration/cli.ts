@@ -30,7 +30,8 @@ function isResult(value: Awaited<ReturnType<typeof runControlledPipeline>>): val
 function positionals(args: string[]): string[] {
   const valueFlags = new Set([
     "--builder", "--reviewer", "--builder-model", "--reviewer-model", "--timeout-minutes",
-    "--max-context-bytes", "--max-turns", "--max-tokens", "--max-price",
+    "--max-context-bytes", "--max-turns", "--max-tokens", "--max-price", "--max-attempts",
+    "--max-total-price",
   ]);
   const values: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
@@ -58,18 +59,21 @@ export async function handlePipelineCommand(
     if (asJson) console.log(JSON.stringify(checkpoint, null, 2));
     else {
       console.log(`PIPELINE ${checkpoint.taskId}`);
-      console.log(`État      ${checkpoint.status}`);
-      console.log(`Étape     ${checkpoint.stage}`);
-      console.log(`Builder   ${checkpoint.builderProvider}${checkpoint.builder ? ` · ${checkpoint.builder.process.runId}` : ""}`);
-      console.log(`Reviewer  ${checkpoint.reviewerProvider}${checkpoint.reviewer ? ` · ${checkpoint.reviewer.process.runId}` : ""}`);
+      console.log(`État       ${checkpoint.status}`);
+      console.log(`Étape      ${checkpoint.stage}`);
+      console.log(`Arrêt      ${checkpoint.stopReason ?? "-"}`);
+      console.log(`Tentatives ${(checkpoint.attempts?.length ?? 0)}/${checkpoint.maxAttempts ?? "-"}`);
+      console.log(`Prix réservé ${(checkpoint.reservedPriceCeilingUsd ?? 0).toFixed(2)}/${checkpoint.maxTotalPriceUsd?.toFixed(2) ?? "-"} USD`);
+      console.log(`Builder    ${checkpoint.builderProvider}${checkpoint.builder ? ` · ${checkpoint.builder.process.runId}` : ""}`);
+      console.log(`Reviewer   ${checkpoint.reviewerProvider}${checkpoint.reviewer ? ` · ${checkpoint.reviewer.process.runId}` : ""}`);
       console.log(`Mis à jour ${checkpoint.updatedAt}`);
-      console.log(`Fichier   ${pipelineStatePath(repository.root, taskId)}`);
-      if (checkpoint.error) console.log(`Erreur    ${checkpoint.error}`);
+      console.log(`Fichier    ${pipelineStatePath(repository.root, taskId)}`);
+      if (checkpoint.error) console.log(`Erreur     ${checkpoint.error}`);
     }
     return true;
   }
   if (action !== "run" || !taskId) {
-    throw new Error("Usage : superia pipeline run <TASK-ID> --builder codex|vibe --reviewer codex|vibe [--resume]");
+    throw new Error("Usage : superia pipeline run <TASK-ID> --builder codex|vibe --reviewer codex|vibe [--resume|--retry]");
   }
   const options: PipelineOptions = {
     builder: provider(flagValue(args, "--builder"), "--builder"),
@@ -81,8 +85,11 @@ export async function handlePipelineCommand(
     maxTurns: numberOption(args, "--max-turns", 1, 50),
     maxTokens: numberOption(args, "--max-tokens", 1, 500_000),
     maxPriceUsd: numberOption(args, "--max-price", 0.01, 5),
+    maxAttempts: numberOption(args, "--max-attempts", 1, 10),
+    maxTotalPriceUsd: numberOption(args, "--max-total-price", 0.01, 50),
     dryRun: args.includes("--dry-run"),
     resume: args.includes("--resume"),
+    retry: args.includes("--retry"),
     allowWithoutGitleaks: args.includes("--allow-without-gitleaks"),
     allowWithoutBubblewrap: args.includes("--allow-without-bwrap"),
   };
@@ -100,14 +107,14 @@ export async function handlePipelineCommand(
     return true;
   }
   console.log(result.passed ? "PIPELINE VALIDÉ" : "PIPELINE À CORRIGER");
-  console.log(`Mission    ${result.taskId}`);
-  console.log(`Builder    ${result.builder.provider} · ${result.builder.process.runId}`);
+  console.log(`Mission     ${result.taskId}`);
+  console.log(`Builder     ${result.builder.provider} · ${result.builder.process.runId}`);
   console.log(`Validations ${result.validation.passed ? "réussies" : "échouées"}`);
-  console.log(`Reviewer   ${result.reviewer.provider} · ${result.reviewer.process.runId}`);
-  console.log(`Verdict    ${result.review.verdict}`);
-  console.log(`Findings   ${result.review.findings.length}`);
-  console.log(`Review     ${result.reviewPath}`);
-  console.log(`Receipt    ${result.receiptPath}`);
+  console.log(`Reviewer    ${result.reviewer.provider} · ${result.reviewer.process.runId}`);
+  console.log(`Verdict     ${result.review.verdict}`);
+  console.log(`Findings    ${result.review.findings.length}`);
+  console.log(`Review      ${result.reviewPath}`);
+  console.log(`Receipt     ${result.receiptPath}`);
   if (!result.passed) process.exitCode = 1;
   return true;
 }
