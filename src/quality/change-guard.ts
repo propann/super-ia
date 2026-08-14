@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { runCommand } from "../utils/command.js";
 
 export interface GitWorkspaceSnapshot {
@@ -18,7 +18,7 @@ export interface ChangeGuardReport {
   reportPath: string;
 }
 
-function hash(value: string): string {
+function hash(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
@@ -47,23 +47,15 @@ async function fingerprint(root: string, path: string): Promise<string> {
 
 export async function captureGitWorkspace(root: string): Promise<GitWorkspaceSnapshot> {
   const resolved = resolve(root);
-  const status = await runCommand("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
-    cwd: resolved,
-    timeoutMs: 30_000,
-  });
+  const status = await runCommand("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], { cwd: resolved, timeoutMs: 30_000 });
   const files: GitWorkspaceSnapshot["files"] = {};
-  for (const entry of parseStatus(status.stdout)) {
-    files[entry.path] = { status: entry.status, sha256: await fingerprint(resolved, entry.path) };
-  }
+  for (const entry of parseStatus(status.stdout)) files[entry.path] = { status: entry.status, sha256: await fingerprint(resolved, entry.path) };
   return { root: resolved, files };
 }
 
 function globPattern(pattern: string): RegExp {
   const normalized = pattern.replaceAll("\\", "/").replace(/^\.\//, "").replace(/\/$/, "");
-  const escaped = normalized.replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*/g, "::DOUBLE_STAR::")
-    .replace(/\*/g, "[^/]*")
-    .replace(/::DOUBLE_STAR::/g, ".*");
+  const escaped = normalized.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*/g, "::DOUBLE_STAR::").replace(/\*/g, "[^/]*").replace(/::DOUBLE_STAR::/g, ".*");
   return new RegExp(`^${escaped}(?:/.*)?$`);
 }
 
@@ -72,12 +64,7 @@ export function pathIsAllowed(path: string, allowedPaths: string[]): boolean {
   return allowedPaths.some((pattern) => globPattern(pattern).test(normalized));
 }
 
-export async function enforceGitChangeScope(input: {
-  before: GitWorkspaceSnapshot;
-  afterRoot: string;
-  allowedPaths: string[];
-  artifactDirectory: string;
-}): Promise<ChangeGuardReport> {
+export async function enforceGitChangeScope(input: { before: GitWorkspaceSnapshot; afterRoot: string; allowedPaths: string[]; artifactDirectory: string }): Promise<ChangeGuardReport> {
   const after = await captureGitWorkspace(input.afterRoot);
   const changedFiles = Object.keys(after.files).filter((path) => {
     const previous = input.before.files[path];
@@ -93,15 +80,7 @@ export async function enforceGitChangeScope(input: {
   const untracked = changedFiles.filter((path) => after.files[path]?.status === "??");
   const appendix = untracked.length ? `\n# Untracked files\n${untracked.join("\n")}\n` : "";
   await writeFile(diffPath, `${diff.stdout}${appendix}`, "utf8");
-  const report: ChangeGuardReport = {
-    schemaVersion: 1,
-    passed: outOfScopeFiles.length === 0,
-    allowedPaths: [...input.allowedPaths],
-    changedFiles,
-    outOfScopeFiles,
-    diffPath,
-    reportPath,
-  };
+  const report: ChangeGuardReport = { schemaVersion: 1, passed: outOfScopeFiles.length === 0, allowedPaths: [...input.allowedPaths], changedFiles, outOfScopeFiles, diffPath, reportPath };
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   return report;
 }
