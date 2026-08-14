@@ -2,6 +2,7 @@ export type ProviderTransport = "cli" | "web-assisted" | "local" | "api";
 export type CostProfile = "included" | "free-tier" | "low-cost" | "local" | "paid" | "unknown";
 export type AutomationLevel = "full" | "assisted" | "manual";
 export type ProviderStatus = "ready" | "planned" | "experimental" | "conditional";
+export type TaskStatus = "planned" | "ready" | "running" | "review" | "done" | "failed" | "cancelled";
 
 export interface ProviderDefinition {
   id: string;
@@ -38,4 +39,35 @@ export interface SuperIaConfig {
     redactSecretsBeforeRemoteSend: boolean;
   };
   preferredProviders: string[];
+}
+
+export interface RepositoryScan {
+  root: string;
+  name: string;
+  isGitRepository: boolean;
+  branch?: string;
+  remote?: string;
+  dirty: boolean;
+  packageManager?: "npm" | "pnpm" | "yarn" | "bun";
+  manifests: string[];
+  languages: string[];
+  instructions: string[];
+  scripts: Record<string, string>;
+  recommendedChecks: string[];
+}
+
+export interface SuperIaTask {
+  id: string;
+  title: string;
+  goal: string;
+  status: TaskStatus;
+  repositoryRoot: string;
+  baseBranch: string;
+  branchName: string;
+  worktreePath?: string;
+  provider?: string;
+  createdAt: string;
+  updatedAt: string;
+  checks: string[];
+  notes: string[];
 }
