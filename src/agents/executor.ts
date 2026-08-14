@@ -7,7 +7,7 @@ import { openControlPlane } from "../control/control-plane.js";
 import { openLeaseManager } from "../control/lease-manager.js";
 import { syncRepositoryToGlobalControl } from "../control/repository-sync.js";
 import { buildGitContext } from "../context/builder.js";
-import { captureGitWorkspace, enforceGitChangeScope } from "../quality/change-guard.js";
+import { captureGitWorkspace, enforceGitChangeScope, type ChangeGuardReport } from "../quality/change-guard.js";
 import { runManagedProcess } from "../runtime/process-runner.js";
 import { findExecutable } from "../utils/command.js";
 import { assertSafeCodexInvocation, buildCodexInvocation } from "./codex-adapter.js";
@@ -32,6 +32,7 @@ export async function executeCodexTask(repositoryDirectory: string, taskId: stri
   const task = await getTask(repository.root, taskId);
   const mode = resolveMode(options.mode);
   if (mode === "build" && !task.worktreePath) throw new Error(`La mission ${task.id} doit posséder un worktree avant le mode build.`);
+  if (mode === "build" && !task.allowedPaths.length) throw new Error(`La mission ${task.id} doit déclarer au moins un --allow-path avant le mode build.`);
   const cwd = task.worktreePath ?? repository.root;
   const synchronized = await syncRepositoryToGlobalControl(repository.root);
   const context = await buildGitContext(cwd, { taskId: task.id, goal: task.goal, query: task.title, maxBytes: options.maxContextBytes }, task);
@@ -58,7 +59,13 @@ export async function executeCodexTask(repositoryDirectory: string, taskId: stri
   const control = await openControlPlane();
   try {
     const processResult = await runManagedProcess({ projectId: synchronized.project.id, taskId: task.id, provider: invocation.provider, command: invocation.command, args: invocation.args, cwd: invocation.cwd, stdin: invocation.stdin, timeoutMs, metadata: invocation.metadata, env: sandbox.env, allowedEnvKeys: ["CODEX_HOME", ...sandbox.allowedEnvKeys], sandbox: sandbox.sandbox }, control);
-    const changeGuard = await enforceGitChangeScope({ before, afterRoot: cwd, allowedPaths: mode === "build" ? task.allowedPaths : [], artifactDirectory: context.directory });
+    let changeGuard: ChangeGuardReport;
+    try {
+      changeGuard = await enforceGitChangeScope({ before, afterRoot: cwd, allowedPaths: mode === "build" ? task.allowedPaths : [], artifactDirectory: context.directory });
+    } catch (error) {
+      control.finishRun(processResult.runId, "failed", { changeGuardError: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
     const finalProcess = changeGuard.passed ? processResult : { ...processResult, status: "failed" as const };
     if (!changeGuard.passed) control.finishRun(processResult.runId, "failed", { changeGuard });
     const stdout = await readFile(processResult.stdoutPath, "utf8");
