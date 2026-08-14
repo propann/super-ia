@@ -4,14 +4,14 @@
 
 Le Raspberry Pi 5 sert de tour de contrôle permanente. Les modèles restent chez leurs fournisseurs officiels ; aucun modèle IA local n'est requis.
 
-## État vérifié — v0.11.0
+## État vérifié — v0.12.0
 
 La CI GitHub valide actuellement :
 
 - Ubuntu 24.04 ;
 - Node.js 22.23.2 et npm 10.9.8 ;
 - compilation TypeScript réussie ;
-- **26 tests réussis, 0 échec** ;
+- **28 tests réussis, 0 échec** ;
 - 0 vulnérabilité npm signalée ;
 - scripts Pi valides ;
 - aucune commande `sudo` dans le paquet Pi.
@@ -24,7 +24,10 @@ Fonctions principales :
 - contexte ciblé avec SHA-256 ;
 - runner avec logs, heartbeat, timeout et arrêt des descendants ;
 - adaptateurs Codex et Mistral Vibe ;
-- **Gitleaks obligatoire avant tout run réel Codex/Vibe** ;
+- Gitleaks obligatoire avant tout run réel Codex/Vibe ;
+- **sandbox Bubblewrap obligatoire sous Linux avant tout run réel Codex/Vibe** ;
+- HOME jetable et accès au workspace limité selon le mode ;
+- autotest Bubblewrap destiné au Pi ;
 - receipts vérifiables ;
 - sauvegardes cohérentes ;
 - daemon et service systemd utilisateur ;
@@ -52,7 +55,19 @@ Node.js **22.5 ou supérieur** est requis.
 bash install/pi/install.sh
 ```
 
-L'installateur compile, teste, initialise `~/.superia`, installe `superia`, crée un service systemd utilisateur durci et vérifie la première sauvegarde. Il n'utilise pas `sudo`.
+L'installateur :
+
+- compile et teste le projet ;
+- initialise `~/.superia` ;
+- installe la commande `superia` ;
+- crée un service systemd utilisateur durci ;
+- vérifie la première sauvegarde ;
+- détecte Gitleaks et Bubblewrap ;
+- exécute l'autotest Bubblewrap lorsqu'il est présent ;
+- écrit `~/.superia/sandbox-status.json` ;
+- n'utilise pas `sudo`.
+
+Le centre de contrôle reste installable sans Gitleaks ou Bubblewrap, mais les agents distants restent alors bloqués par défaut.
 
 ## Flux principal
 
@@ -71,38 +86,66 @@ superia task update TASK-0001 \
 superia task board
 superia worktree TASK-0001
 superia context build TASK-0001 --max-bytes 300000
+superia security scan --required
+superia security sandbox-check
 superia agent run codex TASK-0001 --mode plan
 superia validate
 superia receipt create <RUN-ID>
 ```
 
-## Préflight de sécurité
+## Deux préflights obligatoires
 
-Chaque run réel Codex ou Vibe déclenche automatiquement Gitleaks :
+Chaque run réel Codex ou Vibe vérifie :
 
 ```text
-Gitleaks absent  → agent refusé
-finding détecté  → agent refusé
-scan propre      → agent autorisé
+Gitleaks absent     → agent refusé
+finding détecté     → agent refusé
+Bubblewrap absent   → agent refusé
+préflights propres  → agent autorisé
 ```
 
-Le rapport, les logs et le run Gitleaks sont conservés. L'état du préflight apparaît dans le résultat de l'agent.
+Les résultats apparaissent dans les métadonnées et dans `AGENT_RESULT.json`.
 
-Une dérogation exceptionnelle doit être explicite :
+Dérogations exceptionnelles :
 
 ```bash
 superia agent run codex TASK-0001 \
   --mode plan \
-  --allow-without-gitleaks
+  --allow-without-gitleaks \
+  --allow-without-bwrap
 ```
 
-Cette dérogation produit l'état `waived` et un événement durable `security.preflight.waived`.
+Elles produisent un état `waived` et des événements durables. Une dérogation ne vaut jamais validation.
 
-Le mode `--dry-run` ne lance ni fournisseur distant ni Gitleaks :
+Le mode `--dry-run` ne lance aucun fournisseur ni scanner :
 
 ```bash
 superia agent run codex TASK-0001 --mode plan --dry-run
 ```
+
+## Sandbox Bubblewrap
+
+Politique actuelle :
+
+- vrai HOME non monté ;
+- HOME jetable `/home/superia` ;
+- système et exécutables en lecture seule ;
+- plan/review : dépôt ou worktree en lecture seule ;
+- build : worktree en lecture-écriture ;
+- sortie Codex montée individuellement en écriture ;
+- état fournisseur limité à `~/.superia/providers/` ;
+- capacités supprimées ;
+- namespaces utilisateur, PID, IPC, UTS et cgroup demandés ;
+- réseau isolable pour les tâches qui n'ont pas besoin d'Internet.
+
+Codex et Vibe gardent actuellement le réseau de l'hôte pour joindre leurs services officiels.
+
+```bash
+superia security sandbox-check
+superia security sandbox-check --json
+```
+
+La CI vérifie la politique avec des mocks. Le test noyau réel reste à exécuter sur le Pi 5. Voir [Sandbox Bubblewrap](docs/SANDBOX.md).
 
 ## Suivi des tâches
 
@@ -127,14 +170,17 @@ Documentation de pilotage :
 
 ### Codex
 
-- plan/review en sandbox `read-only` ;
-- build en `workspace-write` uniquement dans un worktree ;
+- sandbox native conservée ;
+- sandbox externe Bubblewrap ;
+- plan/review en lecture seule ;
+- build uniquement dans un worktree ;
 - prompt par stdin ;
 - sortie JSONL ;
 - contournement de sandbox interdit.
 
 ### Mistral Vibe
 
+- sandbox externe Bubblewrap ;
 - plan/review avec le profil `plan` ;
 - build avec `accept-edits` ;
 - aucun shell ;
@@ -161,7 +207,9 @@ Données principales :
 ├── events/events.jsonl
 ├── runs/
 ├── security/
+├── providers/
 ├── backups/
+├── sandbox-status.json
 └── daemon-status.json
 ```
 
@@ -179,19 +227,20 @@ L'approbation humaine reste obligatoire. Super IA ne fusionne jamais automatique
 
 ## Prochaines priorités
 
-1. Bubblewrap, HOME temporaire et contrôle réseau ;
-2. contrôle des fichiers modifiés après chaque agent ;
-3. installation et tests de reprise/restauration sur le Pi 5 ;
-4. tests réels Codex et Vibe ;
-5. reviewer indépendant et pipeline complet ;
-6. Restic ;
-7. routeur coût/qualité mesuré.
+1. terminer l'autotest Bubblewrap réel sur le Pi ;
+2. contrôler les fichiers modifiés après chaque agent ;
+3. installer v0.12 et tester reprise/restauration sur le Pi 5 ;
+4. tester Codex et Vibe réels sous Bubblewrap ;
+5. construire un reviewer indépendant et le pipeline complet ;
+6. intégrer Restic ;
+7. construire le routeur coût/qualité mesuré.
 
 ## Limites actuelles
 
 - installation matérielle Pi non encore validée ;
 - fournisseurs réels non encore testés dans ce dépôt ;
-- sandbox commune Bubblewrap/Podman manquante ;
+- politique Bubblewrap testée en CI avec mocks, frontière noyau réelle non encore prouvée ;
+- réseau distant non filtré par domaine ;
 - contrôle post-run des chemins modifiés manquant ;
 - reviewer, DAG, routeur et interface web non livrés ;
 - restauration automatisée et Restic non livrés.
@@ -203,6 +252,7 @@ L'approbation humaine reste obligatoire. Super IA ne fusionne jamais automatique
 - [Suivi des tâches](docs/TASK_TRACKER.md)
 - [Plan de contrôle](docs/CONTROL_PLANE.md)
 - [Adaptateurs](docs/AGENT_ADAPTERS.md)
+- [Sandbox Bubblewrap](docs/SANDBOX.md)
 - [Receipts](docs/RECEIPTS.md)
 - [Installation Pi](docs/PI_INSTALL.md)
 - [Sécurité](docs/SECURITY.md)
