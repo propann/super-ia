@@ -7,7 +7,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=@REPO@
-Environment=SUPERIA_HOME=@HOME@/.superia
+Environment=SUPERIA_HOME=@SUPERIA_HOME@
 ExecStart=@NODE@ @REPO@/dist/index.js daemon --interval-seconds 30 --stale-minutes 5
 Restart=on-failure
 RestartSec=5
@@ -16,7 +16,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=@HOME@/.superia
+ReadWritePaths=@SUPERIA_HOME@
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
