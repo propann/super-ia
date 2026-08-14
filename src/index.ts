@@ -19,7 +19,7 @@ import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.13.0
+  console.log(`Super IA v0.14.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
@@ -62,8 +62,13 @@ Usage:
       Vibe : --max-turns 8 --max-tokens 50000 --max-price 0.25
 
   superia pipeline run <TASK-ID> [options]      Pipeline contrôlé complet
+  superia pipeline status <TASK-ID> [--json]    État, tentatives et budget
       --builder codex|vibe --reviewer codex|vibe
       --builder-model <nom> --reviewer-model <nom> --dry-run
+      --resume                                  Reprend une étape interrompue
+      --retry                                   Corrige une review changes-requested
+      --max-attempts 3                          Plafond figé au premier lancement
+      --max-total-price 0.75                    Prix Vibe maximal réservé cumulé
       --timeout-minutes 60 --max-context-bytes 300000
       Vibe : --max-turns 8 --max-tokens 50000 --max-price 0.25
 
@@ -90,6 +95,9 @@ Principes:
   - toute modification hors périmètre fait échouer le run et archive le diff
   - pipeline : builder, validations locales, reviewer différent, receipt
   - reviewer strictement en lecture seule et rapport JSON structuré obligatoire
+  - corrections uniquement avec --retry, plafonds figés et review précédente injectée
+  - patch identique détecté comme boucle avant une nouvelle review
+  - coût affiché comme plafond Vibe réservé, jamais comme dépense réelle inventée
   - une seule exécution possède une mission grâce aux leases
   - suivi explicite des blocages, dépendances et critères d'acceptation
   - Codex conserve sa sandbox ; Vibe n'obtient aucun shell
