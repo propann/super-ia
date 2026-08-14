@@ -1,6 +1,6 @@
 {
   "name": "super-ia",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "Orchestrateur local et multi-fournisseurs pour agents IA de développement.",
   "type": "module",
   "bin": {
@@ -12,6 +12,7 @@
     "check": "npm run build && npm test",
     "start": "node dist/index.js",
     "doctor": "npm run build --silent && node dist/index.js doctor",
+    "readiness": "npm run build --silent && node dist/index.js readiness",
     "control": "npm run build --silent && node dist/index.js control status",
     "context": "npm run build --silent && node dist/index.js context build",
     "security": "npm run build --silent && node dist/index.js security scan",
