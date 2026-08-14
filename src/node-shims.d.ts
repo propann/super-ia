@@ -1,3 +1,7 @@
+declare module "node:fs" {
+  export function appendFileSync(path: string, data: string, encoding: string): void;
+}
+
 declare module "node:fs/promises" {
   export function access(path: string): Promise<void>;
   export function mkdir(path: string, options?: unknown): Promise<unknown>;
@@ -14,6 +18,30 @@ declare module "node:path" {
   export function resolve(...parts: string[]): string;
 }
 
+declare module "node:os" {
+  export function homedir(): string;
+}
+
+declare module "node:crypto" {
+  export function createHash(algorithm: string): {
+    update(value: string): { digest(encoding: "hex"): string };
+  };
+  export function randomUUID(): string;
+}
+
+declare module "node:sqlite" {
+  export class DatabaseSync {
+    constructor(path: string);
+    exec(sql: string): void;
+    prepare(sql: string): {
+      run(...params: unknown[]): { changes: number | bigint; lastInsertRowid: number | bigint };
+      get(...params: unknown[]): Record<string, unknown> | undefined;
+      all(...params: unknown[]): Record<string, unknown>[];
+    };
+    close(): void;
+  }
+}
+
 declare module "node:child_process" {
   export function execFile(...args: unknown[]): unknown;
 }
@@ -25,6 +53,8 @@ declare module "node:util" {
 declare const process: {
   platform: string;
   argv: string[];
+  env: Record<string, string | undefined>;
+  pid: number;
   cwd(): string;
   exitCode?: number;
   stdout: {
