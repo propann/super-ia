@@ -34,6 +34,19 @@ export function retryBudget(options: PipelineOptions): {
   return { maxAttempts, maxTotalPriceUsd, reservedPerAttemptUsd };
 }
 
+export function checkpointBudget(checkpoint: PipelineCheckpoint, options: PipelineOptions): {
+  maxAttempts: number;
+  maxTotalPriceUsd: number;
+  reservedPerAttemptUsd: number;
+} {
+  const fallback = retryBudget(options);
+  return {
+    maxAttempts: checkpoint.maxAttempts ?? fallback.maxAttempts,
+    maxTotalPriceUsd: checkpoint.maxTotalPriceUsd ?? fallback.maxTotalPriceUsd,
+    reservedPerAttemptUsd: checkpoint.reservedPerAttemptUsd ?? fallback.reservedPerAttemptUsd,
+  };
+}
+
 export async function fileSha256(path: string): Promise<string> {
   const data = await readFile(path);
   return createHash("sha256").update(data).digest("hex");
@@ -41,10 +54,10 @@ export async function fileSha256(path: string): Promise<string> {
 
 export function prepareRetry(checkpoint: PipelineCheckpoint, options: PipelineOptions): {
   attemptNumber: number;
-  feedbackPath?: string;
+  feedbackPath: string;
   reservedPerAttemptUsd: number;
 } {
-  const budget = retryBudget(options);
+  const budget = checkpointBudget(checkpoint, options);
   const attempts = checkpoint.attempts ?? [];
   if (!checkpoint.review || checkpoint.review.verdict !== "changes-requested") {
     throw new Error("Une correction exige une review structurée avec verdict changes-requested.");
