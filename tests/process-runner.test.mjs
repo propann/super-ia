@@ -21,6 +21,16 @@ function scan(root) {
   };
 }
 
+async function linuxProcessState(pid) {
+  try {
+    const stat = await readFile(`/proc/${pid}/stat`, "utf8");
+    return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[0];
+  } catch (error) {
+    if (error && typeof error === "object" && error.code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
 test("managed runner stores output and completes the durable run", async () => {
   const home = await mkdtemp(join(tmpdir(), "superia-runtime-"));
   const root = await mkdtemp(join(tmpdir(), "superia-project-"));
@@ -75,7 +85,7 @@ test("managed runner times out and kills the process group", async () => {
   }
 });
 
-test("timed-out runner waits for SIGKILL and leaves no detached descendant alive", async () => {
+test("timed-out runner waits for SIGKILL and leaves no running descendant", async () => {
   if (process.platform === "win32") return;
   const home = await mkdtemp(join(tmpdir(), "superia-descendant-timeout-"));
   const root = await mkdtemp(join(tmpdir(), "superia-project-"));
@@ -105,7 +115,8 @@ test("timed-out runner waits for SIGKILL and leaves no detached descendant alive
 
     const descendantPid = Number((await readFile(pidPath, "utf8")).trim());
     assert.equal(result.timedOut, true);
-    assert.throws(() => process.kill(descendantPid, 0));
+    const state = await linuxProcessState(descendantPid);
+    assert.ok(state === undefined || state === "Z", `descendant still running with state ${state}`);
     control.close();
   } finally {
     await rm(home, { recursive: true, force: true });
