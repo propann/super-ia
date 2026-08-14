@@ -1,4 +1,5 @@
 import { connectionCatalog } from "./catalog.js";
+import { renderConnectionDashboard } from "./dashboard.js";
 import { ensureConnectionStore, inspectConnections, removeConnection, saveConnection, setConnectionEnabled, writeSecretsTemplate } from "./store.js";
 import type { AiConnection, ConnectionAuthMode, ConnectionKind } from "./types.js";
 
@@ -45,6 +46,11 @@ export async function handleConnectionCommand(command: string, args: string[], j
     const secretsTemplate = await writeSecretsTemplate();
     if (json) console.log(JSON.stringify({ ...result, secretsTemplate }, null, 2));
     else console.log(`${result.created ? "Créé" : "Déjà présent"} : ${result.path}\nModèle de variables : ${secretsTemplate}`);
+    return true;
+  }
+  if (subcommand === "dashboard") {
+    const checks = await inspectConnections();
+    if (json) console.log(JSON.stringify(checks, null, 2)); else console.log(renderConnectionDashboard(checks, process.stdout.columns ?? 112));
     return true;
   }
   if (subcommand === "list" || subcommand === "doctor") {
@@ -98,5 +104,5 @@ export async function handleConnectionCommand(command: string, args: string[], j
     if (json) console.log(JSON.stringify(connection, null, 2)); else console.log(`Connexion enregistrée : ${connection.id}`);
     return true;
   }
-  throw new Error("Sous-commande connection inconnue. Utiliser catalog, init, list, doctor, add, enable, disable, remove ou secrets-template.");
+  throw new Error("Sous-commande connection inconnue. Utiliser catalog, init, dashboard, list, doctor, add, enable, disable, remove ou secrets-template.");
 }
