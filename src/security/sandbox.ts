@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { access, mkdir, realpath, rm } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import type {
   ManagedProcessRequest,
   SandboxExecutionSummary,
+  SandboxMaskedPath,
 } from "../runtime/types.js";
 
 export interface PreparedSandboxInvocation {
@@ -53,6 +54,23 @@ function setEnvironmentArguments(env: Record<string, string>): string[] {
   return args;
 }
 
+function isInsideWorkspace(workspace: string, path: string): boolean {
+  return path === workspace || path.startsWith(`${workspace}${sep}`);
+}
+
+async function normalizeMaskedPaths(workspace: string, entries: SandboxMaskedPath[]): Promise<SandboxMaskedPath[]> {
+  const byPath = new Map<string, SandboxMaskedPath>();
+  for (const entry of entries) {
+    const path = resolve(entry.path);
+    if (path === workspace || !isInsideWorkspace(workspace, path)) {
+      throw new Error(`Masque sandbox hors workspace refusé : ${entry.path}`);
+    }
+    if (!await pathExists(path)) continue;
+    byPath.set(path, { ...entry, path });
+  }
+  return [...byPath.values()].sort((left, right) => left.path.localeCompare(right.path));
+}
+
 export async function prepareSandboxInvocation(
   request: ManagedProcessRequest,
   safeEnv: Record<string, string>,
@@ -87,16 +105,19 @@ export async function prepareSandboxInvocation(
     SUPERIA_SANDBOX: "bubblewrap",
   };
 
+  const workspace = resolve(request.cwd);
   const statePaths = [...new Set((request.sandbox.statePaths ?? []).map((path) => resolve(path)))];
   const writablePaths = [...new Set((request.sandbox.writablePaths ?? []).map((path) => resolve(path)))];
   const requestedReadOnly = [...new Set((request.sandbox.readOnlyPaths ?? []).map((path) => resolve(path)))];
+  const maskedPaths = await normalizeMaskedPaths(workspace, request.sandbox.maskedPaths ?? []);
   for (const path of statePaths) await mkdir(path, { recursive: true });
   for (const path of writablePaths) {
     if (!await pathExists(path)) throw new Error(`Chemin d'écriture sandbox introuvable : ${path}`);
+    if (maskedPaths.some((masked) => masked.path === path)) throw new Error(`Chemin à la fois inscriptible et masqué : ${path}`);
   }
   const commandMounts = await executableMounts(request.command);
   const readOnlyPaths = [...new Set([...commandMounts, ...requestedReadOnly])]
-    .filter((path) => path !== resolve(request.cwd));
+    .filter((path) => path !== workspace);
 
   const args: string[] = [
     "--die-with-parent",
@@ -169,13 +190,16 @@ export async function prepareSandboxInvocation(
   }
   for (const path of statePaths) args.push("--bind", path, path);
 
-  const workspace = resolve(request.cwd);
   args.push(
     request.sandbox.workspaceAccess === "read-write" ? "--bind" : "--ro-bind",
     workspace,
     workspace,
   );
   for (const path of writablePaths) args.push("--bind", path, path);
+  for (const masked of maskedPaths) {
+    if (masked.kind === "directory") args.push("--tmpfs", masked.path);
+    else args.push("--ro-bind", "/dev/null", masked.path);
+  }
   args.push(
     ...setEnvironmentArguments(env),
     "--chdir",
@@ -194,6 +218,7 @@ export async function prepareSandboxInvocation(
     statePaths,
     writablePaths,
     readOnlyPaths,
+    maskedPaths,
   };
 
   return {
