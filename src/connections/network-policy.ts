@@ -66,6 +66,7 @@ export function evaluateEndpointPolicy(connection: AiConnection): EndpointPolicy
 
   const reasons: string[] = [];
   if (parsed.username || parsed.password) reasons.push("identifiants interdits dans l'URL");
+  if (parsed.search) reasons.push("paramètres de requête interdits dans une baseUrl");
   if (parsed.hash) reasons.push("fragment URL interdit");
   if (!["http:", "https:"].includes(parsed.protocol)) reasons.push("protocole non HTTP(S)");
 
