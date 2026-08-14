@@ -1,6 +1,12 @@
 export type SandboxNetworkMode = "host" | "isolated";
 export type SandboxWorkspaceAccess = "read-only" | "read-write";
 
+export interface SandboxMaskedPath {
+  path: string;
+  kind: "file" | "directory";
+  reason: string;
+}
+
 export interface ManagedSandboxRequest {
   engine: "bubblewrap";
   executable: string;
@@ -9,6 +15,7 @@ export interface ManagedSandboxRequest {
   statePaths?: string[];
   writablePaths?: string[];
   readOnlyPaths?: string[];
+  maskedPaths?: SandboxMaskedPath[];
 }
 
 export interface SandboxExecutionSummary {
@@ -20,6 +27,7 @@ export interface SandboxExecutionSummary {
   statePaths: string[];
   writablePaths: string[];
   readOnlyPaths: string[];
+  maskedPaths: SandboxMaskedPath[];
 }
 
 export interface ManagedProcessRequest {
