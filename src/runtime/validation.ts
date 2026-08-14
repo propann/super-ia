@@ -20,7 +20,7 @@ function parseCommand(command: string): { executable: string; args: string[] } {
 
 export async function runRepositoryValidations(
   directory: string,
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; taskId?: string } = {},
 ): Promise<ValidationReport> {
   const scan = await scanRepository(directory);
   if (!scan.recommendedChecks.length) {
@@ -35,12 +35,13 @@ export async function runRepositoryValidations(
       const parsed = parseCommand(command);
       const result = await runManagedProcess({
         projectId: project.id,
+        taskId: options.taskId,
         provider: "local-validator",
         command: parsed.executable,
         args: parsed.args,
         cwd: scan.root,
         timeoutMs: options.timeoutMs,
-        metadata: { validationCommand: command },
+        metadata: { validationCommand: command, pipelineTaskId: options.taskId ?? null },
       }, control);
       checks.push({ command, result });
       if (result.status !== "completed") break;
