@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, join, resolve, sep } from "node:path";
 import { openControlPlane, type ControlPlane } from "../control/control-plane.js";
+import { prepareSandboxInvocation } from "../security/sandbox.js";
 import type { ManagedProcessRequest, ManagedProcessResult } from "./types.js";
 
 const defaultEnvKeys = [
@@ -95,127 +96,135 @@ export async function runManagedProcess(
     }
 
     const args = request.args ?? [];
-    const startedAt = Date.now();
-    const run = control.createRun({
-      projectId: request.projectId,
-      taskId: request.taskId,
-      provider: request.provider,
-      metadata: {
-        command: request.command,
-        args,
-        cwd: resolve(request.cwd),
-        stdinBytes: request.stdin ? Buffer.byteLength(request.stdin, "utf8") : 0,
-        ...request.metadata,
-      },
-    });
-    const artifactDirectory = join(control.paths.runs, run.id);
-    await mkdir(artifactDirectory, { recursive: true });
-    const stdoutPath = join(artifactDirectory, "stdout.log");
-    const stderrPath = join(artifactDirectory, "stderr.log");
-    const maximumOutputBytes = 4 * 1024 * 1024;
-
-    return await new Promise<ManagedProcessResult>((resolvePromise, rejectPromise) => {
-      let stdout = "";
-      let stderr = "";
-      let stdoutBytes = 0;
-      let stderrBytes = 0;
-      let truncated = false;
-      let timedOut = false;
-      let settled = false;
-      let killTimer: ReturnType<typeof setTimeout> | undefined;
-
-      const child = spawn(request.command, args, {
-        cwd: resolve(request.cwd),
-        env: safeEnvironment(request),
-        detached: process.platform !== "win32",
-        shell: false,
-        stdio: ["pipe", "pipe", "pipe"],
+    const prepared = await prepareSandboxInvocation(request, safeEnvironment(request), control.paths.root);
+    try {
+      const startedAt = Date.now();
+      const run = control.createRun({
+        projectId: request.projectId,
+        taskId: request.taskId,
+        provider: request.provider,
+        metadata: {
+          command: request.command,
+          args,
+          cwd: resolve(request.cwd),
+          stdinBytes: request.stdin ? Buffer.byteLength(request.stdin, "utf8") : 0,
+          sandbox: prepared.summary ?? null,
+          ...request.metadata,
+        },
       });
-      if (typeof child.pid === "number") control.heartbeatRun(run.id, child.pid);
-      if (request.stdin) child.stdin?.end(request.stdin, "utf8");
-      else child.stdin?.end();
+      const artifactDirectory = join(control.paths.runs, run.id);
+      await mkdir(artifactDirectory, { recursive: true });
+      const stdoutPath = join(artifactDirectory, "stdout.log");
+      const stderrPath = join(artifactDirectory, "stderr.log");
+      const maximumOutputBytes = 4 * 1024 * 1024;
 
-      child.stdout?.on("data", (chunk: unknown) => {
-        const appended = appendLimited(stdout, chunk, maximumOutputBytes);
-        stdout = appended.value;
-        stdoutBytes = appended.bytes;
-        truncated ||= appended.truncated;
+      return await new Promise<ManagedProcessResult>((resolvePromise, rejectPromise) => {
+        let stdout = "";
+        let stderr = "";
+        let stdoutBytes = 0;
+        let stderrBytes = 0;
+        let truncated = false;
+        let timedOut = false;
+        let settled = false;
+        let killTimer: ReturnType<typeof setTimeout> | undefined;
+
+        const child = spawn(prepared.command, prepared.args, {
+          cwd: resolve(request.cwd),
+          env: prepared.env,
+          detached: process.platform !== "win32",
+          shell: false,
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+        if (typeof child.pid === "number") control.heartbeatRun(run.id, child.pid);
+        if (request.stdin) child.stdin?.end(request.stdin, "utf8");
+        else child.stdin?.end();
+
+        child.stdout?.on("data", (chunk: unknown) => {
+          const appended = appendLimited(stdout, chunk, maximumOutputBytes);
+          stdout = appended.value;
+          stdoutBytes = appended.bytes;
+          truncated ||= appended.truncated;
+        });
+        child.stderr?.on("data", (chunk: unknown) => {
+          const appended = appendLimited(stderr, chunk, maximumOutputBytes);
+          stderr = appended.value;
+          stderrBytes = appended.bytes;
+          truncated ||= appended.truncated;
+        });
+
+        const heartbeat = setInterval(() => {
+          try {
+            control.heartbeatRun(run.id, child.pid);
+          } catch {
+            // A heartbeat failure must not orphan the child process silently.
+          }
+        }, Math.max(1_000, request.heartbeatMs ?? 10_000));
+
+        const timeout = setTimeout(() => {
+          timedOut = true;
+          killProcessTree(child, "SIGTERM");
+          killTimer = setTimeout(() => killProcessTree(child, "SIGKILL"), Math.max(500, request.terminateGraceMs ?? 3_000));
+        }, Math.max(1_000, request.timeoutMs ?? 15 * 60_000));
+
+        const finish = async (exitCode: number | null, signal: string | null, spawnError?: unknown): Promise<void> => {
+          if (settled) return;
+          settled = true;
+          clearInterval(heartbeat);
+          clearTimeout(timeout);
+          if (killTimer) clearTimeout(killTimer);
+          try {
+            await Promise.all([
+              writeFile(stdoutPath, stdout, "utf8"),
+              writeFile(stderrPath, stderr, "utf8"),
+            ]);
+            const succeeded = exitCode === 0 && !timedOut && !spawnError;
+            const status = succeeded ? "completed" : "failed";
+            const result: ManagedProcessResult = {
+              runId: run.id,
+              command: basename(request.command),
+              args,
+              cwd: resolve(request.cwd),
+              exitCode,
+              signal,
+              timedOut,
+              durationMs: Date.now() - startedAt,
+              stdoutPath,
+              stderrPath,
+              stdoutBytes,
+              stderrBytes,
+              truncated,
+              sandbox: prepared.summary,
+              status,
+            };
+            control.finishRun(run.id, status, {
+              exitCode,
+              signal,
+              timedOut,
+              durationMs: result.durationMs,
+              stdoutPath,
+              stderrPath,
+              stdoutBytes,
+              stderrBytes,
+              truncated,
+              sandbox: prepared.summary ?? null,
+              spawnError: spawnError instanceof Error ? spawnError.message : spawnError ? String(spawnError) : undefined,
+            });
+            resolvePromise(result);
+          } catch (error) {
+            rejectPromise(error);
+          }
+        };
+
+        child.on("error", (error: unknown) => {
+          void finish(null, null, error);
+        });
+        child.on("close", (code: number | null, signal: string | null) => {
+          void finish(code, signal);
+        });
       });
-      child.stderr?.on("data", (chunk: unknown) => {
-        const appended = appendLimited(stderr, chunk, maximumOutputBytes);
-        stderr = appended.value;
-        stderrBytes = appended.bytes;
-        truncated ||= appended.truncated;
-      });
-
-      const heartbeat = setInterval(() => {
-        try {
-          control.heartbeatRun(run.id, child.pid);
-        } catch {
-          // A heartbeat failure must not orphan the child process silently.
-        }
-      }, Math.max(1_000, request.heartbeatMs ?? 10_000));
-
-      const timeout = setTimeout(() => {
-        timedOut = true;
-        killProcessTree(child, "SIGTERM");
-        killTimer = setTimeout(() => killProcessTree(child, "SIGKILL"), Math.max(500, request.terminateGraceMs ?? 3_000));
-      }, Math.max(1_000, request.timeoutMs ?? 15 * 60_000));
-
-      const finish = async (exitCode: number | null, signal: string | null, spawnError?: unknown): Promise<void> => {
-        if (settled) return;
-        settled = true;
-        clearInterval(heartbeat);
-        clearTimeout(timeout);
-        if (killTimer) clearTimeout(killTimer);
-        try {
-          await Promise.all([
-            writeFile(stdoutPath, stdout, "utf8"),
-            writeFile(stderrPath, stderr, "utf8"),
-          ]);
-          const succeeded = exitCode === 0 && !timedOut && !spawnError;
-          const status = succeeded ? "completed" : "failed";
-          const result: ManagedProcessResult = {
-            runId: run.id,
-            command: basename(request.command),
-            args,
-            cwd: resolve(request.cwd),
-            exitCode,
-            signal,
-            timedOut,
-            durationMs: Date.now() - startedAt,
-            stdoutPath,
-            stderrPath,
-            stdoutBytes,
-            stderrBytes,
-            truncated,
-            status,
-          };
-          control.finishRun(run.id, status, {
-            exitCode,
-            signal,
-            timedOut,
-            durationMs: result.durationMs,
-            stdoutPath,
-            stderrPath,
-            stdoutBytes,
-            stderrBytes,
-            truncated,
-            spawnError: spawnError instanceof Error ? spawnError.message : spawnError ? String(spawnError) : undefined,
-          });
-          resolvePromise(result);
-        } catch (error) {
-          rejectPromise(error);
-        }
-      };
-
-      child.on("error", (error: unknown) => {
-        void finish(null, null, error);
-      });
-      child.on("close", (code: number | null, signal: string | null) => {
-        void finish(code, signal);
-      });
-    });
+    } finally {
+      await prepared.cleanup();
+    }
   } finally {
     if (closeControl) control.close();
   }
