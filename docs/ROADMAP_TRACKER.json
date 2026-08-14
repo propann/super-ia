@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Super IA",
-  "currentVersion": "0.11.0",
+  "currentVersion": "0.12.0",
   "updatedAt": "2026-08-14",
   "statuses": ["done", "in_progress", "planned", "blocked", "deferred"],
   "milestones": [
@@ -96,13 +96,13 @@
     {
       "id": "SIA-101",
       "milestone": "M1",
-      "title": "Installer v0.11 sur le Raspberry Pi 5 cible",
+      "title": "Installer v0.12 sur le Raspberry Pi 5 cible",
       "status": "blocked",
       "priority": "critical",
       "dependencies": ["SIA-005"],
       "blockedBy": "Accès terminal au Pi requis",
-      "exitCriteria": ["installateur terminé", "service utilisateur actif", "control status valide", "première sauvegarde vérifiée"],
-      "evidence": ["journalctl du service", "sortie superia control status --json"]
+      "exitCriteria": ["installateur terminé", "service utilisateur actif", "control status valide", "première sauvegarde vérifiée", "rapport sandbox-status.json produit"],
+      "evidence": ["journalctl du service", "sortie superia control status --json", "~/.superia/sandbox-status.json"]
     },
     {
       "id": "SIA-102",
@@ -130,9 +130,9 @@
       "title": "Authentifier et tester Codex réel",
       "status": "planned",
       "priority": "high",
-      "dependencies": ["SIA-101"],
-      "exitCriteria": ["doctor détecte Codex", "plan réel terminé", "receipt valide", "aucune écriture en mode plan"],
-      "evidence": ["run Codex", "receipt"]
+      "dependencies": ["SIA-101", "SIA-203"],
+      "exitCriteria": ["doctor détecte Codex", "plan réel terminé sous Bubblewrap", "receipt valide", "aucune écriture hors sortie autorisée"],
+      "evidence": ["run Codex", "receipt", "événements sandbox"]
     },
     {
       "id": "SIA-105",
@@ -140,9 +140,9 @@
       "title": "Authentifier et tester Mistral Vibe réel",
       "status": "planned",
       "priority": "high",
-      "dependencies": ["SIA-101"],
-      "exitCriteria": ["doctor détecte Vibe", "plan réel terminé", "budget respecté", "shell absent"],
-      "evidence": ["run Vibe", "receipt"]
+      "dependencies": ["SIA-101", "SIA-203"],
+      "exitCriteria": ["doctor détecte Vibe", "plan réel terminé sous Bubblewrap", "budget respecté", "shell absent"],
+      "evidence": ["run Vibe", "receipt", "événements sandbox"]
     },
     {
       "id": "SIA-201",
@@ -168,11 +168,12 @@
       "id": "SIA-203",
       "milestone": "M2",
       "title": "Ajouter sandbox Bubblewrap commune",
-      "status": "planned",
+      "status": "in_progress",
       "priority": "critical",
       "dependencies": ["SIA-002"],
-      "exitCriteria": ["réseau désactivable", "écriture limitée au worktree", "HOME temporaire", "tests d'évasion basiques"],
-      "evidence": ["tests sandbox Linux"]
+      "blockedBy": "Politique et mocks validés en CI ; exécution noyau réelle à confirmer sur le Pi 5",
+      "exitCriteria": ["réseau désactivable", "écriture limitée au worktree", "HOME temporaire", "sorties individuelles autorisées", "tests d'évasion basiques sur le Pi réel"],
+      "evidence": ["tests/sandbox.test.mjs", "tests/codex-adapter.test.mjs", "tests/vibe-adapter.test.mjs", "src/security/sandbox.ts", "src/security/sandbox-check.ts", "~/.superia/sandbox-status.json sur le Pi"]
     },
     {
       "id": "SIA-204",
@@ -271,7 +272,7 @@
       "status": "blocked",
       "priority": "critical",
       "dependencies": ["SIA-102", "SIA-103", "SIA-104", "SIA-105", "SIA-202", "SIA-203"],
-      "blockedBy": "Preuves matérielles, fournisseurs réels et sandbox manquants",
+      "blockedBy": "Preuves matérielles, fournisseurs réels et autotest Bubblewrap du Pi manquants",
       "exitCriteria": ["CI verte", "Pi validé", "restauration validée", "Codex/Vibe réels validés", "sécurité minimale validée"],
       "evidence": ["docs/STATUS.md", "receipts matériels", "checklist de release"]
     }
