@@ -11,7 +11,7 @@ Pull request : `#1` vers `main`
 | Version | `0.14.0` |
 | CI GitHub | réussie |
 | Build TypeScript | réussi |
-| Tests | **44 réussis, 0 échec** |
+| Tests | **48 réussis, 0 échec** |
 | Audit npm du job | 0 vulnérabilité signalée |
 | Système CI | Ubuntu 24.04 |
 | Node / npm | 22.23.2 / 10.9.8 |
@@ -30,7 +30,7 @@ Pull request : `#1` vers `main`
 - Codex et Mistral Vibe ;
 - Gitleaks obligatoire avant les agents réels ;
 - Bubblewrap obligatoire sous Linux avant les agents réels ;
-- contrôle des fichiers modifiés ;
+- contrôle des fichiers modifiés avec limites et chemins critiques interdits ;
 - reviewer indépendant ;
 - pipeline builder → validations → review → receipt ;
 - checkpoints et reprise ;
@@ -100,8 +100,6 @@ review-completed
 receipt-created
 ```
 
-Commandes :
-
 ```bash
 superia pipeline status TASK-0001
 
@@ -115,8 +113,6 @@ Les tests prouvent la reprise après le builder et après la review sans relance
 
 ## Retries et détection de boucle
 
-Une correction exige une action explicite :
-
 ```bash
 superia pipeline run TASK-0001 \
   --builder codex \
@@ -127,26 +123,16 @@ superia pipeline run TASK-0001 \
 Règles :
 
 - retry autorisé seulement après `changes-requested` ;
-- la review précédente est injectée au builder par fichier, pas dans `argv` ;
-- le nombre maximal d'essais est figé au premier lancement ;
-- le plafond total de prix réservé est figé au premier lancement ;
-- chaque builder terminé consomme une tentative, même si les tests échouent ensuite ;
+- review précédente injectée au builder par fichier, pas dans `argv` ;
+- plafonds d'essais et de prix figés au premier lancement ;
+- chaque builder terminé consomme une tentative ;
 - chaque patch est empreinté en SHA-256 ;
 - un patch déjà produit arrête la boucle avant une nouvelle validation/review ;
-- les causes d'arrêt sont enregistrées : `approved`, `changes-requested`, `review-blocked`, `retry-limit`, `price-limit`, `loop-detected`, `technical-failure`.
+- causes d'arrêt persistées.
 
-`Prix réservé` signifie plafond maximal autorisé pour Vibe, pas dépense réelle inventée.
+Le prix réservé est le plafond maximal autorisé pour Vibe, pas une dépense réelle inventée.
 
-Le test d'intégration prouve :
-
-1. première review en `changes-requested` ;
-2. review transmise au second builder ;
-3. second patch identique ;
-4. reviewer non relancé ;
-5. état `loop-detected` ;
-6. deux tentatives et 0,50 USD de plafond réservé enregistrés.
-
-## Contrôle des modifications
+## Contrôle des modifications renforcé
 
 Chaque mission déclare son périmètre :
 
@@ -158,6 +144,26 @@ superia task update TASK-0001 \
 
 Un build sans chemin autorisé est refusé. Une modification hors périmètre transforme le run en `failed`.
 
+Limites sûres par défaut :
+
+```text
+50 fichiers modifiés maximum
+1 000 000 octets effectifs maximum
+```
+
+Le calcul inclut le diff binaire Git et le contenu complet des fichiers non suivis.
+
+Toujours interdits, même avec `allowedPaths: ["**"]` :
+
+```text
+.env et variantes
+.npmrc
+.pypirc
+clés *.pem et *.key
+id_rsa et id_ed25519
+.git-credentials
+```
+
 Artefacts :
 
 ```text
@@ -166,24 +172,21 @@ CHANGE_GUARD.json
 AGENT_RESULT.json
 ```
 
+Le rapport distingue :
+
+- `outOfScopeFiles` ;
+- `forbiddenFiles` ;
+- `limitViolations` ;
+- nombre de fichiers ;
+- nombre d'octets effectifs.
+
 ## Receipts
 
-Les receipts incluent :
-
-- contexte et empreinte ;
-- logs ;
-- résultat agent ;
-- patch ;
-- change guard ;
-- validations ;
-- review ;
-- identité du reviewer ;
-- verdict et findings ;
-- `humanApprovalRequired: true`.
+Les receipts incluent contexte, logs, résultat agent, patch, change guard, validations, review, identité du reviewer, verdict, findings et `humanApprovalRequired: true`.
 
 Toute modification ultérieure d'un artefact invalide la preuve SHA-256.
 
-## Couverture des 44 tests
+## Couverture des 48 tests
 
 La suite couvre notamment :
 
@@ -195,14 +198,16 @@ La suite couvre notamment :
 - Bubblewrap et HOME jetable ;
 - Codex et Vibe simulés ;
 - runner, logs, timeout et descendants ;
-- garde Git ;
+- périmètre Git et patch archivé ;
+- chemin `.env` interdit malgré un glob large ;
+- dépassement du nombre de fichiers ;
+- dépassement d'octets avec fichier non suivi ;
+- limite invalide bloquante ;
 - reviewer structuré ;
 - pipeline complet ;
 - checkpoints et reprise ;
 - budget de retries immuable ;
-- plafond de prix réservé ;
-- injection de feedback ;
-- détection de patch identique ;
+- injection de feedback et boucle identique ;
 - receipts et falsification ;
 - roadmap et scripts Pi.
 
@@ -210,13 +215,13 @@ La suite couvre notamment :
 
 | État | Nombre |
 |---|---:|
-| Terminé | 11 |
+| Terminé | 12 |
 | En cours | 1 |
 | Planifié | 9 |
 | Bloqué | 2 |
-| Total | 23 |
+| Total | 24 |
 
-Le milestone M3 — pipeline multi-agent contrôlé — est terminé. `SIA-203` reste en cours jusqu'à la validation Bubblewrap réelle sur le Pi.
+`SIA-206` — limites de diff et chemins critiques — est terminé. `SIA-203` reste en cours jusqu'à la validation Bubblewrap réelle sur le Pi.
 
 ## Encore à prouver sur le Pi
 
@@ -234,7 +239,7 @@ Le milestone M3 — pipeline multi-agent contrôlé — est terminé. `SIA-203` 
 - correction automatique sans intervention humaine non activée ;
 - réseau Codex/Vibe nécessaire pour joindre leurs services ;
 - filtrage réseau par domaine non livré ;
-- taille maximale des diffs et fichiers toujours interdits à renforcer ;
+- limites de diff globales, non encore personnalisables par projet ;
 - DAG, routeur coût/qualité et interface web non livrés ;
 - Restic et restauration automatisée non livrés ;
 - `node:sqlite` affiche encore un avertissement expérimental sous Node 22 ;
@@ -248,5 +253,4 @@ Le milestone M3 — pipeline multi-agent contrôlé — est terminé. `SIA-203` 
 4. `SIA-104` / `SIA-105` — Codex et Vibe réels ;
 5. `SIA-205` — Restic ;
 6. `SIA-401` — routeur coût/qualité mesuré ;
-7. `SIA-402` — DAG de missions ;
-8. renforcer les limites de diff et chemins interdits.
+7. `SIA-402` — DAG de missions.
