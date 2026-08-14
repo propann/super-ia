@@ -69,6 +69,7 @@ export async function executeCodexTask(
     model: options.model,
   });
   assertSafeCodexInvocation(invocation);
+  if (!options.dryRun) await writeFile(invocation.lastMessagePath, "", "utf8");
   const securityPreflight = await runAgentSecurityPreflight({
     cwd,
     projectId: synchronized.project.id,
@@ -82,6 +83,7 @@ export async function executeCodexTask(
     taskId: task.id,
     provider: invocation.provider,
     mode,
+    writablePaths: options.dryRun ? undefined : [invocation.lastMessagePath],
     dryRun: options.dryRun,
     allowWithoutBubblewrap: options.allowWithoutBubblewrap,
   });
