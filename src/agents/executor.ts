@@ -50,7 +50,7 @@ export async function executeCodexTask(repositoryDirectory: string, taskId: stri
   assertSafeCodexInvocation(invocation);
   if (!options.dryRun) await writeFile(invocation.lastMessagePath, "", "utf8");
   const securityPreflight = await runAgentSecurityPreflight({ cwd, projectId: synchronized.project.id, taskId: task.id, provider: invocation.provider, dryRun: options.dryRun, allowWithoutGitleaks: options.allowWithoutGitleaks });
-  const sandbox = await prepareAgentSandbox({ projectId: synchronized.project.id, taskId: task.id, provider: invocation.provider, mode, writablePaths: options.dryRun ? undefined : [invocation.lastMessagePath], dryRun: options.dryRun, allowWithoutBubblewrap: options.allowWithoutBubblewrap });
+  const sandbox = await prepareAgentSandbox({ projectId: synchronized.project.id, taskId: task.id, provider: invocation.provider, mode, workspaceRoot: cwd, writablePaths: options.dryRun ? undefined : [invocation.lastMessagePath], dryRun: options.dryRun, allowWithoutBubblewrap: options.allowWithoutBubblewrap });
   invocation.metadata.securityPreflight = securityPreflight;
   invocation.metadata.sandboxPreflight = sandbox.preflight;
   invocation.metadata.allowedPaths = mode === "build" ? task.allowedPaths : [];
