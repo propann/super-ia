@@ -2,21 +2,29 @@
 
 Source de vérité machine-lisible : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json).
 
-Dernière mise à jour : **14 août 2026**  
+Dernière mise à jour : **15 août 2026**  
 Version suivie : **0.13.0**
 
 ## État global
 
 | État | Nombre |
 |---|---:|
-| Terminé | 8 |
+| Terminé | 10 |
 | En cours | 1 |
-| Planifié | 12 |
+| Planifié | 10 |
 | Bloqué | 2 |
 | Différé | 0 |
 | **Total** | **23** |
 
 ## Priorité immédiate
+
+### Pipeline qualité
+
+| ID | État | Tâche | Résultat |
+|---|---|---|---|
+| `SIA-301` | terminé | Reviewer indépendant | fournisseur différent, lecture seule, findings structurés et verdict bloquant |
+| `SIA-302` | terminé | Pipeline builder → validation → review → receipt | étapes déterministes, checkpoints et reprise testée |
+| `SIA-303` | planifié | Budget de retries et détection de boucle | plafond d'essais, empreinte de tentative et cause d'arrêt |
 
 ### Sécurité
 
@@ -35,57 +43,85 @@ Version suivie : **0.13.0**
 | `SIA-104` | Tester Codex réel sous Bubblewrap | plan terminé, receipt valide, aucun changement non autorisé |
 | `SIA-105` | Tester Mistral Vibe réel sous Bubblewrap | budget respecté, shell absent, receipt valide |
 
-### Prochain lot logiciel
-
-| ID | Priorité | Tâche | Dépendances |
-|---|---|---|---|
-| `SIA-301` | critique | Reviewer indépendant | `SIA-202`, `SIA-204` — satisfaites |
-| `SIA-302` | critique | Pipeline builder → validation → review → receipt | `SIA-301` |
-| `SIA-303` | haute | Budget de retries et détection de boucle | `SIA-302` |
-| `SIA-205` | haute | Restic et politique de rétention | `SIA-103` |
-
 ## Terminé dans v0.13
 
-`SIA-204` apporte :
+### Contrôle des changements — `SIA-204`
 
 - champ de mission `allowedPaths` ;
 - option répétable `--allow-path <glob>` ;
 - refus d'un build sans périmètre déclaré ;
 - snapshot Git avant et après l'agent ;
-- comparaison des statuts et empreintes ;
 - détection des fichiers hors périmètre ;
-- `AGENT_CHANGES.patch` ;
-- `CHANGE_GUARD.json` ;
-- résultat ajouté à `AGENT_RESULT.json` ;
-- run SQLite transformé en `failed` en cas de violation ;
-- comportement fail-closed si le contrôleur lui-même échoue ;
-- test de bout en bout avec faux build Codex.
+- `AGENT_CHANGES.patch` et `CHANGE_GUARD.json` ;
+- run marqué `failed` en cas de violation.
 
-Documentation : [`CHANGE_GUARD.md`](CHANGE_GUARD.md).
+### Reviewer indépendant — `SIA-301`
 
-## Préparer un build
+- builder et reviewer obligatoirement différents ;
+- review strictement en lecture seule ;
+- JSON structuré obligatoire ;
+- findings avec sévérité, preuve et recommandation ;
+- sortie invalide transformée en verdict `blocked` ;
+- `approve` incompatible avec un finding moyen ou supérieur ;
+- rapport durable `REVIEW.json`.
+
+### Pipeline et reprise — `SIA-302`
+
+- ordre builder → garde Git → validations → reviewer → receipt ;
+- arrêt avant reviewer si une étape précédente échoue ;
+- receipt enrichi avec garde, diff et review ;
+- état atomique `.superia/pipelines/TASK-XXXX.json` ;
+- commande `superia pipeline status` ;
+- reprise avec `--resume` ;
+- reprise testée après builder et après review ;
+- aucune étape terminée relancée silencieusement ;
+- aucune fusion automatique.
+
+## Préparer et lancer un pipeline
 
 ```bash
 superia task create "Modifier le module d'authentification"
 
 superia task update TASK-0001 \
   --priority high \
-  --provider codex-cli \
   --allow-path "src/auth/**" \
   --allow-path "tests/auth/**" \
   --allow-path "package.json" \
-  --accept "tests réussis"
+  --accept "tests réussis" \
+  --accept "review indépendante approuvée"
 
 superia worktree TASK-0001
-superia agent run codex TASK-0001 --mode build
+
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe
 ```
 
-Une modification de `README.md`, par exemple, ferait échouer ce run puisqu'elle n'est pas autorisée.
+Suivre ou reprendre :
+
+```bash
+superia pipeline status TASK-0001
+
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe \
+  --resume
+```
+
+Le sens inverse est également pris en charge :
+
+```bash
+superia pipeline run TASK-0001 \
+  --builder vibe \
+  --reviewer codex \
+  --max-price 0.25
+```
 
 ## Contrôles quotidiens
 
 ```bash
 superia task board
+superia pipeline status TASK-0001
 superia security scan --required
 superia security sandbox-check
 superia run list
@@ -100,7 +136,10 @@ superia events --limit 100
 4. Une dépendance doit exister et ne peut pas pointer vers elle-même.
 5. Un build autonome exige un worktree et au moins un chemin autorisé.
 6. Toute modification hors périmètre fait échouer le run.
-7. Toute dérogation de sécurité est explicite et journalisée.
-8. Une validation simulée ne remplace pas un test matériel requis.
-9. La PR reste en brouillon tant que `SIA-501` est bloquée.
-10. Aucune tâche ne supprime l'approbation humaine avant fusion.
+7. Builder et reviewer utilisent deux fournisseurs différents.
+8. Une review non structurée est bloquante.
+9. Une reprise ne relance pas un builder sans checkpoint complet.
+10. Toute dérogation de sécurité est explicite et journalisée.
+11. Une validation simulée ne remplace pas un test matériel requis.
+12. La PR reste en brouillon tant que `SIA-501` est bloquée.
+13. Aucune tâche ne supprime l'approbation humaine avant fusion.
