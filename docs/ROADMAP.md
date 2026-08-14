@@ -1,6 +1,6 @@
 # Feuille de route Super IA
 
-Version courante : **0.12.0**  
+Version courante : **0.13.0**  
 Registre détaillé validé par la CI : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json)  
 Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 
@@ -13,23 +13,19 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - contexte ciblé avec SHA-256 et barrière anti-secrets ;
 - runner avec logs, heartbeat, timeout et arrêt des descendants ;
 - adaptateurs Codex et Mistral Vibe ;
-- receipts vérifiables ;
-- sauvegardes cohérentes ;
-- daemon et service systemd utilisateur pour le Pi ;
-- console Matrix globale ;
+- Gitleaks obligatoire ;
+- politique Bubblewrap commune avec HOME jetable ;
+- receipts et sauvegardes vérifiables ;
+- daemon, service Pi et console Matrix ;
 - suivi enrichi des tâches ;
-- Gitleaks avec rapport JSON expurgé ;
-- préflight Gitleaks obligatoire ;
-- politique Bubblewrap commune ;
-- HOME jetable ;
-- accès au workspace limité par mode ;
-- sortie Codex montée individuellement ;
-- dérogations de sécurité explicites et journalisées ;
-- autotest Bubblewrap destiné au Pi.
+- périmètre d'écriture par mission ;
+- snapshot Git avant/après ;
+- diff et rapport de changement archivés ;
+- échec automatique en cas de modification hors périmètre.
 
 ### Bloqué par le matériel ou les comptes
 
-- exécution noyau réelle de l'autotest Bubblewrap sur le Pi ;
+- autotest Bubblewrap réel sur le Pi ;
 - installation sur le Pi 5 réel ;
 - test de coupure brutale ;
 - test de restauration ;
@@ -39,11 +35,11 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 
 ### Prochain chantier logiciel
 
-1. contrôler les fichiers réellement modifiés par chaque agent ;
-2. intégrer un reviewer indépendant ;
-3. construire le pipeline builder → validation → review → receipt ;
-4. ajouter Restic après le test de restauration local ;
-5. construire le routeur coût/qualité à partir des benchmarks réels.
+1. reviewer indépendant ;
+2. pipeline builder → validation → review → receipt ;
+3. checkpoints et budget de retries ;
+4. Restic après le test de restauration ;
+5. routeur coût/qualité à partir des benchmarks réels.
 
 ## V0.1 à V0.9 — fondations terminées
 
@@ -86,7 +82,7 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [x] build limité au worktree en écriture ;
 - [x] sortie Codex individuelle en écriture ;
 - [x] état fournisseur limité ;
-- [x] réseau désactivable pour les tâches sans Internet ;
+- [x] réseau désactivable ;
 - [x] dérogation Bubblewrap explicite et journalisée ;
 - [x] autotest `superia security sandbox-check` ;
 - [x] rapport `sandbox-status.json` pendant l'installation Pi ;
@@ -97,19 +93,36 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [ ] Podman optionnel pour les tâches à risque élevé ;
 - [ ] filtrage réseau plus fin pour les agents distants.
 
-## V0.13 — contrôle des modifications et qualité
+## V0.13 — contrôle des modifications
 
-- [ ] capturer l'état Git avant/après ;
-- [ ] comparer les fichiers modifiés à une liste autorisée ;
-- [ ] échouer sur modification hors périmètre ;
-- [ ] archiver le diff dans le receipt ;
+- [x] champ `allowedPaths` dans les missions ;
+- [x] option répétable `--allow-path <glob>` ;
+- [x] build refusé sans périmètre ;
+- [x] état Git capturé avant/après ;
+- [x] empreintes des fichiers modifiés ;
+- [x] comparaison aux chemins autorisés ;
+- [x] plan/review avec zéro modification autorisée ;
+- [x] `AGENT_CHANGES.patch` archivé ;
+- [x] `CHANGE_GUARD.json` archivé ;
+- [x] résultat inclus dans `AGENT_RESULT.json` ;
+- [x] run durable marqué `failed` en cas de violation ;
+- [x] erreur du change guard traitée en fail-closed ;
+- [x] test de bout en bout Codex avec fichier autorisé et interdit ;
+- [x] 32 tests réussis.
+
+## V0.14 — reviewer et pipeline qualité
+
 - [ ] reviewer différent du builder ;
 - [ ] findings structurés par sévérité ;
-- [ ] pipeline déterministe builder → validation → review → receipt ;
-- [ ] checkpoints, retries limités et détection de boucle ;
+- [ ] pipeline builder → validation → review → receipt ;
+- [ ] checkpoints persistants ;
+- [ ] retries limités ;
+- [ ] détection de boucle ;
+- [ ] taille maximale des diffs ;
+- [ ] liste de fichiers toujours interdits ;
 - [ ] aucune fusion automatique.
 
-## V0.14 — validation Raspberry Pi
+## V0.15 — validation Raspberry Pi
 
 - [ ] installation complète sur le Pi 5 ;
 - [ ] service disponible après déconnexion ;
@@ -122,7 +135,7 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [ ] Restic et politique de rétention ;
 - [ ] copie hors machine.
 
-## V0.15 — orchestration multi-agent
+## V0.16 — orchestration multi-agent
 
 - [ ] DAG avec détection de cycles ;
 - [ ] claim/ack/complete/requeue atomiques ;
@@ -141,7 +154,8 @@ La PR ne passe en prête pour revue que lorsque :
 - [ ] le Pi réel est validé ;
 - [ ] la restauration est prouvée ;
 - [ ] Codex et Vibe réels ont produit un receipt valide ;
-- [x] Gitleaks est obligatoire avant les agents distants intégrés ;
+- [x] Gitleaks est obligatoire ;
+- [x] les modifications hors périmètre sont bloquées ;
 - [ ] la sandbox commune est validée sur le noyau du Pi ;
 - [ ] la CI est verte sur le head final ;
 - [ ] les limites restantes sont documentées ;
