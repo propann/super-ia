@@ -14,7 +14,12 @@ function flagValue(args: string[], name: string): string | undefined {
 
 function positionals(args: string[]): string[] {
   const values: string[] = [];
-  const booleanFlags = new Set(["--dry-run", "--json", "--allow-without-gitleaks"]);
+  const booleanFlags = new Set([
+    "--dry-run",
+    "--json",
+    "--allow-without-gitleaks",
+    "--allow-without-bwrap",
+  ]);
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
     if (value.startsWith("--")) {
@@ -66,6 +71,7 @@ export async function handleAgentCommand(
     maxContextBytes,
     dryRun: args.includes("--dry-run"),
     allowWithoutGitleaks: args.includes("--allow-without-gitleaks"),
+    allowWithoutBubblewrap: args.includes("--allow-without-bwrap"),
   };
   if (provider === "vibe") {
     options.maxTurns = numberOption(args, "--max-turns", 1, 50);
@@ -84,15 +90,17 @@ export async function handleAgentCommand(
     console.log(`Dossier    ${result.cwd}`);
     console.log(`Commande   ${result.command} ${result.args.join(" ")}`);
     console.log(`Contexte   ${result.context.manifest.id}`);
-    console.log(`Sécurité   ${result.securityPreflight.status}`);
+    console.log(`Gitleaks   ${result.securityPreflight.status}`);
+    console.log(`Sandbox    ${result.sandboxPreflight.status}`);
     console.log(`Prompt     ${result.stdinBytes} octets transmis par stdin`);
   } else {
     console.log(result.process.status === "completed" ? "AGENT TERMINÉ" : "AGENT EN ÉCHEC");
     console.log(`Provider   ${result.provider}`);
     console.log(`Run        ${result.process.runId}`);
     console.log(`Contexte   ${result.context.manifest.id}`);
-    console.log(`Sécurité   ${result.securityPreflight.status}`);
-    if (result.securityPreflight.reportPath) console.log(`Gitleaks   ${result.securityPreflight.reportPath}`);
+    console.log(`Gitleaks   ${result.securityPreflight.status}`);
+    console.log(`Sandbox    ${result.sandboxPreflight.status}`);
+    if (result.securityPreflight.reportPath) console.log(`Rapport    ${result.securityPreflight.reportPath}`);
     console.log(`Événements ${result.parsedEvents}`);
     console.log(`Réponse    ${result.lastMessagePath}`);
     console.log(`Logs       ${result.process.stdoutPath}`);
