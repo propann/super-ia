@@ -30,8 +30,7 @@ test("daemon synchronizes projects and recovers stale runs", async () => {
   try {
     process.env.SUPERIA_HOME = home;
     const scan = await scanRepository(root);
-    let now = new Date("2026-08-14T21:00:00.000Z");
-    const control = await openControlPlane(home, { now: () => now });
+    const control = await openControlPlane(home, { now: () => new Date("2000-01-01T00:00:00.000Z") });
     const project = control.registerProject(scan);
     const run = control.createRun({ projectId: project.id, provider: "codex-cli" });
     control.close();
