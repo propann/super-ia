@@ -12,8 +12,23 @@
 - [x] créer un worktree sécurisé ;
 - [x] console de contrôle Matrix.
 
+## V0.1.5 — recherche et architecture
+
+- [x] analyser les principales IA de code et leurs rôles ;
+- [x] étudier Aider, OpenCode, mini-SWE-agent, OpenHands, Spec Kit, Repomix, Pochi et Tabby ;
+- [x] définir l'architecture locale sur Raspberry Pi 5 ;
+- [x] définir la mémoire Git + SQLite + artefacts ;
+- [x] définir le pipeline multi-agent déterministe ;
+- [x] créer un protocole de benchmark par dépôt et par rôle ;
+- [ ] construire un registre séparé des outils locaux et moteurs d'inférence ;
+- [ ] détecter Ollama, llama.cpp, Repomix, Aider, mini-SWE-agent et OpenCode ;
+- [ ] générer un rapport de capacité du Pi 5.
+
 ## V0.2 — première mission réelle
 
+- [ ] constructeur de contexte Git ciblé ;
+- [ ] manifeste de contexte et scan de secrets ;
+- [ ] journal d'événements JSONL et checkpoints ;
 - [ ] adaptateur Codex CLI ;
 - [ ] adaptateur Mistral Vibe ;
 - [ ] exécution non interactive contrôlée ;
@@ -25,9 +40,11 @@
 
 - [ ] Claude Code ;
 - [ ] Qwen Code ;
-- [ ] Gemini ou successeur officiel selon disponibilité ;
+- [ ] Gemini CLI ;
 - [ ] GitHub Copilot ;
-- [ ] OpenCode, Aider et Goose ;
+- [ ] OpenCode, Aider et mini-SWE-agent ;
+- [ ] Ollama et llama.cpp pour fonctions locales légères ;
+- [ ] backend OpenHands / ACP optionnel ;
 - [ ] modèle local ou serveur personnel.
 
 ## V0.4 — web assisté
@@ -40,9 +57,10 @@
 
 ## V0.5 — orchestration
 
-- [ ] routeur coût/capacité ;
+- [ ] routeur coût/capacité/qualité mesurée ;
 - [ ] missions parallèles sans fichiers concurrents ;
 - [ ] relecture croisée ;
+- [ ] reprise automatique après interruption ;
 - [ ] console Matrix interactive complète ;
 - [ ] tableau de bord local web ;
-- [ ] métriques de qualité par fournisseur.
+- [ ] benchmarks et métriques de qualité par fournisseur.
