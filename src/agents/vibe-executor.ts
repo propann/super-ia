@@ -47,7 +47,16 @@ export async function executeVibeTask(repositoryDirectory: string, taskId: strin
   const context = await buildGitContext(cwd, { taskId: task.id, goal: task.goal, query: task.title, maxBytes: options.maxContextBytes }, task);
   const vibe = await findExecutable("vibe");
   if (!vibe && !options.dryRun) throw new Error("Mistral Vibe est absent du PATH. Exécuter `superia doctor` après son installation.");
-  const invocation = await buildVibeInvocation({ command: vibe ?? "vibe", task, context, cwd, mode, model: options.model, budget });
+  const invocation = await buildVibeInvocation({
+    command: vibe ?? "vibe",
+    task,
+    context,
+    cwd,
+    mode,
+    model: options.model,
+    budget,
+    feedbackPath: options.feedbackPath,
+  });
   assertSafeVibeInvocation(invocation);
   const securityPreflight = await runAgentSecurityPreflight({ cwd, projectId: synchronized.project.id, taskId: task.id, provider: invocation.provider, dryRun: options.dryRun, allowWithoutGitleaks: options.allowWithoutGitleaks });
   const sandbox = await prepareAgentSandbox({ projectId: synchronized.project.id, taskId: task.id, provider: invocation.provider, mode, dryRun: options.dryRun, allowWithoutBubblewrap: options.allowWithoutBubblewrap });
@@ -82,7 +91,7 @@ export async function executeVibeTask(repositoryDirectory: string, taskId: strin
     const lastMessagePath = invocation.lastMessagePath;
     await Promise.all([writeFile(normalizedEventsPath, `${JSON.stringify(parsed.events, null, 2)}\n`, "utf8"), writeFile(lastMessagePath, `${JSON.stringify(parsed.events.at(-1) ?? {}, null, 2)}\n`, "utf8")]);
     const result: AgentExecutionResult = { ...preview, process: finalProcess, lastMessagePath, normalizedEventsPath, parsedEvents: parsed.events.length, invalidEventLines: parsed.invalid, changeGuard };
-    await writeFile(join(context.directory, "AGENT_RESULT.json"), `${JSON.stringify({ provider: result.provider, mode: result.mode, taskId: task.id, runId: result.process.runId, status: result.process.status, contextId: context.manifest.id, contextHash: context.manifest.contextHash, baseCommit: context.manifest.baseCommit, securityPreflight, sandboxPreflight: sandbox.preflight, sandboxExecution: processResult.sandbox ?? null, changeGuard, parsedEvents: result.parsedEvents, invalidEventLines: result.invalidEventLines, budget, model: options.model ?? null, lastMessagePath: result.lastMessagePath, normalizedEventsPath: result.normalizedEventsPath }, null, 2)}\n`, "utf8");
+    await writeFile(join(context.directory, "AGENT_RESULT.json"), `${JSON.stringify({ provider: result.provider, mode: result.mode, taskId: task.id, runId: result.process.runId, status: result.process.status, contextId: context.manifest.id, contextHash: context.manifest.contextHash, baseCommit: context.manifest.baseCommit, feedbackPath: options.feedbackPath ?? null, securityPreflight, sandboxPreflight: sandbox.preflight, sandboxExecution: processResult.sandbox ?? null, changeGuard, parsedEvents: result.parsedEvents, invalidEventLines: result.invalidEventLines, budget, model: options.model ?? null, lastMessagePath: result.lastMessagePath, normalizedEventsPath: result.normalizedEventsPath }, null, 2)}\n`, "utf8");
     return result;
   } finally {
     control.close();
