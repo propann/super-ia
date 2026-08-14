@@ -4,186 +4,155 @@ Date du contrôle : **14 août 2026**
 Branche : `agent/bootstrap-universal-cli`  
 Pull request : `#1` vers `main`
 
-## Résultat v0.12.0
+## Résultat v0.13.0
 
 | Élément | Résultat |
 |---|---|
-| Version | `0.12.0` |
+| Version | `0.13.0` |
 | CI GitHub | réussie |
 | Build TypeScript | réussi |
-| Tests | **28 réussis, 0 échec** |
+| Tests | **32 réussis, 0 échec** |
 | Audit npm du job | 0 vulnérabilité signalée |
 | Système CI | Ubuntu 24.04 |
 | Node / npm | 22.23.2 / 10.9.8 |
 | Scripts Pi | syntaxe valide |
 | Commande `sudo` dans `install/pi` | aucune |
 
-## Livré et vérifié
-
-### Plan de contrôle et Git
+## Socle livré
 
 - SQLite WAL et migrations ;
 - registre multi-projets ;
-- runs, heartbeats, événements et récupération ;
-- journal JSONL append-only ;
+- missions, runs, heartbeats, événements et reprise ;
 - leases exclusifs ;
-- scanner Git, missions, branches et worktrees ;
-- console Matrix multi-projets.
+- scanner Git, branches et worktrees ;
+- contexte ciblé et manifestes SHA-256 ;
+- runner sans shell implicite avec logs, timeout et arrêt des descendants ;
+- Codex et Mistral Vibe ;
+- Gitleaks obligatoire avant les agents réels ;
+- Bubblewrap obligatoire sous Linux avant les agents réels ;
+- receipts vérifiables ;
+- sauvegardes cohérentes ;
+- daemon, service Pi utilisateur et console Matrix ;
+- roadmap et suivi de tâches contrôlés par la CI.
 
-### Suivi des tâches
+## Nouveau dans v0.13 — contrôle des modifications
 
-- statuts, priorités, responsable, fournisseur et échéance ;
-- tags, dépendances et critères d'acceptation ;
-- notes horodatées ;
-- tableau `superia task board` ;
-- registre `SIA-XXX` contrôlé par la CI.
-
-### Contexte, runner et preuves
-
-- contexte Git ciblé ;
-- manifestes et empreintes SHA-256 ;
-- première barrière interne anti-secrets ;
-- runner sans shell implicite ;
-- environnement réduit ;
-- logs persistants ;
-- heartbeat, timeout et arrêt du groupe de processus ;
-- validations du dépôt ;
-- receipts vérifiables et détection de falsification ;
-- approbation humaine obligatoire.
-
-### Préflight Gitleaks obligatoire
-
-Avant tout run réel Codex ou Vibe :
-
-1. Gitleaks doit être disponible ;
-2. son scan doit réussir sans finding ;
-3. le rapport et le run de sécurité sont enregistrés ;
-4. l'état est inclus dans les métadonnées et `AGENT_RESULT.json`.
-
-La dérogation `--allow-without-gitleaks` produit l'état `waived` et l'événement durable `security.preflight.waived`.
-
-### Sandbox Bubblewrap commune
-
-La v0.12 ajoute :
-
-- préflight Bubblewrap obligatoire pour Codex et Vibe réels sous Linux ;
-- refus avant lancement si `bwrap` est absent ;
-- dérogation explicite `--allow-without-bwrap` ;
-- événement durable `sandbox.preflight.waived` ;
-- HOME jetable `/home/superia` ;
-- système et exécutables montés en lecture seule ;
-- dépôt/worktree en lecture seule pour plan et review ;
-- worktree en lecture-écriture pour build ;
-- fichier de réponse Codex monté individuellement en écriture ;
-- état fournisseur limité à `~/.superia/providers/<provider>/` ;
-- namespaces utilisateur, PID, IPC, UTS et cgroup demandés ;
-- capacités supprimées ;
-- réseau isolable avec `--unshare-net` ;
-- configuration effective inscrite dans les métadonnées du run.
-
-La CI valide la construction de la politique et son passage aux agents avec de faux exécutables. Elle ne prouve pas encore la frontière noyau réelle de Bubblewrap sur le Pi.
-
-### Autotest matériel
+Chaque mission peut déclarer son périmètre d'écriture :
 
 ```bash
-superia security sandbox-check
+superia task update TASK-0001 \
+  --allow-path "src/**" \
+  --allow-path "tests/**"
+```
+
+Un build sans chemin autorisé est refusé avant lancement.
+
+Pour chaque run Codex ou Vibe, Super IA :
+
+1. capture l'état Git avant l'agent ;
+2. exécute l'agent dans son worktree ;
+3. capture l'état Git après ;
+4. compare statuts et empreintes ;
+5. contrôle chaque fichier par rapport aux motifs autorisés ;
+6. archive le diff ;
+7. fait échouer le run si un fichier sort du périmètre.
+
+Artefacts produits :
+
+```text
+AGENT_CHANGES.patch
+CHANGE_GUARD.json
+AGENT_RESULT.json
+```
+
+Une violation transforme le statut SQLite du run en `failed`, même si l'agent a renvoyé le code 0. Une erreur du change guard est également bloquante.
+
+Le test de bout en bout fait modifier à un faux Codex `src/app.ts` autorisé et `README.md` interdit. Il vérifie le rapport, le patch, `AGENT_RESULT.json` et le statut durable du run.
+
+Voir [`CHANGE_GUARD.md`](CHANGE_GUARD.md).
+
+## Sécurité Bubblewrap
+
+La politique validée en CI comprend :
+
+- HOME jetable `/home/superia` ;
+- système et exécutables en lecture seule ;
+- plan/review en lecture seule ;
+- build limité au worktree ;
+- sortie Codex montée individuellement ;
+- état fournisseur limité à `~/.superia/providers/` ;
+- capacités supprimées ;
+- namespaces utilisateur, PID, IPC, UTS et cgroup ;
+- réseau isolable ;
+- dérogation explicite et journalisée.
+
+La frontière noyau réelle reste à confirmer sur le Pi :
+
+```bash
 superia security sandbox-check --json
 ```
 
-L'autotest vérifie le démarrage de Bubblewrap, le HOME jetable, l'invisibilité d'un fichier extérieur, les droits du workspace, l'état autorisé et la demande d'un namespace réseau isolé.
+L'installateur conservera le résultat dans `~/.superia/sandbox-status.json`.
 
-L'installateur Pi conserve le résultat dans :
+## Couverture des 32 tests
 
-```text
-~/.superia/sandbox-status.json
-```
+La suite couvre notamment :
 
-### Sauvegarde et Raspberry Pi
+- sauvegarde et détection de corruption ;
+- SQLite WAL, projets, tâches, runs et événements ;
+- reprise des runs et leases ;
+- contexte ciblé et exclusion de secrets ;
+- Gitleaks propre, finding bloquant et dérogation ;
+- politique Bubblewrap, HOME jetable et refus sans `bwrap` ;
+- Codex et Vibe simulés avec les deux préflights ;
+- runner, logs, timeout et arrêt du groupe ;
+- receipts et falsification ;
+- roadmap et suivi des tâches ;
+- change guard unitaire ;
+- build Codex hors périmètre de bout en bout ;
+- refus d'un build sans `--allow-path` ;
+- scripts d'installation Pi et absence de `sudo`.
 
-- sauvegarde SQLite cohérente avec `VACUUM INTO` ;
-- manifeste SHA-256 ;
-- détection de corruption ;
-- daemon de synchronisation/récupération ;
-- service systemd utilisateur durci ;
-- installateur sans privilèges ;
-- détection de Gitleaks et Bubblewrap ;
-- autotest Bubblewrap lancé lorsqu'il est présent ;
-- aucune installation de modèle local.
+## État de la roadmap
 
-## Liste des 28 tests
+| État | Nombre |
+|---|---:|
+| Terminé | 8 |
+| En cours | 1 |
+| Planifié | 12 |
+| Bloqué | 2 |
+| Total | 23 |
 
-1. sauvegarde cohérente et vérifiable ;
-2. unicité des fournisseurs ;
-3. API distantes désactivées ;
-4. transports déclarés ;
-5. Codex avec Gitleaks et politique Bubblewrap ;
-6. contexte ciblé et secret exclu ;
-7. SQLite WAL et persistance multi-projets ;
-8. récupération des runs et journal JSONL ;
-9. flux Git mission/worktree ;
-10. daemon synchronisation/récupération ;
-11. Gitleaks propre et finding bloquant ;
-12. lease exclusif ;
-13. reprise d'un lease expiré ;
-14. unicité des outils locaux ;
-15. légèreté des outils requis ;
-16. exécutables candidats déclarés ;
-17. Matrix locale et globale ;
-18. runner réussi avec logs ;
-19. runner timeout et arrêt du groupe ;
-20. receipt et détection de falsification ;
-21. catalogue de recherche valide ;
-22. surface de décision des projets étudiés ;
-23. registre de roadmap valide ;
-24. politique Bubblewrap et HOME jetable ;
-25. refus sans Bubblewrap et dérogation journalisée ;
-26. dérogation Gitleaks visible et journalisée ;
-27. suivi des tâches et progression ;
-28. Vibe avec Gitleaks et politique Bubblewrap.
+`SIA-204` est terminé. `SIA-203` reste en cours jusqu'à la validation Bubblewrap réelle sur le Pi.
 
-## Distinction de preuve
+## Encore à prouver sur le Pi
 
-### Prouvé par la CI
-
-- génération des arguments Bubblewrap ;
-- choix lecture seule/lecture-écriture ;
-- montage d'une sortie individuelle ;
-- HOME remplacé ;
-- refus sans `bwrap` ;
-- dérogations journalisées ;
-- branchement Codex/Vibe ;
-- compilation et non-régression du reste du système.
-
-### Encore à prouver sur le Pi
-
-- fonctionnement des espaces de noms utilisateur du noyau ;
-- refus réel d'une écriture extérieure ;
+- installation complète de v0.13 ;
+- espaces de noms Bubblewrap réellement fonctionnels ;
 - compatibilité Bubblewrap + sandbox native Codex ;
-- authentification via les dossiers fournisseur limités ;
-- stabilité d'un run réel Codex et Vibe ;
-- comportement après redémarrage.
+- Codex et Vibe authentifiés ;
+- reprise après coupure ;
+- restauration d'une sauvegarde ;
+- service disponible après déconnexion.
 
 ## Limites actuelles
 
-- installation Pi réelle non testée ;
-- comptes Codex/Vibe réels non testés ;
+- réseau Codex/Vibe autorisé pour joindre leurs services ;
+- filtrage réseau par domaine non livré ;
+- reviewer indépendant non livré ;
+- pipeline builder → validation → review → receipt non livré ;
+- DAG, routeur coût/qualité et interface web non livrés ;
+- Restic et restauration automatisée non livrés ;
 - `node:sqlite` affiche encore un avertissement expérimental sous Node 22 ;
-- réseau Codex/Vibe autorisé parce que les services sont distants ;
-- pas encore de filtrage réseau par domaine ;
-- pas de contrôle post-run des chemins modifiés ;
-- pas de reviewer indépendant ni pipeline complet ;
-- pas de DAG ou routeur automatique coût/qualité ;
-- pas de Restic ni de restauration automatisée ;
-- pas d'interface web locale ;
 - aucune fusion automatique.
 
 ## Suite prioritaire
 
-1. terminer `SIA-203` par l'autotest Bubblewrap réel sur le Pi ;
-2. `SIA-204` — contrôler et archiver les fichiers modifiés ;
-3. `SIA-101` — installer v0.12 sur le Pi 5 réel ;
-4. `SIA-102` / `SIA-103` — reprise et restauration ;
-5. `SIA-104` / `SIA-105` — Codex et Vibe réels sous Bubblewrap ;
-6. `SIA-301` / `SIA-302` — reviewer indépendant et pipeline ;
+1. `SIA-203` — exécuter l'autotest Bubblewrap réel sur le Pi ;
+2. `SIA-101` — installer v0.13 sur le Pi 5 ;
+3. `SIA-301` — reviewer indépendant ;
+4. `SIA-302` — pipeline complet ;
+5. `SIA-102` / `SIA-103` — reprise et restauration ;
+6. `SIA-104` / `SIA-105` — Codex et Vibe réels ;
 7. `SIA-205` — Restic ;
 8. `SIA-401` — routeur coût/qualité mesuré.
