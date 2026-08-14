@@ -3,108 +3,97 @@
 ## 14 août 2026 — fondation
 
 - Branche : `agent/bootstrap-universal-cli`.
-- Socle : CLI TypeScript, catalogue multi-fournisseurs, politiques de coût, scanner Git, missions et worktrees.
-- Règles : API désactivées par défaut, aucun contournement de quota, aucune fusion automatique.
+- CLI TypeScript, catalogue multi-fournisseurs, scanner Git, missions et worktrees.
+- API désactivées par défaut, aucun contournement de quota, aucune fusion automatique.
 
-## Console Matrix et recherche
+## Recherche et architecture
 
-- Console terminal Matrix reliée aux données réelles.
-- Étude des concurrents, agents ouverts, protocoles ACP/MCP/A2A, mémoire, contexte et architecture Pi.
-- Décision : Pi 5 comme plan de contrôle uniquement ; aucun modèle local obligatoire.
-- Catalogue de recherche machine-lisible et protocole de benchmark.
+- Étude des agents de code, orchestrateurs multi-agents, mémoire, contexte, ACP/MCP/A2A et concurrents GitHub.
+- Décision : Raspberry Pi 5 comme plan de contrôle ; aucun modèle local obligatoire.
+- Documentation de recherche et catalogue machine-lisible.
 
-## Audit v0.3
+## V0.3 — audit initial
 
 - Vérification stricte de ce qui existait réellement dans Git.
-- Résultat de l'époque : 10 tests verts ; stockage JSON par dépôt ; aucun agent lancé.
-- Création de `docs/STATUS.md` pour séparer livré, conçu et restant à faire.
+- 10 tests verts ; missions JSON par dépôt ; aucune exécution d'agent.
+- Création de `docs/STATUS.md`.
 
 ## V0.4 — plan de contrôle durable
 
 - `SUPERIA_HOME` global ;
-- SQLite WAL et migration initiale ;
-- projets, missions synchronisées, runs, heartbeats et événements ;
-- miroir JSONL append-only ;
-- récupération des runs abandonnés ;
-- commandes `control`, `project`, `run`, `events` et `recover`.
+- SQLite WAL et migrations ;
+- projets, missions, runs, heartbeats et événements ;
+- journal JSONL ;
+- récupération des runs abandonnés.
 
-Validation : 12 tests réussis.
+Validation : 12 tests.
 
 ## V0.5 — contexte et runner
 
 - contexte Git ciblé ;
-- manifeste SHA-256 par fichier et empreinte globale ;
-- chemins sensibles, binaires et formats de secrets exclus ;
+- manifestes SHA-256 ;
+- exclusions de secrets et binaires ;
 - runner sans shell implicite ;
-- environnement réduit ;
-- logs persistants ;
-- timeout et arrêt du groupe de processus ;
-- commande `superia validate`.
+- logs, heartbeat, timeout et arrêt des descendants ;
+- validations locales.
 
-Validation : 15 tests réussis.
+Validation : 15 tests.
 
 ## V0.6 — Codex et leases
 
-- lease SQLite exclusif par mission ;
-- expiration et reprise du lease ;
-- adaptateur Codex `exec` ;
+- lease exclusif par mission ;
+- Codex `exec` avec prompt par stdin ;
 - plan/review en lecture seule ;
 - build uniquement dans un worktree ;
 - sandbox officielle conservée ;
-- prompt par stdin ;
-- JSONL et dernière réponse archivés ;
-- test de bout en bout avec faux Codex sans quota.
+- JSONL et dernière réponse archivés.
 
-Validation : 18 tests réussis.
+Validation : 18 tests.
 
 ## V0.7 — exploitation Pi
 
-- sauvegarde SQLite par `VACUUM INTO` ;
-- manifeste SHA-256 et détection de corruption ;
-- daemon de synchronisation/récupération ;
+- sauvegarde SQLite cohérente ;
+- manifeste SHA-256 et corruption détectable ;
+- daemon ;
 - console Matrix multi-projets ;
-- service systemd utilisateur durci ;
-- installateur/désinstallateur sans `sudo` ;
-- première sauvegarde créée et vérifiée lors de l'installation.
+- service systemd utilisateur ;
+- installateur sans `sudo`.
 
-Validation : 20 tests, scripts shell valides et contrôle anti-`sudo`.
+Validation : 20 tests.
 
 ## V0.8 — Mistral Vibe
 
 - mode programmatique forcé ;
-- contexte transmis par stdin ;
-- plan/review via `plan` ;
-- build via `accept-edits` ;
+- prompt par stdin ;
+- plan/review avec profil plan ;
+- build avec `accept-edits` ;
 - shell désactivé ;
-- outils de fichiers limités ;
-- budgets de prix, tokens et tours ;
-- test de bout en bout avec faux Vibe sans coût.
+- prix, tokens et tours plafonnés.
 
-Validation : 21 tests réussis.
+Validation : 21 tests.
 
-## V0.9 — receipts de preuve
+## V0.9 — receipts
 
 - receipt par run ;
-- contexte, Git, logs, réponse, événements et validations réunis ;
-- SHA-256 du receipt et de chaque artefact ;
-- vérification ultérieure ;
-- test de falsification d'un log ;
-- approbation humaine toujours obligatoire.
+- contexte, Git, logs, événements et validations ;
+- empreinte globale et empreinte de chaque artefact ;
+- détection de falsification ;
+- approbation humaine obligatoire.
 
-Validation : 22 tests réussis.
+Validation : 22 tests.
 
-## V0.10 et v0.11 — suivi et Gitleaks
+## V0.10 et V0.11 — suivi et Gitleaks
 
 - priorité, responsable, échéance, tags, dépendances et critères d'acceptation ;
-- tableau `superia task board` ;
+- tableau `task board` ;
 - roadmap JSON contrôlée par la CI ;
-- Gitleaks intégré puis rendu obligatoire avant Codex/Vibe ;
-- absence, finding ou erreur bloquants ;
+- Gitleaks intégré puis rendu obligatoire ;
+- absence, erreur ou finding bloquants ;
 - dérogation explicite et journalisée.
 
-Validation : 26 tests réussis.
+Validation : 26 tests.
 
-## V0.12 — sandbox Bubblewrap
+## V0.12 — Bubblewrap
 
 - HOME jetable ;
 - système en lecture seule ;
@@ -114,94 +103,83 @@ Validation : 26 tests réussis.
 - autotest et rapport Pi ;
 - dérogation explicite et journalisée.
 
-La politique est validée en CI. La frontière noyau réelle reste à vérifier sur le Raspberry Pi cible.
+La politique est validée en CI avec des mocks. Le noyau réel reste à tester sur le Pi.
 
-## V0.13 — contrôle des modifications
+## V0.13 — garde Git, reviewer et pipeline
+
+### Contrôle des changements
 
 - chemins autorisés par mission ;
 - build refusé sans périmètre ;
 - snapshot Git avant/après ;
 - patch et rapport archivés ;
-- run marqué `failed` en cas de modification hors périmètre ;
-- correction du parseur Git vers porcelain v2 après détection CI.
+- run en échec si hors périmètre ;
+- parseur Git porcelain v2.
 
-## Reviewer indépendant et pipeline
+### Reviewer indépendant
 
-- builder et reviewer obligatoirement différents ;
+- fournisseur différent du builder ;
 - review strictement en lecture seule ;
-- schéma JSON obligatoire ;
-- findings structurés par sévérité, preuve et recommandation ;
-- sortie non structurée transformée en `blocked` ;
-- approbation incohérente transformée en `changes-requested` ;
-- ordre builder → garde Git → validations → reviewer → receipt ;
-- reviewer non lancé si une étape précédente échoue ;
-- receipt enrichi avec change guard, patch et review ;
-- aucune fusion automatique.
+- JSON structuré obligatoire ;
+- findings avec sévérité, preuve et recommandation ;
+- sortie invalide → `blocked` ;
+- approbation incohérente → `changes-requested`.
 
-## Checkpoints et reprise
+### Pipeline et reprise
 
-- état atomique `.superia/pipelines/TASK-XXXX.json` ;
-- étapes `initialized`, `builder-completed`, `validation-completed`, `review-completed`, `receipt-created` ;
-- commande `superia pipeline status` ;
-- option `--resume` ;
-- reprise après builder sans relancer le builder ;
-- reprise après review en ne recréant que le receipt ;
-- reprise refusée sans checkpoint builder complet.
+- builder → garde Git → validations → reviewer → receipt ;
+- checkpoints atomiques ;
+- `pipeline status` ;
+- `--resume` ;
+- reprise après builder et après review sans double exécution.
 
-Validation v0.13 : 39 tests réussis.
+Validation : 39 tests.
 
 ## V0.14 — corrections bornées
 
 - nouvelle tentative uniquement avec `--retry` ;
-- retry autorisé seulement après une review `changes-requested` ;
+- retry après `changes-requested` seulement ;
 - `--resume` et `--retry` incompatibles ;
-- review précédente injectée au builder via un fichier, jamais dans `argv` ;
-- nombre maximal d'essais figé au premier lancement ;
-- plafond total de prix Vibe réservé figé au premier lancement ;
-- chaque builder terminé consomme une tentative, même si les validations échouent ensuite ;
+- review précédente injectée par fichier, jamais dans `argv` ;
+- nombre maximal d'essais figé ;
+- plafond total de prix Vibe réservé figé ;
+- chaque builder terminé consomme une tentative ;
 - empreinte SHA-256 de chaque patch ;
-- détection d'un patch déjà vu ;
-- arrêt avant une nouvelle validation ou review en cas de boucle ;
-- causes d'arrêt persistées ;
-- tableau `pipeline status` enrichi avec tentatives et prix réservé.
+- patch déjà vu → `loop-detected` avant une nouvelle review ;
+- causes d'arrêt persistées.
 
-Causes d'arrêt :
+Le test de boucle vérifie que la seconde correction reçoit la review, consomme une tentative, porte le plafond réservé à 0,50 USD et ne relance pas le reviewer.
 
-```text
-approved
-changes-requested
-review-blocked
-retry-limit
-price-limit
-loop-detected
-technical-failure
-```
+## V0.14 — durcissement final du change guard
 
-Le test d'intégration vérifie qu'une seconde correction identique :
+- 50 fichiers modifiés maximum ;
+- 1 000 000 octets effectifs maximum ;
+- contenu des fichiers non suivis compté ;
+- `.env` et variantes interdits ;
+- `.npmrc` et `.pypirc` interdits ;
+- clés `.pem`, `.key`, `id_rsa`, `id_ed25519` interdites ;
+- `.git-credentials` interdit ;
+- chemin interdit prioritaire sur un glob autorisé ;
+- limite non positive = fail-closed ;
+- rapport enrichi avec `forbiddenFiles`, `limits` et `limitViolations`.
 
-- reçoit la review précédente ;
-- consomme une seconde tentative ;
-- porte le plafond réservé à 0,50 USD ;
-- ne relance pas le reviewer ;
-- termine avec `loop-detected`.
-
-Validation GitHub v0.14 :
+Validation GitHub finale :
 
 - Ubuntu 24.04 ;
 - Node 22.23.2 ;
 - npm 10.9.8 ;
-- **44 tests réussis, 0 échec** ;
+- **48 tests réussis, 0 échec** ;
 - 0 vulnérabilité npm signalée ;
 - scripts Pi valides ;
 - aucune commande `sudo` dans `install/pi`.
 
 ## État honnête des adaptateurs
 
-Codex et Vibe sont validés par de faux exécutables ou des runners simulés reproduisant leur transport programmatique. Cela prouve la plomberie Super IA, pas encore :
+Les faux exécutables et runners simulés prouvent la plomberie Super IA, pas encore :
 
 - l'authentification réelle ;
 - la disponibilité du compte ;
-- la qualité du modèle ;
+- la qualité des modèles ;
 - le coût réellement facturé ;
 - le fonctionnement sur le Pi cible.
 
@@ -211,8 +189,8 @@ Codex et Vibe sont validés par de faux exécutables ou des runners simulés rep
 2. lancer l'autotest Bubblewrap réel ;
 3. tester service, coupure et restauration ;
 4. authentifier Codex et Vibe ;
-5. benchmark identique ;
-6. Restic ;
-7. limites de diff et fichiers toujours interdits ;
-8. routeur coût/qualité ;
-9. DAG de missions.
+5. exécuter un benchmark commun ;
+6. intégrer Restic ;
+7. construire le routeur coût/qualité ;
+8. construire le DAG de missions ;
+9. ajouter interface web et notifications.
