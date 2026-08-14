@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-08-15",
+  "principles": {
+    "noLocalModelByDefault": true,
+    "noSecretWrittenByInstaller": true,
+    "noImplicitPrivilegeEscalation": true,
+    "userOwnedInstallPrefix": "~/.local",
+    "verifiedDownloads": ["Node.js SHA256 manifest", "Gitleaks release checksums"]
+  },
+  "profiles": {
+    "core": {
+      "description": "Plan de contrôle et deux agents principaux.",
+      "tools": ["git", "node", "npm", "uv", "codex", "vibe", "repomix", "gitleaks", "jq", "sqlite3", "ripgrep", "bubblewrap", "restic"]
+    },
+    "standard": {
+      "description": "Couverture multi-fournisseurs pour le travail quotidien.",
+      "inherits": "core",
+      "tools": ["gemini", "qwen", "opencode", "aider", "mini-swe-agent", "gh", "tmux", "shellcheck"]
+    },
+    "full": {
+      "description": "Laboratoire complet sans modèle local obligatoire.",
+      "inherits": "standard",
+      "tools": ["claude", "pre-commit", "ruff"]
+    }
+  },
+  "tools": [
+    {"id":"node","command":"node","profile":"core","channel":"official-tarball","package":"latest-v22.x","verification":"SHASUMS256.txt","official":true},
+    {"id":"uv","command":"uv","profile":"core","channel":"isolated-python-venv","package":"uv","verification":"PyPI TLS and isolated venv","official":true},
+    {"id":"codex","command":"codex","profile":"core","channel":"npm-user-prefix","package":"@openai/codex@latest","verification":"npm registry","official":true,"authentication":"interactive ChatGPT login or OPENAI_API_KEY"},
+    {"id":"vibe","command":"vibe","profile":"core","channel":"uv-tool","package":"mistral-vibe","verification":"PyPI TLS and isolated tool environment","official":true,"authentication":"interactive setup or MISTRAL_API_KEY"},
+    {"id":"repomix","command":"repomix","profile":"core","channel":"npm-user-prefix","package":"repomix@latest","verification":"npm registry","official":true},
+    {"id":"gitleaks","command":"gitleaks","profile":"core","channel":"github-release","package":"gitleaks/gitleaks","verification":"release checksums asset","official":true},
+    {"id":"gemini","command":"gemini","profile":"standard","channel":"npm-user-prefix","package":"@google/gemini-cli@latest","verification":"npm registry","official":true,"authentication":"interactive Google login or GEMINI_API_KEY"},
+    {"id":"qwen","command":"qwen","profile":"standard","channel":"npm-user-prefix","package":"@qwen-code/qwen-code@latest","verification":"npm registry","official":true,"authentication":"interactive auth or provider key"},
+    {"id":"opencode","command":"opencode","profile":"standard","channel":"npm-user-prefix","package":"opencode-ai@latest","verification":"npm registry","official":true,"authentication":"provider connection through /connect"},
+    {"id":"aider","command":"aider","profile":"standard","channel":"uv-tool","package":"aider-chat@latest","verification":"PyPI TLS and isolated tool environment","official":true,"authentication":"provider environment variables"},
+    {"id":"mini-swe-agent","command":"mini","profile":"standard","channel":"uv-tool","package":"mini-swe-agent","verification":"PyPI TLS and isolated tool environment","official":true,"authentication":"provider environment variables or setup wizard"},
+    {"id":"claude","command":"claude","profile":"full","channel":"npm-user-prefix","package":"@anthropic-ai/claude-code@latest","verification":"npm registry and platform binary","official":true,"authentication":"interactive Claude login or ANTHROPIC_API_KEY"},
+    {"id":"pre-commit","command":"pre-commit","profile":"full","channel":"uv-tool","package":"pre-commit","verification":"PyPI TLS and isolated tool environment","official":true},
+    {"id":"ruff","command":"ruff","profile":"full","channel":"uv-tool","package":"ruff","verification":"PyPI TLS and isolated tool environment","official":true}
+  ],
+  "excludedByDefault": ["ollama", "llama.cpp", "LocalAI", "model weights", "automatic API key setup", "Docker daemon"]
+}
