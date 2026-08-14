@@ -7,6 +7,7 @@ export interface ManagedSandboxRequest {
   network: SandboxNetworkMode;
   workspaceAccess: SandboxWorkspaceAccess;
   statePaths?: string[];
+  writablePaths?: string[];
   readOnlyPaths?: string[];
 }
 
@@ -17,6 +18,7 @@ export interface SandboxExecutionSummary {
   workspaceAccess: SandboxWorkspaceAccess;
   ephemeralHome: true;
   statePaths: string[];
+  writablePaths: string[];
   readOnlyPaths: string[];
 }
 
