@@ -11,7 +11,7 @@ La CI GitHub valide :
 - Ubuntu 24.04 ;
 - Node.js 22.23.2 et npm 10.9.8 ;
 - compilation TypeScript réussie ;
-- **32 tests réussis, 0 échec** ;
+- **39 tests réussis, 0 échec** ;
 - 0 vulnérabilité npm signalée ;
 - scripts Pi valides ;
 - aucune commande `sudo` dans le paquet Pi.
@@ -27,6 +27,9 @@ Fonctions principales :
 - Gitleaks obligatoire ;
 - Bubblewrap obligatoire sous Linux ;
 - contrôle des fichiers modifiés après chaque agent ;
+- reviewer indépendant et structuré ;
+- pipeline builder → validation → review → receipt ;
+- checkpoints atomiques et reprise contrôlée ;
 - receipts vérifiables ;
 - sauvegardes cohérentes ;
 - daemon, service systemd utilisateur et console Matrix ;
@@ -57,7 +60,7 @@ L'installateur compile, teste, initialise `~/.superia`, installe la commande et 
 
 Sans Gitleaks ou Bubblewrap, le centre de contrôle reste installable mais les agents réels sont bloqués par défaut.
 
-## Flux principal
+## Flux recommandé
 
 ```bash
 superia init
@@ -65,21 +68,71 @@ superia task create "Modifier le module d'authentification"
 
 superia task update TASK-0001 \
   --priority high \
-  --provider codex-cli \
   --allow-path "src/auth/**" \
   --allow-path "tests/auth/**" \
-  --accept "tests réussis"
+  --accept "tests réussis" \
+  --accept "review indépendante approuvée"
 
 superia worktree TASK-0001
-superia context build TASK-0001 --max-bytes 300000
-superia security scan --required
-superia security sandbox-check
-superia agent run codex TASK-0001 --mode build
-superia validate
-superia receipt create <RUN-ID>
+
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe
 ```
 
-## Trois barrières autour d'un agent
+Le sens inverse est pris en charge :
+
+```bash
+superia pipeline run TASK-0001 \
+  --builder vibe \
+  --reviewer codex \
+  --max-price 0.25
+```
+
+## Pipeline contrôlé
+
+```text
+builder
+  ↓
+Gitleaks + Bubblewrap
+  ↓
+change guard
+  ↓
+validations locales
+  ↓
+reviewer différent et read-only
+  ↓
+REVIEW.json
+  ↓
+receipt SHA-256
+  ↓
+approbation humaine
+```
+
+Le reviewer ne démarre pas si le builder, le périmètre Git ou les validations échouent.
+
+### Suivre et reprendre
+
+```bash
+superia pipeline status TASK-0001
+
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe \
+  --resume
+```
+
+État durable :
+
+```text
+.superia/pipelines/TASK-0001.json
+```
+
+Une reprise ne relance pas une étape déjà terminée. Super IA refuse de relancer silencieusement un builder si aucun checkpoint builder complet n'existe.
+
+Voir [Pipeline multi-agent](docs/PIPELINE.md).
+
+## Quatre barrières autour d'un agent
 
 ### 1. Gitleaks
 
@@ -108,9 +161,7 @@ La CI valide la politique avec des mocks. Le test noyau réel reste à exécuter
 
 ### 3. Change guard
 
-Un build exige au moins un `--allow-path`.
-
-Après le run, Super IA compare l'état Git avant/après et produit :
+Un build exige au moins un `--allow-path`. Après le run, Super IA produit :
 
 ```text
 AGENT_CHANGES.patch
@@ -120,16 +171,16 @@ AGENT_RESULT.json
 
 Une modification hors périmètre fait échouer le run, même lorsque l'agent renvoie le code 0.
 
-Exemple :
-
-```bash
-superia task update TASK-0001 \
-  --allow-path "src/**" \
-  --allow-path "tests/**" \
-  --allow-path "package.json"
-```
-
 Voir [Contrôle des modifications](docs/CHANGE_GUARD.md).
+
+### 4. Reviewer indépendant
+
+- fournisseur différent du builder ;
+- lecture seule ;
+- JSON structuré obligatoire ;
+- sévérité, preuve et recommandation pour chaque finding ;
+- réponse invalide transformée en `blocked` ;
+- approbation incohérente transformée en `changes-requested`.
 
 ## Dérogations exceptionnelles
 
@@ -177,29 +228,29 @@ superia receipt create <RUN-ID>
 superia receipt verify ~/.superia/runs/<RUN-ID>/RECEIPT.json
 ```
 
-L'approbation humaine reste obligatoire. Super IA ne fusionne jamais automatiquement.
+Les receipts incluent les logs, le contexte, le change guard, le patch, les validations et la review indépendante. L'approbation humaine reste obligatoire. Super IA ne fusionne jamais automatiquement.
 
 ## État de la feuille de route
 
 | État | Nombre |
 |---|---:|
-| Terminé | 8 |
+| Terminé | 10 |
 | En cours | 1 |
-| Planifié | 12 |
+| Planifié | 10 |
 | Bloqué | 2 |
 
-`SIA-204` — contrôle des modifications — est terminé. `SIA-203` — Bubblewrap — attend encore la preuve noyau réelle du Pi.
+`SIA-301` et `SIA-302` sont terminés. `SIA-203` — Bubblewrap — attend encore la preuve noyau réelle du Pi.
 
 ## Prochaines priorités
 
-1. lancer l'autotest Bubblewrap réel sur le Pi ;
-2. installer v0.13 sur le Pi 5 ;
-3. construire le reviewer indépendant ;
-4. relier builder → validation → review → receipt ;
-5. tester reprise et restauration ;
-6. tester Codex et Vibe réels ;
-7. intégrer Restic ;
-8. construire le routeur coût/qualité.
+1. limiter les retries et détecter les boucles ;
+2. lancer l'autotest Bubblewrap réel sur le Pi ;
+3. installer v0.13 sur le Pi 5 ;
+4. tester reprise et restauration matérielles ;
+5. tester Codex et Vibe réels ;
+6. intégrer Restic ;
+7. construire le routeur coût/qualité ;
+8. construire le DAG de missions.
 
 ## Documentation
 
@@ -207,6 +258,7 @@ L'approbation humaine reste obligatoire. Super IA ne fusionne jamais automatique
 - [Feuille de route](docs/ROADMAP.md)
 - [Registre JSON](docs/ROADMAP_TRACKER.json)
 - [Suivi des tâches](docs/TASK_TRACKER.md)
+- [Pipeline multi-agent](docs/PIPELINE.md)
 - [Plan de contrôle](docs/CONTROL_PLANE.md)
 - [Adaptateurs](docs/AGENT_ADAPTERS.md)
 - [Sandbox Bubblewrap](docs/SANDBOX.md)
