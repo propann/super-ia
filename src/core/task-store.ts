@@ -46,6 +46,7 @@ function normalizeTask(raw: Partial<SuperIaTask>): SuperIaTask {
     tags: stringArray(raw.tags),
     dependencies: stringArray(raw.dependencies),
     acceptanceCriteria: stringArray(raw.acceptanceCriteria),
+    allowedPaths: stringArray(raw.allowedPaths),
     createdAt: raw.createdAt ?? now,
     updatedAt: raw.updatedAt ?? raw.createdAt ?? now,
     checks: stringArray(raw.checks),
@@ -104,6 +105,7 @@ export async function createTask(scan: RepositoryScan, goal: string): Promise<Su
     tags: [],
     dependencies: [],
     acceptanceCriteria: [],
+    allowedPaths: [],
   };
   await saveTask(task);
   return task;
@@ -118,6 +120,7 @@ export interface TaskUpdate {
   tags?: string[];
   dependencies?: string[];
   acceptanceCriteria?: string[];
+  allowedPaths?: string[];
 }
 
 export async function updateTask(root: string, id: string, update: TaskUpdate): Promise<SuperIaTask> {
@@ -136,6 +139,7 @@ export async function updateTask(root: string, id: string, update: TaskUpdate): 
   if (update.tags) task.tags = stringArray(update.tags);
   if (update.dependencies) task.dependencies = stringArray(update.dependencies);
   if (update.acceptanceCriteria) task.acceptanceCriteria = stringArray(update.acceptanceCriteria);
+  if (update.allowedPaths) task.allowedPaths = stringArray(update.allowedPaths);
   task.updatedAt = new Date().toISOString();
   await saveTask(task);
   return task;
