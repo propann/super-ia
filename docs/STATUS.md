@@ -1,124 +1,215 @@
 # État vérifié du projet
 
 Date du contrôle : **14 août 2026**  
-Branche contrôlée : `agent/bootstrap-universal-cli`  
+Branche : `agent/bootstrap-universal-cli`  
 Pull request : `#1` vers `main`
 
-Ce document distingue strictement ce qui est présent dans Git, ce qui a été validé par la CI et ce qui reste à construire.
+Ce document distingue ce qui est réellement livré, ce qui est validé sans fournisseur externe et ce qui reste à vérifier sur le Raspberry Pi réel.
 
-## Résultat du contrôle v0.4.0
+## Résultat v0.9.0
 
 | Élément | Résultat |
 |---|---|
-| Version du paquet | `0.4.0` |
+| Version | `0.9.0` |
 | CI GitHub | réussie |
 | Build TypeScript | réussi |
-| Tests | 12 réussis, 0 échec |
-| Audit npm du job CI | 0 vulnérabilité signalée |
-| Environnement CI | Ubuntu 24.04, Node 22.23.2, npm 10.9.8 |
+| Tests | **22 réussis, 0 échec** |
+| Audit npm du job | 0 vulnérabilité signalée |
+| Système CI | Ubuntu 24.04 |
+| Node / npm | 22.23.2 / 10.9.8 |
+| Scripts Pi | syntaxe valide |
+| Commande `sudo` dans `install/pi` | aucune |
 
-Commande complète exécutée :
+La CI exécute :
 
 ```bash
+npm install
 npm test
+bash -n install/pi/install.sh
+bash -n install/pi/uninstall.sh
 ```
 
 ## Livré et vérifié
 
-### Socle Git
+### Git et missions
 
-- détection de la racine, de la branche, du remote et de l'état Git ;
-- détection de la stack et des commandes de validation ;
-- missions lisibles `TASK-XXXX` dans `.superia/tasks` ;
-- branche et worktree dédiés par mission ;
-- mode `--dry-run`.
+- scanner Git, stack et checks ;
+- missions `TASK-XXXX` lisibles par dépôt ;
+- branches dédiées ;
+- worktrees ;
+- mode `--dry-run` ;
+- synchronisation automatique avec le registre global.
 
 ### Plan de contrôle global
 
-- répertoire global `SUPERIA_HOME` ou `~/.superia` ;
-- base `control.sqlite` ;
-- SQLite en mode WAL ;
-- clés étrangères, `busy_timeout=5000` et `synchronous=NORMAL` ;
-- première migration de schéma versionnée ;
-- registre multi-projets ;
-- identifiant de projet stable dérivé de son chemin ;
-- synchronisation des missions JSON existantes ;
-- persistance des runs et de leurs heartbeats ;
-- états `running`, `completed`, `failed`, `cancelled` et `interrupted` ;
-- récupération des runs devenus inactifs ;
-- événements SQLite auditables ;
-- miroir append-only `events/events.jsonl` ;
-- reprise des événements non encore recopiés dans le journal.
+- `SUPERIA_HOME` ou `~/.superia` ;
+- SQLite WAL ;
+- migrations versionnées ;
+- projets et missions ;
+- runs, PID, heartbeats et statuts ;
+- récupération des runs abandonnés ;
+- événements SQLite ;
+- miroir JSONL append-only ;
+- leases exclusifs avec expiration ;
+- console Matrix multi-projets.
 
-### Commandes ajoutées
+### Contexte sécurisé
 
-```bash
-superia control init
-superia control status --json
-superia status --json
+- sélection depuis les fichiers suivis par Git ;
+- instructions et manifests prioritaires ;
+- prise en compte des fichiers modifiés, cités et trouvés par mots-clés ;
+- budget maximal en octets ;
+- SHA-256 de chaque fichier ;
+- empreinte globale du contexte ;
+- `MISSION.md`, `CONTEXT.md` et `MANIFEST.json` ;
+- exclusion des chemins sensibles ;
+- exclusion des binaires ;
+- blocage de formats de secrets à haute confiance.
 
-superia project add [path]
-superia project sync [path]
-superia project list
-superia project show <PROJECT-ID>
+Le scanner intégré n'est pas encore Gitleaks. Il constitue une première barrière et reste couvert par un test avec faux jeton.
 
-superia run start <provider> [TASK-ID]
-superia run list
-superia run heartbeat <RUN-ID>
-superia run finish <RUN-ID> completed|failed|cancelled
+### Runner
 
-superia events --limit 100
-superia recover --stale-minutes 5
-```
+- aucun shell implicite ;
+- dossier de travail limité au projet ou à son worktree ;
+- environnement réduit ;
+- stdin contrôlé ;
+- logs stdout/stderr persistants ;
+- limite de sortie ;
+- heartbeat ;
+- timeout ;
+- `SIGTERM`, puis `SIGKILL` sur le groupe de processus ;
+- validations du dépôt via `superia validate`.
 
-`superia init`, `task create` et la création réelle d'un worktree resynchronisent le dépôt courant dans le registre global.
+### Adaptateur Codex
 
-### Tests ajoutés
+- mode plan/review en lecture seule ;
+- mode build refusé sans worktree ;
+- sandbox officielle `read-only` ou `workspace-write` ;
+- prompt via stdin ;
+- sortie JSONL ;
+- dernière réponse enregistrée ;
+- options dangereuses explicitement refusées ;
+- lease exclusif par mission.
 
-1. SQLite utilise réellement le mode WAL ;
-2. deux projets restent présents après fermeture et réouverture ;
-3. les anciennes missions JSON sont importées ;
-4. les événements sont entièrement recopiés dans JSONL ;
-5. un run sans heartbeat récent devient `interrupted` ;
-6. tous les anciens tests Git, Matrix, catalogues et sécurité restent verts.
+### Adaptateur Mistral Vibe
 
-## Limites connues
+- mode programmatique forcé ;
+- prompt via stdin, pas dans la liste des processus ;
+- plan/review avec profil `plan` ;
+- build avec `accept-edits` ;
+- `auto-approve` interdit ;
+- shell explicitement désactivé ;
+- outils de fichiers limités par mode ;
+- plafonds de prix, tokens et tours ;
+- sortie streaming JSON archivée ;
+- lease exclusif par mission.
 
-### Node SQLite
+### Nature des tests d'agents
 
-`node:sqlite` est encore signalé comme expérimental par Node 22. Le projet fixe donc actuellement Node `>=22.5` et conserve l'accès SQLite derrière le module `control-plane` afin de pouvoir changer de backend si nécessaire.
+Les tests Codex et Vibe utilisent de faux exécutables locaux. Ils valident :
 
-### Exécution d'agents
+- le contexte réellement transmis par stdin ;
+- les arguments de sécurité ;
+- les budgets ;
+- le parsing JSONL ;
+- les logs et réponses ;
+- les états SQLite ;
+- le refus du build sans worktree.
 
-Les runs sont persistants, mais aucun processus Codex, Mistral, Claude ou Gemini n'est encore lancé par Super IA. La commande `run start` ouvre seulement l'enregistrement durable qui sera utilisé par le futur runner.
+Ils ne prouvent pas encore l'authentification réelle, la disponibilité d'un compte, la qualité d'un modèle ni le coût observé.
 
-### Sécurité système
+### Sauvegarde et daemon
 
-Le worktree reste une isolation Git, pas une sandbox. Bubblewrap ou Podman doivent être ajoutés avant d'autoriser une exécution autonome de commandes non fiables.
+- image SQLite cohérente avec `VACUUM INTO` ;
+- copie du journal JSONL ;
+- manifeste avec tailles et SHA-256 ;
+- vérification et détection de corruption ;
+- daemon one-shot ou permanent ;
+- resynchronisation des projets ;
+- récupération des runs ;
+- état `daemon-status.json` ;
+- événement d'échec par projet.
 
-### Contexte et secrets
+### Raspberry Pi
 
-Le constructeur de contexte, les manifestes de fichiers et le scan Gitleaks ne sont pas encore codés. Aucun envoi distant automatique ne doit être activé avant cette étape.
+Le paquet comprend :
+
+- installateur utilisateur ;
+- désinstallateur conservant les données ;
+- wrapper `~/.local/bin/superia` ;
+- service systemd utilisateur ;
+- durcissement `NoNewPrivileges`, `ProtectSystem`, `ProtectHome` et protections du noyau ;
+- test, daemon initial, création et vérification de sauvegarde ;
+- aucune commande `sudo` ;
+- aucun modèle IA local.
+
+La CI vérifie le paquet, mais l'installation matérielle complète n'a pas encore été exécutée sur le Pi 5 cible.
+
+### Receipts
+
+- création par run ;
+- projet, mission, provider et mode ;
+- commits et état Git ;
+- contexte et manifeste ;
+- logs et artefacts ;
+- validations associées ;
+- verdict structuré ;
+- SHA-256 du receipt ;
+- vérification des artefacts ;
+- falsification d'un log détectée par test ;
+- approbation humaine toujours obligatoire.
+
+## Liste des 22 tests
+
+1. sauvegarde cohérente et vérifiable ;
+2. unicité des fournisseurs ;
+3. API distantes désactivées ;
+4. transports déclarés ;
+5. adaptateur Codex de bout en bout simulé ;
+6. contexte ciblé et secret exclu ;
+7. SQLite WAL et persistance multi-projets ;
+8. récupération des runs et journal JSONL ;
+9. flux Git mission/worktree ;
+10. daemon synchronisation/récupération ;
+11. lease exclusif ;
+12. reprise d'un lease expiré ;
+13. unicité des outils locaux ;
+14. légèreté des outils requis ;
+15. exécutables candidats déclarés ;
+16. Matrix locale et globale ;
+17. runner réussi avec logs ;
+18. runner timeout et arrêt du groupe ;
+19. receipt et détection de falsification ;
+20. catalogue de recherche valide ;
+21. surface de décision de chaque projet étudié ;
+22. adaptateur Vibe de bout en bout simulé.
+
+## Limites et risques
+
+- `node:sqlite` affiche un avertissement expérimental avec Node 22 ;
+- installation Pi réelle non testée ;
+- comptes Codex/Vibe réels non testés par la CI ;
+- Gitleaks externe non intégré ;
+- sandbox bubblewrap/Podman commune non intégrée ;
+- pas de signature cryptographique d'identité des receipts ;
+- pas de relation de pipeline explicite entre builder, validator et reviewer ;
+- pas de reviewer indépendant ;
+- pas de DAG ou de sous-missions ;
+- pas de routeur automatique coût/qualité ;
+- pas de Restic ni de test automatique de restauration ;
+- pas d'interface web locale ;
+- aucune fusion automatique.
 
 ## Prochain lot recommandé
 
-1. runner de processus avec timeout et arrêt du groupe de processus ;
-2. leases et clés d'idempotence ;
-3. contexte Git ciblé et manifestes SHA-256 ;
-4. Gitleaks avant tout contexte distant ;
-5. adaptateur générique CLI ;
-6. adaptateur Codex non interactif avec sortie JSONL ;
-7. validations et receipt minimal ;
-8. sauvegarde/restauration ;
-9. paquet systemd et test réel sur Raspberry Pi 5.
-
-## Critères avant installation permanente sur le Pi
-
-- reprise après arrêt brutal testée sur la machine ;
-- sauvegarde et restauration testées ;
-- secrets absents de tous les paquets distants ;
-- agent confiné au worktree et à une sandbox ;
-- arrêt d'urgence fonctionnel ;
-- service systemd non privilégié ;
-- au moins un adaptateur IA testé de bout en bout ;
-- documentation d'installation reproductible.
+1. exécuter `install/pi/install.sh` sur le Pi 5 réel ;
+2. vérifier le service, l'arrêt brutal et la restauration ;
+3. installer/authentifier Codex et Vibe officiellement ;
+4. lancer les mêmes missions de benchmark en mode plan ;
+5. enregistrer durée, erreurs et consommation observée ;
+6. intégrer Gitleaks ;
+7. créer un reviewer indépendant ;
+8. relier builder → validations → review → receipt ;
+9. ajouter Restic et un test de restauration ;
+10. construire ensuite le routeur coût/qualité.
