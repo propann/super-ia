@@ -10,6 +10,7 @@ import { handleControlCommand } from "./control/cli.js";
 import { handleOperationsCommand } from "./control/operations-cli.js";
 import { syncRepositoryToGlobalControl } from "./control/repository-sync.js";
 import { handleContextCommand } from "./context/cli.js";
+import { handlePipelineCommand } from "./orchestration/cli.js";
 import { providerCatalog } from "./providers/catalog.js";
 import { handleReceiptCommand } from "./quality/cli.js";
 import { handleRuntimeCommand } from "./runtime/cli.js";
@@ -60,6 +61,12 @@ Usage:
       --allow-without-bwrap                      Dérogation explicite et journalisée
       Vibe : --max-turns 8 --max-tokens 50000 --max-price 0.25
 
+  superia pipeline run <TASK-ID> [options]      Pipeline contrôlé complet
+      --builder codex|vibe --reviewer codex|vibe
+      --builder-model <nom> --reviewer-model <nom> --dry-run
+      --timeout-minutes 60 --max-context-bytes 300000
+      Vibe : --max-turns 8 --max-tokens 50000 --max-price 0.25
+
   superia receipt create <RUN-ID>               Crée la preuve d'un run
   superia receipt verify <RECEIPT.json>         Vérifie empreinte et artefacts
 
@@ -81,6 +88,8 @@ Principes:
   - mode agent par défaut : plan en lecture seule
   - mode build uniquement dans un worktree avec chemins autorisés
   - toute modification hors périmètre fait échouer le run et archive le diff
+  - pipeline : builder, validations locales, reviewer différent, receipt
+  - reviewer strictement en lecture seule et rapport JSON structuré obligatoire
   - une seule exécution possède une mission grâce aux leases
   - suivi explicite des blocages, dépendances et critères d'acceptation
   - Codex conserve sa sandbox ; Vibe n'obtient aucun shell
@@ -142,6 +151,7 @@ async function main(): Promise<void> {
   if (await handleSecurityCommand(command, args, json, process.cwd())) return;
   if (await handleRuntimeCommand(command, args, json, process.cwd())) return;
   if (await handleAgentCommand(command, args, json, process.cwd())) return;
+  if (await handlePipelineCommand(command, args, json, process.cwd())) return;
   if (await handleReceiptCommand(command, args, json)) return;
 
   if (command === "matrix" || command === "cockpit") {
