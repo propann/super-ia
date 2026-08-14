@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { openControlPlane } from "../control/control-plane.js";
 import { runCommand } from "../utils/command.js";
-import type { ReceiptArtifact, ReceiptValidation, ReceiptVerification, RunReceipt } from "./types.js";
+import type { ReceiptArtifact, ReceiptReview, ReceiptValidation, ReceiptVerification, RunReceipt } from "./types.js";
 
 function sha256(value: unknown): string {
   return createHash("sha256").update(value).digest("hex");
@@ -42,11 +42,19 @@ function validationState(mode: string | undefined, validations: ReceiptValidatio
   return validations.every((item) => item.status === "completed") ? "passed" : "failed";
 }
 
+function reviewState(mode: string | undefined, review: ReceiptReview | undefined): RunReceipt["verdict"]["reviewState"] {
+  if (mode !== "build") return "not-required";
+  return review?.verdict ?? "missing";
+}
+
 function contextFiles(cwd: string, contextId: string, provider: string): Array<[string, string]> {
   const directory = join(cwd, ".superia", "contexts", contextId);
   const files: Array<[string, string]> = [
     ["context-manifest", join(directory, "MANIFEST.json")],
     ["agent-result", join(directory, "AGENT_RESULT.json")],
+    ["change-guard", join(directory, "CHANGE_GUARD.json")],
+    ["agent-changes", join(directory, "AGENT_CHANGES.patch")],
+    ["independent-review", join(directory, "REVIEW.json")],
   ];
   if (provider === "codex-cli") {
     files.push(["agent-last-message", join(directory, "CODEX_LAST_MESSAGE.md")]);
@@ -57,6 +65,26 @@ function contextFiles(cwd: string, contextId: string, provider: string): Array<[
     files.push(["agent-events", join(directory, "VIBE_EVENTS.json")]);
   }
   return files;
+}
+
+async function readReview(path: string): Promise<ReceiptReview | undefined> {
+  if (!(await exists(path))) return undefined;
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+    const verdict = parsed.verdict;
+    if (verdict !== "approve" && verdict !== "changes-requested" && verdict !== "blocked") return undefined;
+    if (typeof parsed.reviewerProvider !== "string" || typeof parsed.reviewerRunId !== "string") return undefined;
+    return {
+      path,
+      reviewerProvider: parsed.reviewerProvider,
+      reviewerRunId: parsed.reviewerRunId,
+      verdict,
+      structured: parsed.structured === true,
+      findings: Array.isArray(parsed.findings) ? parsed.findings.length : 0,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export async function createRunReceipt(
@@ -94,12 +122,15 @@ export async function createRunReceipt(
     const contextId = typeof run.metadata.contextId === "string" ? run.metadata.contextId : undefined;
     const expectedContextHash = typeof run.metadata.contextHash === "string" ? run.metadata.contextHash : undefined;
     let context: RunReceipt["context"];
+    let review: ReceiptReview | undefined;
     if (contextId) {
       for (const [kind, path] of contextFiles(cwd, contextId, run.provider)) {
         const candidate = await artifact(kind, path);
         if (candidate) artifacts.push(candidate);
       }
       const manifestPath = join(cwd, ".superia", "contexts", contextId, "MANIFEST.json");
+      const reviewPath = join(cwd, ".superia", "contexts", contextId, "REVIEW.json");
+      review = await readReview(reviewPath);
       let manifestSha256: string | undefined;
       let manifestHashMatches = false;
       if (await exists(manifestPath)) {
@@ -172,6 +203,7 @@ export async function createRunReceipt(
         diffSha256: sha256(diff),
       },
       context,
+      review,
       artifacts: artifacts.sort((left, right) => left.kind.localeCompare(right.kind) || left.path.localeCompare(right.path)),
       validations,
       verdict: {
@@ -179,6 +211,7 @@ export async function createRunReceipt(
         contextVerified: Boolean(context?.manifestHashMatches),
         artifactsVerified: artifacts.length > 0,
         validationState: validationState(mode, validations),
+        reviewState: reviewState(mode, review),
         humanApprovalRequired: true,
       },
     };
@@ -197,6 +230,7 @@ export async function createRunReceipt(
       receiptHash,
       path,
       validationState: receipt.verdict.validationState,
+      reviewState: receipt.verdict.reviewState,
     });
     return { path, receipt };
   } finally {
