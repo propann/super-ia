@@ -18,6 +18,9 @@ export interface AgentExecutionOptions {
   model?: string;
   timeoutMs?: number;
   maxContextBytes?: number;
+  maxTurns?: number;
+  maxTokens?: number;
+  maxPriceUsd?: number;
   dryRun?: boolean;
 }
 
