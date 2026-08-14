@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prepareAgentSandbox } from "../dist/agents/sandbox-preflight.js";
+import { runBubblewrapSelfTest } from "../dist/security/sandbox-check.js";
 import { prepareSandboxInvocation } from "../dist/security/sandbox.js";
 
 function containsSequence(values, ...sequence) {
@@ -14,6 +15,7 @@ test("Bubblewrap policy uses an ephemeral HOME and limits workspace access", asy
   const parent = await mkdtemp(join(tmpdir(), "superia-sandbox-"));
   const workspace = join(parent, "workspace");
   const state = join(parent, "provider-state");
+  const output = join(workspace, "agent-output.txt");
   const bin = join(parent, "bin");
   const command = join(bin, "agent");
   const controlHome = join(parent, "control");
@@ -23,7 +25,10 @@ test("Bubblewrap policy uses an ephemeral HOME and limits workspace access", asy
     mkdir(bin, { recursive: true }),
     mkdir(controlHome, { recursive: true }),
   ]);
-  await writeFile(command, "#!/bin/sh\nexit 0\n");
+  await Promise.all([
+    writeFile(command, "#!/bin/sh\nexit 0\n"),
+    writeFile(output, ""),
+  ]);
 
   try {
     const prepared = await prepareSandboxInvocation({
@@ -38,6 +43,7 @@ test("Bubblewrap policy uses an ephemeral HOME and limits workspace access", asy
         network: "isolated",
         workspaceAccess: "read-only",
         statePaths: [state],
+        writablePaths: [output],
       },
     }, {
       PATH: bin,
@@ -52,12 +58,14 @@ test("Bubblewrap policy uses an ephemeral HOME and limits workspace access", asy
     assert.equal(prepared.summary?.active, true);
     assert.equal(prepared.summary?.network, "isolated");
     assert.equal(prepared.summary?.workspaceAccess, "read-only");
+    assert.deepEqual(prepared.summary?.writablePaths, [output]);
     assert.ok(prepared.args.includes("--new-session"));
     assert.ok(prepared.args.includes("--disable-userns"));
     assert.ok(prepared.args.includes("--unshare-net"));
     assert.ok(prepared.args.includes("--clearenv"));
     assert.ok(containsSequence(prepared.args, "--ro-bind", workspace, workspace));
     assert.ok(containsSequence(prepared.args, "--bind", state, state));
+    assert.ok(containsSequence(prepared.args, "--bind", output, output));
     assert.ok(containsSequence(prepared.args, "--chdir", workspace));
     assert.ok(containsSequence(prepared.args, "--", command, "--check"));
     assert.ok(!prepared.args.includes("/home/real-user"));
@@ -101,6 +109,11 @@ test("missing Bubblewrap blocks agents unless an explicit waiver is journaled", 
     const journal = await readFile(join(home, "events", "events.jsonl"), "utf8");
     assert.match(journal, /sandbox\.preflight\.waived/);
     assert.match(journal, /allow-without-bwrap/);
+
+    const liveCheck = await runBubblewrapSelfTest();
+    assert.equal(liveCheck.available, false);
+    assert.equal(liveCheck.passed, false);
+    assert.match(liveCheck.reason ?? "", /absent du PATH/);
   } finally {
     process.env.PATH = oldPath;
     if (oldHome === undefined) delete process.env.SUPERIA_HOME;
