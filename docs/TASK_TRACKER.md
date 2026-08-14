@@ -9,11 +9,12 @@ Version suivie : **0.10.0**
 
 | État | Nombre |
 |---|---:|
-| Terminé | 7 |
+| Terminé | 6 |
 | En cours | 0 |
-| Planifié | 12 |
-| Bloqué | 3 |
+| Planifié | 15 |
+| Bloqué | 2 |
 | Différé | 0 |
+| **Total** | **23** |
 
 ## Priorité immédiate
 
