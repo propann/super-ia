@@ -18,7 +18,7 @@ import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.12.0
+  console.log(`Super IA v0.13.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
@@ -43,6 +43,7 @@ Usage:
       --priority low|normal|high|critical
       --owner <nom> --provider <id> --due YYYY-MM-DD
       --tag <tag> --depends TASK-XXXX --accept <critère>
+      --allow-path <glob>                        Périmètre d'écriture d'un build
   superia worktree <TASK-ID> [--dry-run]        Crée son worktree
 
   superia context build [TASK-ID] [options]     Crée un contexte Git vérifiable
@@ -78,7 +79,8 @@ Usage:
 
 Principes:
   - mode agent par défaut : plan en lecture seule
-  - mode build uniquement dans un worktree existant
+  - mode build uniquement dans un worktree avec chemins autorisés
+  - toute modification hors périmètre fait échouer le run et archive le diff
   - une seule exécution possède une mission grâce aux leases
   - suivi explicite des blocages, dépendances et critères d'acceptation
   - Codex conserve sa sandbox ; Vibe n'obtient aucun shell
