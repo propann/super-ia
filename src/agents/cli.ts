@@ -1,5 +1,6 @@
 import { executeCodexTask } from "./executor.js";
-import type { AgentMode } from "./types.js";
+import { executeVibeTask } from "./vibe-executor.js";
+import type { AgentExecutionOptions, AgentMode } from "./types.js";
 
 function flagValue(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -19,6 +20,16 @@ function positionals(args: string[]): string[] {
   return values;
 }
 
+function numberOption(args: string[], flag: string, minimum: number, maximum: number): number | undefined {
+  const raw = flagValue(args, flag);
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < minimum || value > maximum) {
+    throw new Error(`${flag} doit être compris entre ${minimum} et ${maximum}.`);
+  }
+  return value;
+}
+
 export async function handleAgentCommand(
   command: string,
   args: string[],
@@ -27,35 +38,35 @@ export async function handleAgentCommand(
 ): Promise<boolean> {
   if (command !== "agent") return false;
   const [action, provider, taskId] = positionals(args);
-  if (action !== "run" || provider !== "codex" || !taskId) {
-    throw new Error("Usage : superia agent run codex <TASK-ID> [--mode plan|build|review] [--dry-run]");
+  if (action !== "run" || !["codex", "vibe"].includes(provider ?? "") || !taskId) {
+    throw new Error("Usage : superia agent run codex|vibe <TASK-ID> [--mode plan|build|review] [--dry-run]");
   }
   const mode = (flagValue(args, "--mode") ?? "plan") as AgentMode;
   if (!(["plan", "build", "review"] as string[]).includes(mode)) {
     throw new Error("--mode doit être plan, build ou review.");
   }
-  const timeoutRaw = flagValue(args, "--timeout-minutes");
-  const timeoutMinutes = timeoutRaw ? Number(timeoutRaw) : 60;
-  if (!Number.isFinite(timeoutMinutes) || timeoutMinutes <= 0 || timeoutMinutes > 240) {
-    throw new Error("--timeout-minutes doit être compris entre 0 et 240.");
-  }
-  const contextBytesRaw = flagValue(args, "--max-context-bytes");
-  const maxContextBytes = contextBytesRaw ? Number(contextBytesRaw) : undefined;
-  if (contextBytesRaw && (!Number.isFinite(maxContextBytes) || Number(maxContextBytes) <= 0)) {
-    throw new Error("--max-context-bytes doit être positif.");
-  }
-
-  const result = await executeCodexTask(cwd, taskId, {
+  const timeoutMinutes = numberOption(args, "--timeout-minutes", 0.1, 240) ?? 60;
+  const maxContextBytes = numberOption(args, "--max-context-bytes", 1, 2_000_000);
+  const options: AgentExecutionOptions = {
     mode,
     model: flagValue(args, "--model"),
     timeoutMs: timeoutMinutes * 60_000,
     maxContextBytes,
     dryRun: args.includes("--dry-run"),
-  });
+  };
+  if (provider === "vibe") {
+    options.maxTurns = numberOption(args, "--max-turns", 1, 50);
+    options.maxTokens = numberOption(args, "--max-tokens", 1, 500_000);
+    options.maxPriceUsd = numberOption(args, "--max-price", 0.01, 5);
+  }
+
+  const result = provider === "codex"
+    ? await executeCodexTask(cwd, taskId, options)
+    : await executeVibeTask(cwd, taskId, options);
 
   if (asJson) console.log(JSON.stringify(result, null, 2));
   else if (!("process" in result)) {
-    console.log("PRÉVISUALISATION CODEX");
+    console.log(`PRÉVISUALISATION ${result.provider.toUpperCase()}`);
     console.log(`Mode       ${result.mode}`);
     console.log(`Dossier    ${result.cwd}`);
     console.log(`Commande   ${result.command} ${result.args.join(" ")}`);
@@ -63,6 +74,7 @@ export async function handleAgentCommand(
     console.log(`Prompt     ${result.stdinBytes} octets transmis par stdin`);
   } else {
     console.log(result.process.status === "completed" ? "AGENT TERMINÉ" : "AGENT EN ÉCHEC");
+    console.log(`Provider   ${result.provider}`);
     console.log(`Run        ${result.process.runId}`);
     console.log(`Contexte   ${result.context.manifest.id}`);
     console.log(`Événements ${result.parsedEvents}`);
