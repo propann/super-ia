@@ -3,81 +3,79 @@
 Source de vérité machine-lisible : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json).
 
 Dernière mise à jour : **15 août 2026**  
-Version suivie : **0.13.0**
+Version suivie : **0.14.0**
 
 ## État global
 
 | État | Nombre |
 |---|---:|
-| Terminé | 10 |
+| Terminé | 11 |
 | En cours | 1 |
-| Planifié | 10 |
+| Planifié | 9 |
 | Bloqué | 2 |
 | Différé | 0 |
 | **Total** | **23** |
 
-## Priorité immédiate
-
-### Pipeline qualité
+## Pipeline qualité — milestone M3 terminé
 
 | ID | État | Tâche | Résultat |
 |---|---|---|---|
 | `SIA-301` | terminé | Reviewer indépendant | fournisseur différent, lecture seule, findings structurés et verdict bloquant |
 | `SIA-302` | terminé | Pipeline builder → validation → review → receipt | étapes déterministes, checkpoints et reprise testée |
-| `SIA-303` | planifié | Budget de retries et détection de boucle | plafond d'essais, empreinte de tentative et cause d'arrêt |
+| `SIA-303` | terminé | Budget de retries et détection de boucle | essais et prix réservés bornés, feedback injecté, patch identique bloquant |
 
-### Sécurité
+## Priorité immédiate
+
+### Sécurité et Raspberry Pi
 
 | ID | État | Tâche | Reste à faire |
 |---|---|---|---|
 | `SIA-203` | en cours | Sandbox Bubblewrap commune | autotest noyau et runs Codex/Vibe réels sur le Pi 5 |
-| `SIA-204` | terminé | Contrôle des fichiers modifiés | périmètre obligatoire, diff archivé et hors-scope bloquant |
+| `SIA-101` | bloqué | Installer v0.14 sur le Pi 5 cible | accès terminal au Pi, service actif, sauvegarde et rapport sandbox |
+| `SIA-102` | planifié | Tester coupure brutale et reprise | dépend de l'installation Pi |
+| `SIA-103` | planifié | Tester sauvegarde et restauration | dépend de l'installation Pi |
+| `SIA-104` | planifié | Tester Codex réel sous Bubblewrap | dépend du Pi et de l'authentification |
+| `SIA-105` | planifié | Tester Vibe réel sous Bubblewrap | dépend du Pi et de l'authentification |
 
-### Bloqué par une action sur le Raspberry Pi
+### Exploitation et orchestration
 
-| ID | Tâche | Sortie attendue |
+| ID | État | Tâche |
 |---|---|---|
-| `SIA-101` | Installer v0.13 sur le Pi 5 cible | service actif, sauvegarde vérifiée, `sandbox-status.json` produit |
-| `SIA-102` | Tester coupure brutale et reprise | run interrompu détecté, aucun doublon, SQLite intact |
-| `SIA-103` | Tester sauvegarde et restauration | restauration dans un nouvel emplacement et état relisible |
-| `SIA-104` | Tester Codex réel sous Bubblewrap | plan terminé, receipt valide, aucun changement non autorisé |
-| `SIA-105` | Tester Mistral Vibe réel sous Bubblewrap | budget respecté, shell absent, receipt valide |
+| `SIA-205` | planifié | Restic et politique de rétention |
+| `SIA-401` | planifié | Routeur coût/capacité/qualité mesurée |
+| `SIA-402` | planifié | DAG de missions et détection de cycles |
+| `SIA-403` | planifié | Interface web locale |
+| `SIA-404` | planifié | Notifications de blocage et fin de run |
+| `SIA-501` | bloqué | Passer la PR en prête pour revue |
 
-## Terminé dans v0.13
+## Terminé dans v0.14 — `SIA-303`
 
-### Contrôle des changements — `SIA-204`
+- retry uniquement après une review `changes-requested` ;
+- correction déclenchée explicitement avec `--retry` ;
+- review précédente transmise au builder par fichier ;
+- prompt de correction absent de la ligne de commande ;
+- nombre maximal d'essais figé au premier lancement ;
+- plafond total de prix réservé figé au premier lancement ;
+- chaque builder terminé consomme une tentative ;
+- empreinte SHA-256 de chaque patch ;
+- patch identique détecté comme boucle ;
+- reviewer non relancé après détection de boucle ;
+- causes d'arrêt persistées ;
+- coût présenté comme plafond réservé, jamais comme dépense réelle supposée.
 
-- champ de mission `allowedPaths` ;
-- option répétable `--allow-path <glob>` ;
-- refus d'un build sans périmètre déclaré ;
-- snapshot Git avant et après l'agent ;
-- détection des fichiers hors périmètre ;
-- `AGENT_CHANGES.patch` et `CHANGE_GUARD.json` ;
-- run marqué `failed` en cas de violation.
+Causes d'arrêt :
 
-### Reviewer indépendant — `SIA-301`
+```text
+approved
+changes-requested
+review-blocked
+retry-limit
+price-limit
+loop-detected
+technical-failure
+```
 
-- builder et reviewer obligatoirement différents ;
-- review strictement en lecture seule ;
-- JSON structuré obligatoire ;
-- findings avec sévérité, preuve et recommandation ;
-- sortie invalide transformée en verdict `blocked` ;
-- `approve` incompatible avec un finding moyen ou supérieur ;
-- rapport durable `REVIEW.json`.
-
-### Pipeline et reprise — `SIA-302`
-
-- ordre builder → garde Git → validations → reviewer → receipt ;
-- arrêt avant reviewer si une étape précédente échoue ;
-- receipt enrichi avec garde, diff et review ;
-- état atomique `.superia/pipelines/TASK-XXXX.json` ;
-- commande `superia pipeline status` ;
-- reprise avec `--resume` ;
-- reprise testée après builder et après review ;
-- aucune étape terminée relancée silencieusement ;
-- aucune fusion automatique.
-
-## Préparer et lancer un pipeline
+## Lancer un pipeline borné
 
 ```bash
 superia task create "Modifier le module d'authentification"
@@ -86,7 +84,6 @@ superia task update TASK-0001 \
   --priority high \
   --allow-path "src/auth/**" \
   --allow-path "tests/auth/**" \
-  --allow-path "package.json" \
   --accept "tests réussis" \
   --accept "review indépendante approuvée"
 
@@ -94,28 +91,38 @@ superia worktree TASK-0001
 
 superia pipeline run TASK-0001 \
   --builder codex \
-  --reviewer vibe
+  --reviewer vibe \
+  --max-attempts 3 \
+  --max-price 0.25 \
+  --max-total-price 0.75
 ```
 
-Suivre ou reprendre :
+Voir l'état :
 
 ```bash
 superia pipeline status TASK-0001
+superia pipeline status TASK-0001 --json
+```
 
+Reprendre une interruption :
+
+```bash
 superia pipeline run TASK-0001 \
   --builder codex \
   --reviewer vibe \
   --resume
 ```
 
-Le sens inverse est également pris en charge :
+Corriger une review :
 
 ```bash
 superia pipeline run TASK-0001 \
-  --builder vibe \
-  --reviewer codex \
-  --max-price 0.25
+  --builder codex \
+  --reviewer vibe \
+  --retry
 ```
+
+Les plafonds du premier lancement restent ceux du pipeline ; une nouvelle commande ne peut pas les augmenter discrètement.
 
 ## Contrôles quotidiens
 
@@ -134,12 +141,15 @@ superia events --limit 100
 2. Une tâche `blocked` possède une cause explicite.
 3. Une tâche critique possède des critères d'acceptation.
 4. Une dépendance doit exister et ne peut pas pointer vers elle-même.
-5. Un build autonome exige un worktree et au moins un chemin autorisé.
+5. Un build exige un worktree et au moins un chemin autorisé.
 6. Toute modification hors périmètre fait échouer le run.
 7. Builder et reviewer utilisent deux fournisseurs différents.
 8. Une review non structurée est bloquante.
 9. Une reprise ne relance pas un builder sans checkpoint complet.
-10. Toute dérogation de sécurité est explicite et journalisée.
-11. Une validation simulée ne remplace pas un test matériel requis.
-12. La PR reste en brouillon tant que `SIA-501` est bloquée.
-13. Aucune tâche ne supprime l'approbation humaine avant fusion.
+10. Une correction exige `--retry` et une review `changes-requested`.
+11. Un patch déjà vu arrête la boucle.
+12. Les plafonds de retry ne peuvent pas augmenter après le premier lancement.
+13. Toute dérogation de sécurité est explicite et journalisée.
+14. Une validation simulée ne remplace pas un test matériel requis.
+15. La PR reste en brouillon tant que `SIA-501` est bloquée.
+16. Aucune tâche ne supprime l'approbation humaine avant fusion.
