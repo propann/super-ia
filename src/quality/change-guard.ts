@@ -27,11 +27,23 @@ function parseStatus(output: string): Array<{ path: string; status: string }> {
   const result: Array<{ path: string; status: string }> = [];
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index];
-    if (entry.length < 4) continue;
-    const status = entry.slice(0, 2);
-    const path = entry.slice(3);
-    if (path && !path.startsWith(".superia/")) result.push({ path, status });
-    if ((status.includes("R") || status.includes("C")) && entries[index + 1]) index += 1;
+    if (entry.startsWith("? ")) {
+      const path = entry.slice(2);
+      if (!path.startsWith(".superia/")) result.push({ path, status: "??" });
+      continue;
+    }
+    if (entry.startsWith("1 ")) {
+      const fields = entry.split(" ");
+      const path = fields.slice(8).join(" ");
+      if (path && !path.startsWith(".superia/")) result.push({ path, status: fields[1] ?? ".." });
+      continue;
+    }
+    if (entry.startsWith("2 ")) {
+      const fields = entry.split(" ");
+      const path = fields.slice(9).join(" ");
+      index += 1;
+      if (path && !path.startsWith(".superia/")) result.push({ path, status: fields[1] ?? "R." });
+    }
   }
   return result;
 }
@@ -48,7 +60,7 @@ async function fingerprint(root: string, path: string): Promise<string> {
 
 export async function captureGitWorkspace(root: string): Promise<GitWorkspaceSnapshot> {
   const resolved = resolve(root);
-  const status = await runCommand("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
+  const status = await runCommand("git", ["status", "--porcelain=v2", "-z", "--untracked-files=all"], {
     cwd: resolved,
     timeoutMs: 30_000,
   });
