@@ -15,7 +15,22 @@ async function git(cwd, ...args) {
   await execFileAsync("git", args, { cwd });
 }
 
-test("Vibe adapter forces safe programmatic mode and archives streaming JSON", async () => {
+async function writeFakeGitleaks(path) {
+  await writeFile(path, `#!/bin/sh
+report=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--report-path" ]; then
+    shift
+    report="$1"
+  fi
+  shift
+done
+printf '%s\n' '[]' > "$report"
+`);
+  await chmod(path, 0o755);
+}
+
+test("Vibe adapter forces safe programmatic mode after a clean Gitleaks preflight", async () => {
   const parent = await mkdtemp(join(tmpdir(), "superia-vibe-"));
   const root = join(parent, "repo");
   const home = join(parent, "home");
@@ -37,6 +52,7 @@ cat >/dev/null
 printf '%s\n' '{"type":"assistant","content":"fake-vibe-completed"}'
 `);
   await chmod(fakeVibe, 0o755);
+  await writeFakeGitleaks(join(bin, "gitleaks"));
 
   try {
     process.env.PATH = `${bin}${delimiter}${oldPath ?? ""}`;
@@ -47,6 +63,9 @@ printf '%s\n' '{"type":"assistant","content":"fake-vibe-completed"}'
     const result = await executeVibeTask(root, task.id, { mode: "plan", timeoutMs: 10_000 });
     assert.ok("process" in result);
     assert.equal(result.process.status, "completed");
+    assert.equal(result.securityPreflight.status, "passed");
+    assert.equal(result.securityPreflight.findings, 0);
+    assert.ok(result.securityPreflight.reportPath);
     assert.equal(result.parsedEvents, 1);
     assert.equal(result.invalidEventLines, 0);
     assert.equal(result.args[result.args.indexOf("--prompt") + 1], "");
