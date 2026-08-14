@@ -1,4 +1,5 @@
 import { runGitleaksScan } from "./gitleaks.js";
+import { runBubblewrapSelfTest } from "./sandbox-check.js";
 
 function flagValue(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -8,7 +9,26 @@ function flagValue(args: string[], name: string): string | undefined {
 export async function handleSecurityCommand(command: string, args: string[], asJson: boolean, cwd: string): Promise<boolean> {
   if (command !== "security") return false;
   const action = args.find((arg) => !arg.startsWith("--"));
-  if (action !== "scan") throw new Error("Usage : superia security scan [--required] [--mode dir|git]");
+
+  if (action === "sandbox-check") {
+    const report = await runBubblewrapSelfTest();
+    if (asJson) console.log(JSON.stringify(report, null, 2));
+    else {
+      console.log(report.passed ? "SANDBOX BUBBLEWRAP VALIDÉE" : "SANDBOX BUBBLEWRAP NON VALIDÉE");
+      console.log(`Disponible ${report.available ? "oui" : "non"}`);
+      if (report.executable) console.log(`Exécutable ${report.executable}`);
+      for (const check of report.checks) {
+        console.log(`${check.passed ? "✓" : "✗"} ${check.id} — ${check.detail}`);
+      }
+      if (report.reason) console.log(`Raison     ${report.reason}`);
+    }
+    if (!report.passed) process.exitCode = 1;
+    return true;
+  }
+
+  if (action !== "scan") {
+    throw new Error("Usage : superia security scan [--required] [--mode dir|git] | sandbox-check");
+  }
   const mode = (flagValue(args, "--mode") ?? "dir") as "dir" | "git";
   if (!(["dir", "git"] as string[]).includes(mode)) throw new Error("--mode doit être dir ou git.");
   const timeoutRaw = flagValue(args, "--timeout-minutes");
