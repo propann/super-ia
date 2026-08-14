@@ -24,7 +24,7 @@ function flagValue(args: string[], name: string): string | undefined {
 
 function positionals(args: string[]): string[] {
   const values: string[] = [];
-  const valueFlags = new Set(["--status", "--priority", "--provider", "--owner", "--due", "--tag", "--depends", "--accept"]);
+  const valueFlags = new Set(["--status", "--priority", "--provider", "--owner", "--due", "--tag", "--depends", "--accept", "--allow-path"]);
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
     if (value.startsWith("--")) {
@@ -55,6 +55,7 @@ function compactTask(task: SuperIaTask): Record<string, unknown> {
     dueDate: task.dueDate ?? null,
     dependencies: task.dependencies,
     tags: task.tags,
+    allowedPaths: task.allowedPaths,
     updatedAt: task.updatedAt,
   };
 }
@@ -70,6 +71,7 @@ function printTask(task: SuperIaTask): void {
   console.log(`Worktree    ${task.worktreePath ?? "non créé"}`);
   console.log(`Dépendances ${task.dependencies.join(", ") || "-"}`);
   console.log(`Tags        ${task.tags.join(", ") || "-"}`);
+  console.log(`Chemins     ${task.allowedPaths.join(", ") || "aucune écriture autorisée"}`);
   console.log(`Critères    ${task.acceptanceCriteria.join(" ; ") || "-"}`);
   console.log(`Checks      ${task.checks.join(" ; ") || "-"}`);
   console.log(`Notes       ${task.notes.length}`);
@@ -143,6 +145,7 @@ export async function handleTaskCommand(command: string, args: string[], asJson:
       tags: optionalFlagValues(args, "--tag"),
       dependencies: optionalFlagValues(args, "--depends"),
       acceptanceCriteria: optionalFlagValues(args, "--accept"),
+      allowedPaths: optionalFlagValues(args, "--allow-path"),
     });
     await syncRepositoryToGlobalControl(scan.root);
     if (asJson) console.log(JSON.stringify(task, null, 2));
