@@ -7,6 +7,7 @@ export type ReviewSeverity = "critical" | "high" | "medium" | "low";
 export type ReviewVerdict = "approve" | "changes-requested" | "blocked";
 export type PipelineStage = "initialized" | "builder-completed" | "validation-completed" | "review-completed" | "receipt-created";
 export type PipelineStatus = "running" | "completed" | "failed";
+export type PipelineStopReason = "approved" | "changes-requested" | "review-blocked" | "retry-limit" | "price-limit" | "loop-detected" | "technical-failure";
 
 export interface ReviewFinding {
   severity: ReviewSeverity;
@@ -33,11 +34,25 @@ export interface IndependentReviewReport {
   createdAt: string;
 }
 
+export interface PipelineAttempt {
+  number: number;
+  builderRunId: string;
+  reviewerRunId?: string;
+  patchSha256: string;
+  verdict?: ReviewVerdict;
+  reviewPath?: string;
+  reservedPriceCeilingUsd: number;
+  completedAt: string;
+}
+
 export interface PipelineOptions {
   builder: PipelineProvider;
   reviewer: PipelineProvider;
   dryRun?: boolean;
   resume?: boolean;
+  retry?: boolean;
+  maxAttempts?: number;
+  maxTotalPriceUsd?: number;
   builderModel?: string;
   reviewerModel?: string;
   timeoutMs?: number;
@@ -79,6 +94,12 @@ export interface PipelineCheckpoint {
   stage: PipelineStage;
   startedAt: string;
   updatedAt: string;
+  maxAttempts?: number;
+  maxTotalPriceUsd?: number;
+  reservedPriceCeilingUsd?: number;
+  attempts?: PipelineAttempt[];
+  feedbackPath?: string;
+  stopReason?: PipelineStopReason;
   builder?: AgentExecutionResult;
   validation?: ValidationReport;
   reviewer?: AgentExecutionResult;
