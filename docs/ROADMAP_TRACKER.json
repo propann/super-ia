@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "project": "Super IA",
-  "currentVersion": "0.10.0",
+  "currentVersion": "0.11.0",
   "updatedAt": "2026-08-14",
   "statuses": ["done", "in_progress", "planned", "blocked", "deferred"],
   "milestones": [
@@ -96,7 +96,7 @@
     {
       "id": "SIA-101",
       "milestone": "M1",
-      "title": "Installer v0.10 sur le Raspberry Pi 5 cible",
+      "title": "Installer v0.11 sur le Raspberry Pi 5 cible",
       "status": "blocked",
       "priority": "critical",
       "dependencies": ["SIA-005"],
@@ -158,11 +158,11 @@
       "id": "SIA-202",
       "milestone": "M2",
       "title": "Rendre Gitleaks obligatoire avant envoi distant",
-      "status": "planned",
+      "status": "done",
       "priority": "critical",
       "dependencies": ["SIA-201"],
       "exitCriteria": ["agent distant refusé si Gitleaks absent", "agent refusé si finding", "exception locale explicite et journalisée"],
-      "evidence": ["tests de préflight agent"]
+      "evidence": ["tests/codex-adapter.test.mjs", "tests/vibe-adapter.test.mjs", "tests/security-preflight.test.mjs", "src/agents/security-preflight.ts"]
     },
     {
       "id": "SIA-203",
