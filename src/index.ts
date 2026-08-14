@@ -6,6 +6,7 @@ import { scanRepository } from "./core/repository-scanner.js";
 import { createTask, getTask, listTasks } from "./core/task-store.js";
 import { createWorktree } from "./core/worktree-manager.js";
 import { handleControlCommand } from "./control/cli.js";
+import { handleOperationsCommand } from "./control/operations-cli.js";
 import { syncRepositoryToGlobalControl } from "./control/repository-sync.js";
 import { handleContextCommand } from "./context/cli.js";
 import { providerCatalog } from "./providers/catalog.js";
@@ -14,7 +15,7 @@ import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.6.0
+  console.log(`Super IA v0.7.0
 
 Usage:
   superia matrix [--once]                       Ouvre la console Matrix
@@ -35,12 +36,17 @@ Usage:
   superia worktree <TASK-ID> [--dry-run]        Crée son worktree
 
   superia context build [TASK-ID] [options]     Crée un contexte Git vérifiable
-      --query "mots clés" --max-bytes 300000 --output <dossier>
   superia validate [--timeout-minutes 15]       Exécute les checks dans le runner
 
   superia agent run codex <TASK-ID> [options]   Lance Codex via le plan de contrôle
       --mode plan|build|review --model <nom> --dry-run
       --timeout-minutes 60 --max-context-bytes 300000
+
+  superia backup create                         Crée une sauvegarde cohérente
+  superia backup list                           Liste les sauvegardes
+  superia backup verify <dossier>               Vérifie tailles et SHA-256
+  superia daemon --once                         Synchronise et récupère une fois
+  superia daemon [--interval-seconds 30]        Lance la boucle permanente
 
   superia run start <provider> [TASK-ID]        Ouvre un run durable manuel
   superia run list [--project PROJECT-ID]       Liste les runs
@@ -59,6 +65,7 @@ Principes:
   - API désactivées par défaut
   - aucun fichier sensible dans un paquet de contexte
   - aucun shell implicite dans le runner
+  - daemon et service Pi sans privilèges root
   - état global durable dans SUPERIA_HOME ou ~/.superia
 `);
 }
@@ -101,6 +108,7 @@ async function main(): Promise<void> {
   const [command = "help", ...args] = process.argv.slice(2);
   const json = args.includes("--json");
 
+  if (await handleOperationsCommand(command, args, json)) return;
   if (await handleControlCommand(command, args, json, process.cwd())) return;
   if (await handleContextCommand(command, args, json, process.cwd())) return;
   if (await handleRuntimeCommand(command, args, json, process.cwd())) return;
