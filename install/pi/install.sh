@@ -67,10 +67,12 @@ escape_sed() {
 
 REPO_ESCAPED=$(escape_sed "$REPO_DIR")
 HOME_ESCAPED=$(escape_sed "$HOME")
+SUPERIA_HOME_ESCAPED=$(escape_sed "$SUPERIA_HOME")
 NODE_ESCAPED=$(escape_sed "$NODE_BIN")
 sed \
   -e "s|@REPO@|$REPO_ESCAPED|g" \
   -e "s|@HOME@|$HOME_ESCAPED|g" \
+  -e "s|@SUPERIA_HOME@|$SUPERIA_HOME_ESCAPED|g" \
   -e "s|@NODE@|$NODE_ESCAPED|g" \
   "$SCRIPT_DIR/superia.service.template" > "$SERVICE_FILE"
 
@@ -92,13 +94,14 @@ SUPERIA_HOME="$SUPERIA_HOME" "$NODE_BIN" "$REPO_DIR/dist/index.js" backup verify
 SANDBOX_STATUS="$SUPERIA_HOME/sandbox-status.json"
 if command -v bwrap >/dev/null 2>&1; then
   printf '==> Autotest Bubblewrap réel\n'
-  if SUPERIA_HOME="$SUPERIA_HOME" "$NODE_BIN" "$REPO_DIR/dist/index.js" security sandbox-check --json > "$SANDBOX_STATUS"; then
+  if SUPERIA_HOME="$SUPERIA_HOME" "$NODE_BIN" "$REPO_DIR/dist/index.js" security sandbox-check --json >/dev/null; then
     printf 'Sandbox Bubblewrap validée. Rapport : %s\n' "$SANDBOX_STATUS"
   else
     warn "Bubblewrap est présent mais son autotest a échoué. Rapport : $SANDBOX_STATUS"
   fi
 else
   printf '%s\n' '{"engine":"bubblewrap","available":false,"passed":false,"reason":"absent du PATH"}' > "$SANDBOX_STATUS"
+  chmod 0600 "$SANDBOX_STATUS"
 fi
 
 if command -v systemctl >/dev/null 2>&1 && systemctl --user daemon-reload 2>/dev/null; then
