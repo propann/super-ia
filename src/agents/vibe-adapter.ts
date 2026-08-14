@@ -59,10 +59,12 @@ export async function buildVibeInvocation(input: {
   mode: AgentMode;
   model?: string;
   budget: VibeBudget;
+  feedbackPath?: string;
 }): Promise<AgentInvocation> {
-  const [mission, contextText] = await Promise.all([
+  const [mission, contextText, feedback] = await Promise.all([
     readFile(input.context.missionPath, "utf8"),
     readFile(input.context.contextPath, "utf8"),
+    input.feedbackPath ? readFile(input.feedbackPath, "utf8") : Promise.resolve(""),
   ]);
   const agent = input.mode === "build" ? "accept-edits" : "plan";
   const args = [
@@ -86,12 +88,21 @@ export async function buildVibeInvocation(input: {
     "bash*",
   ];
 
+  const feedbackSection = feedback
+    ? [
+      "",
+      "REVIEW INDÉPENDANTE À CORRIGER",
+      "Traite chaque finding prouvé. Ne modifie rien hors du périmètre autorisé.",
+      feedback,
+    ]
+    : [];
   const stdin = [
     modeInstructions(input.mode),
     "",
     mission,
     "",
     contextText,
+    ...feedbackSection,
     "",
     input.mode === "review"
       ? "Base ton verdict uniquement sur les éléments visibles dans le dépôt et le diff courant."
@@ -108,6 +119,7 @@ export async function buildVibeInvocation(input: {
     metadata: {
       mode: input.mode,
       model: input.model ?? null,
+      feedbackPath: input.feedbackPath ?? null,
       agent,
       contextId: input.context.manifest.id,
       contextHash: input.context.manifest.contextHash,
