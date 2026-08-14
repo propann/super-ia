@@ -11,5 +11,6 @@ test("Pi service template keeps the configured control home", async () => {
   assert.equal(template.includes("Environment=SUPERIA_HOME=@HOME@/.superia"), false);
   assert.equal(installer.includes("SUPERIA_HOME_ESCAPED="), true);
   assert.equal(installer.includes("@SUPERIA_HOME@"), true);
-  assert.equal(installer.includes("sandbox-check --json >"), false);
+  assert.equal(installer.includes('sandbox-check --json > "$SANDBOX_STATUS"'), false);
+  assert.equal(installer.includes("sandbox-check --json >/dev/null"), true);
 });
