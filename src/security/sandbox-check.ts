@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, chmod, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ensureControlHome } from "../control/home.js";
 import { findExecutable, runCommand } from "../utils/command.js";
@@ -18,6 +18,8 @@ export interface SandboxCheckReport {
   executable?: string;
   checks: SandboxCheck[];
   reason?: string;
+  checkedAt?: string;
+  platform?: string;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -33,6 +35,30 @@ function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
+export async function persistSandboxCheckReport(report: SandboxCheckReport): Promise<string> {
+  const control = await ensureControlHome();
+  const path = join(control.root, "sandbox-status.json");
+  const persisted: SandboxCheckReport = {
+    ...report,
+    checkedAt: report.checkedAt ?? new Date().toISOString(),
+    platform: report.platform ?? process.platform,
+  };
+  await writeFile(path, `${JSON.stringify(persisted, null, 2)}\n`, "utf8");
+  await chmod(path, 0o600);
+  return path;
+}
+
+export async function loadSandboxCheckReport(): Promise<SandboxCheckReport | undefined> {
+  const control = await ensureControlHome();
+  try {
+    const parsed = JSON.parse(await readFile(join(control.root, "sandbox-status.json"), "utf8")) as SandboxCheckReport;
+    if (parsed.engine !== "bubblewrap" || typeof parsed.passed !== "boolean" || !Array.isArray(parsed.checks)) return undefined;
+    return parsed;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function runBubblewrapSelfTest(): Promise<SandboxCheckReport> {
   const executable = process.platform === "linux" ? await findExecutable("bwrap") : undefined;
   if (!executable) {
@@ -44,6 +70,8 @@ export async function runBubblewrapSelfTest(): Promise<SandboxCheckReport> {
       reason: process.platform === "linux"
         ? "Bubblewrap est absent du PATH."
         : `Bubblewrap exige Linux, plateforme détectée : ${process.platform}.`,
+      checkedAt: new Date().toISOString(),
+      platform: process.platform,
     };
   }
 
@@ -152,6 +180,8 @@ export async function runBubblewrapSelfTest(): Promise<SandboxCheckReport> {
       executable,
       checks,
       reason: passed ? undefined : "Au moins un contrôle Bubblewrap a échoué.",
+      checkedAt: new Date().toISOString(),
+      platform: process.platform,
     };
   } catch (error) {
     return {
@@ -161,6 +191,8 @@ export async function runBubblewrapSelfTest(): Promise<SandboxCheckReport> {
       executable,
       checks,
       reason: error instanceof Error ? error.message : String(error),
+      checkedAt: new Date().toISOString(),
+      platform: process.platform,
     };
   } finally {
     await rm(root, { recursive: true, force: true });
