@@ -13,6 +13,15 @@ export interface ReceiptValidation {
   finishedAt?: string;
 }
 
+export interface ReceiptReview {
+  path: string;
+  reviewerProvider: string;
+  reviewerRunId: string;
+  verdict: "approve" | "changes-requested" | "blocked";
+  structured: boolean;
+  findings: number;
+}
+
 export interface RunReceipt {
   schemaVersion: 1;
   id: string;
@@ -55,6 +64,7 @@ export interface RunReceipt {
     manifestSha256?: string;
     manifestHashMatches: boolean;
   };
+  review?: ReceiptReview;
   artifacts: ReceiptArtifact[];
   validations: ReceiptValidation[];
   verdict: {
@@ -62,6 +72,7 @@ export interface RunReceipt {
     contextVerified: boolean;
     artifactsVerified: boolean;
     validationState: "not-required" | "missing" | "passed" | "failed";
+    reviewState: "not-required" | "missing" | "approve" | "changes-requested" | "blocked";
     humanApprovalRequired: true;
   };
   receiptHash: string;
