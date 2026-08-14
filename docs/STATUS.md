@@ -11,7 +11,7 @@ Pull request : `#1` vers `main`
 |---|---|
 | CI GitHub | réussie |
 | Build TypeScript | réussi |
-| Tests | **78 réussis, 0 échec** |
+| Tests | **79 réussis, 0 échec** |
 | Audit npm | **0 vulnérabilité signalée** |
 | Système CI | Ubuntu 24.04.4 |
 | Node / npm | 22.23.2 / 10.9.8 |
@@ -49,6 +49,7 @@ Aucun profil n’installe de modèle local ni de poids IA.
 - Gitleaks obligatoire avant les agents distants ;
 - Bubblewrap avec HOME jetable et contrôle du workspace ;
 - masquage des `.env`, credentials, bases privées, clés et répertoires sensibles dans la sandbox ;
+- noms de fichiers Git conservés au caractère près pendant le masquage ;
 - garde Git avec chemins critiques interdits et plafonds de diff ;
 - reviewer indépendant ;
 - pipeline builder → validation → review → receipt ;
