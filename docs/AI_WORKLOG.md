@@ -18,8 +18,17 @@
 
 - Mission : étudier les IA, agents open source, systèmes de contexte et solutions locales avant de figer l'architecture.
 - Projets étudiés : Codex, Claude Code, Mistral Vibe, Gemini CLI, Qwen Code, Aider, OpenCode, mini-SWE-agent, OpenHands, Spec Kit, Repomix, Pochi, Tabby, Ollama, llama.cpp et LocalAI.
-- Décision matérielle : Raspberry Pi 5 comme tour de contrôle permanente sur NVMe ; les modèles lourds restent distants ou sur une autre machine.
+- Décision matérielle : Raspberry Pi 5 8 Go comme tour de contrôle permanente sur NVMe ; les modèles lourds restent distants ou sur une autre machine.
 - Décision mémoire : Git pour la vérité du code, Markdown pour les décisions, SQLite et JSONL pour les missions et événements, transcriptions locales pour les preuves.
 - Décision multi-agent : orchestrateur déterministe, rôles spécialisés, worktrees séparés, contrôleur indépendant et validation humaine.
 - Livré : documentation de recherche, matrice des rôles, architecture Pi 5, mémoire de contexte, pipeline multi-agent et protocole de benchmark.
-- Suite : registre des outils locaux, constructeur de contexte Git, checkpoints, puis adaptateurs Codex et Mistral Vibe.
+
+## 14 août 2026 — registre des capacités locales
+
+- Mission : distinguer les fournisseurs IA des outils réellement disponibles sur la machine.
+- Livré : registre de 15 outils locaux couvrant Git, recherche, contexte, agents, inférence, sandbox, conteneurs et sauvegarde.
+- Nouvelle commande : `superia local [--json]`.
+- Diagnostic étendu : `superia doctor` affiche désormais fournisseurs et outils locaux.
+- Console Matrix : nouveau panneau des capacités locales détectées.
+- Tests ajoutés : unicité du catalogue, exigences des outils obligatoires et rendu Matrix avec outil local.
+- Suite : rapport de capacité du Pi 5, constructeur de contexte Git, checkpoints, puis adaptateurs Codex et Mistral Vibe.
