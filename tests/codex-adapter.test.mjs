@@ -15,11 +15,28 @@ async function git(cwd, ...args) {
   await execFileAsync("git", args, { cwd });
 }
 
-test("Codex adapter sends verified stdin, parses JSONL and stores the last message", async () => {
+async function writeFakeGitleaks(path, findings = [], exitCode = 0) {
+  await writeFile(path, `#!/bin/sh
+report=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "--report-path" ]; then
+    shift
+    report="$1"
+  fi
+  shift
+done
+printf '%s\n' '${JSON.stringify(findings)}' > "$report"
+exit ${exitCode}
+`);
+  await chmod(path, 0o755);
+}
+
+test("Codex adapter requires a clean Gitleaks preflight before launch", async () => {
   const parent = await mkdtemp(join(tmpdir(), "superia-codex-"));
   const root = join(parent, "repo");
   const home = join(parent, "home");
   const bin = join(parent, "bin");
+  const marker = join(parent, "codex-launches.txt");
   const oldPath = process.env.PATH;
   const oldHome = process.env.SUPERIA_HOME;
   await git(parent, "init", "-b", "main", root);
@@ -34,6 +51,7 @@ test("Codex adapter sends verified stdin, parses JSONL and stores the last messa
 
   const fakeCodex = join(bin, "codex");
   await writeFile(fakeCodex, `#!/bin/sh
+printf 'launch\n' >> ${JSON.stringify(marker)}
 output=""
 while [ "$#" -gt 0 ]; do
   if [ "$1" = "--output-last-message" ]; then
@@ -47,6 +65,8 @@ printf '%s\n' '{"type":"thread.started","thread_id":"fake-thread"}'
 printf '%s\n' '# Fake Codex completed' > "$output"
 `);
   await chmod(fakeCodex, 0o755);
+  const fakeGitleaks = join(bin, "gitleaks");
+  await writeFakeGitleaks(fakeGitleaks);
 
   try {
     process.env.PATH = `${bin}${delimiter}${oldPath ?? ""}`;
@@ -57,12 +77,24 @@ printf '%s\n' '# Fake Codex completed' > "$output"
     const result = await executeCodexTask(root, task.id, { mode: "plan", timeoutMs: 10_000 });
     assert.ok("process" in result);
     assert.equal(result.process.status, "completed");
+    assert.equal(result.securityPreflight.status, "passed");
+    assert.equal(result.securityPreflight.findings, 0);
+    assert.ok(result.securityPreflight.reportPath);
     assert.equal(result.parsedEvents, 1);
     assert.equal(result.invalidEventLines, 0);
     assert.ok(result.args.includes("read-only"));
     assert.ok(!result.args.includes("--dangerously-bypass-approvals-and-sandbox"));
     assert.match(await readFile(result.lastMessagePath, "utf8"), /Fake Codex completed/);
     assert.equal(JSON.parse(await readFile(result.normalizedEventsPath, "utf8"))[0].thread_id, "fake-thread");
+    assert.equal((await readFile(marker, "utf8")).trim().split(/\r?\n/).length, 1);
+
+    await writeFakeGitleaks(fakeGitleaks, [{ RuleID: "test-secret", File: "README.md" }], 1);
+    const blockedTask = await createTask(scan, "Ce run doit être bloqué avant Codex");
+    await assert.rejects(
+      () => executeCodexTask(root, blockedTask.id, { mode: "plan", timeoutMs: 10_000 }),
+      /Préflight de sécurité refusé/,
+    );
+    assert.equal((await readFile(marker, "utf8")).trim().split(/\r?\n/).length, 1);
 
     await assert.rejects(
       () => executeCodexTask(root, task.id, { mode: "build", dryRun: true }),
