@@ -14,6 +14,10 @@ function flagValues(args: string[], name: string): string[] {
   return values;
 }
 
+function optionalFlagValues(args: string[], name: string): string[] | undefined {
+  return args.includes(name) ? flagValues(args, name) : undefined;
+}
+
 function flagValue(args: string[], name: string): string | undefined {
   return flagValues(args, name).at(-1);
 }
@@ -136,9 +140,9 @@ export async function handleTaskCommand(command: string, args: string[], asJson:
       provider: flagValue(args, "--provider"),
       owner: flagValue(args, "--owner"),
       dueDate: validateDate(flagValue(args, "--due")),
-      tags: flagValues(args, "--tag"),
-      dependencies: flagValues(args, "--depends"),
-      acceptanceCriteria: flagValues(args, "--accept"),
+      tags: optionalFlagValues(args, "--tag"),
+      dependencies: optionalFlagValues(args, "--depends"),
+      acceptanceCriteria: optionalFlagValues(args, "--accept"),
     });
     await syncRepositoryToGlobalControl(scan.root);
     if (asJson) console.log(JSON.stringify(task, null, 2));
