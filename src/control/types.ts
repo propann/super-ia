@@ -6,6 +6,7 @@ export interface ControlPaths {
   database: string;
   events: string;
   eventJournal: string;
+  runs: string;
   backups: string;
 }
 
