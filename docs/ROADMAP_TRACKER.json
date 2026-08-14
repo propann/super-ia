@@ -1,0 +1,279 @@
+{
+  "schemaVersion": 1,
+  "project": "Super IA",
+  "currentVersion": "0.10.0",
+  "updatedAt": "2026-08-14",
+  "statuses": ["done", "in_progress", "planned", "blocked", "deferred"],
+  "milestones": [
+    {
+      "id": "M0",
+      "title": "Socle fiable",
+      "status": "done",
+      "goal": "État durable, Git, contexte, runner, preuves et sauvegardes."
+    },
+    {
+      "id": "M1",
+      "title": "Validation Raspberry Pi réelle",
+      "status": "blocked",
+      "goal": "Prouver installation, reprise, sauvegarde et restauration sur le Pi 5 cible."
+    },
+    {
+      "id": "M2",
+      "title": "Sécurité d'exécution",
+      "status": "in_progress",
+      "goal": "Empêcher les fuites et confiner les commandes des agents."
+    },
+    {
+      "id": "M3",
+      "title": "Pipeline multi-agent contrôlé",
+      "status": "planned",
+      "goal": "Builder, validations, reviewer indépendant et receipt final."
+    },
+    {
+      "id": "M4",
+      "title": "Orchestration et ergonomie",
+      "status": "planned",
+      "goal": "Routeur mesuré, DAG, interface locale et notifications."
+    },
+    {
+      "id": "M5",
+      "title": "Publication stable",
+      "status": "blocked",
+      "goal": "Fusionner vers main uniquement après preuves matérielles et sécurité minimale."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "SIA-001",
+      "milestone": "M0",
+      "title": "Plan de contrôle SQLite WAL multi-projets",
+      "status": "done",
+      "priority": "critical",
+      "dependencies": [],
+      "exitCriteria": ["SQLite en WAL", "migrations versionnées", "projets, tâches, runs et événements persistants"],
+      "evidence": ["tests/control-plane.test.mjs", "docs/CONTROL_PLANE.md"]
+    },
+    {
+      "id": "SIA-002",
+      "milestone": "M0",
+      "title": "Runner contrôlé et arrêt des descendants",
+      "status": "done",
+      "priority": "critical",
+      "dependencies": ["SIA-001"],
+      "exitCriteria": ["timeout", "heartbeat", "logs", "arrêt du groupe de processus"],
+      "evidence": ["tests/runner.test.mjs"]
+    },
+    {
+      "id": "SIA-003",
+      "milestone": "M0",
+      "title": "Adaptateurs Codex et Mistral Vibe",
+      "status": "done",
+      "priority": "critical",
+      "dependencies": ["SIA-002"],
+      "exitCriteria": ["mode plan", "mode build en worktree", "sorties archivées", "options dangereuses refusées"],
+      "evidence": ["tests/codex-adapter.test.mjs", "tests/vibe-adapter.test.mjs"]
+    },
+    {
+      "id": "SIA-004",
+      "milestone": "M0",
+      "title": "Receipts vérifiables et détection de falsification",
+      "status": "done",
+      "priority": "high",
+      "dependencies": ["SIA-002"],
+      "exitCriteria": ["empreintes SHA-256", "artefacts vérifiés", "approbation humaine obligatoire"],
+      "evidence": ["tests/receipt.test.mjs"]
+    },
+    {
+      "id": "SIA-005",
+      "milestone": "M0",
+      "title": "Suivi enrichi des missions",
+      "status": "done",
+      "priority": "high",
+      "dependencies": ["SIA-001"],
+      "exitCriteria": ["priorité", "blocage", "dépendances", "responsable", "échéance", "critères d'acceptation", "tableau de progression"],
+      "evidence": ["tests/task-tracking.test.mjs", "src/core/task-cli.ts"]
+    },
+    {
+      "id": "SIA-101",
+      "milestone": "M1",
+      "title": "Installer v0.10 sur le Raspberry Pi 5 cible",
+      "status": "blocked",
+      "priority": "critical",
+      "dependencies": ["SIA-005"],
+      "blockedBy": "Accès terminal au Pi requis",
+      "exitCriteria": ["installateur terminé", "service utilisateur actif", "control status valide", "première sauvegarde vérifiée"],
+      "evidence": ["journalctl du service", "sortie superia control status --json"]
+    },
+    {
+      "id": "SIA-102",
+      "milestone": "M1",
+      "title": "Tester coupure brutale et reprise",
+      "status": "planned",
+      "priority": "critical",
+      "dependencies": ["SIA-101"],
+      "exitCriteria": ["run interrompu détecté", "base SQLite intègre", "daemon redémarré", "aucune mission doublée"],
+      "evidence": ["receipt du test de reprise", "journal systemd"]
+    },
+    {
+      "id": "SIA-103",
+      "milestone": "M1",
+      "title": "Tester sauvegarde et restauration sur copie",
+      "status": "planned",
+      "priority": "critical",
+      "dependencies": ["SIA-101"],
+      "exitCriteria": ["sauvegarde vérifiée", "restauration dans un nouvel emplacement", "projets et runs lisibles"],
+      "evidence": ["rapport de restauration", "hashes avant/après"]
+    },
+    {
+      "id": "SIA-104",
+      "milestone": "M1",
+      "title": "Authentifier et tester Codex réel",
+      "status": "planned",
+      "priority": "high",
+      "dependencies": ["SIA-101"],
+      "exitCriteria": ["doctor détecte Codex", "plan réel terminé", "receipt valide", "aucune écriture en mode plan"],
+      "evidence": ["run Codex", "receipt"]
+    },
+    {
+      "id": "SIA-105",
+      "milestone": "M1",
+      "title": "Authentifier et tester Mistral Vibe réel",
+      "status": "planned",
+      "priority": "high",
+      "dependencies": ["SIA-101"],
+      "exitCriteria": ["doctor détecte Vibe", "plan réel terminé", "budget respecté", "shell absent"],
+      "evidence": ["run Vibe", "receipt"]
+    },
+    {
+      "id": "SIA-201",
+      "milestone": "M2",
+      "title": "Intégrer Gitleaks avec rapport JSON expurgé",
+      "status": "done",
+      "priority": "critical",
+      "dependencies": ["SIA-002"],
+      "exitCriteria": ["scan dir et git", "mode required", "rapport archivé", "finding provoque un échec"],
+      "evidence": ["tests/gitleaks.test.mjs", "src/security/gitleaks.ts"]
+    },
+    {
+      "id": "SIA-202",
+      "milestone": "M2",
+      "title": "Rendre Gitleaks obligatoire avant envoi distant",
+      "status": "planned",
+      "priority": "critical",
+      "dependencies": ["SIA-201"],
+      "exitCriteria": ["agent distant refusé si Gitleaks absent", "agent refusé si finding", "exception locale explicite et journalisée"],
+      "evidence": ["tests de préflight agent"]
+    },
+    {
+      "id": "SIA-203",
+      "milestone": "M2",
+      "title": "Ajouter sandbox Bubblewrap commune",
+      "status": "planned",
+      "priority": "critical",
+      "dependencies": ["SIA-002"],
+      "exitCriteria": ["réseau désactivable", "écriture limitée au worktree", "HOME temporaire", "tests d'évasion basiques"],
+      "evidence": ["tests sandbox Linux"]
+    },
+    {
+      "id": "SIA-204",
+      "milestone": "M2",
+      "title": "Contrôler les fichiers modifiés par un agent",
+      "status": "planned",
+      "priority": "high",
+      "dependencies": ["SIA-003"],
+      "exitCriteria": ["liste autorisée", "hors-scope détecté", "run marqué failed", "diff archivé"],
+      "evidence": ["test de modification hors périmètre"]
+    },
+    {
+      "id": "SIA-205",
+      "milestone": "M2",
+      "title": "Ajouter Restic et politique de rétention",
+      "status": "planned",
+      "priority": "high",
+      "dependencies": ["SIA-103"],
+      "exitCriteria": ["sauvegarde chiffrée", "rétention configurable", "vérification et restauration documentées"],
+      "evidence": ["test Restic sur dépôt temporaire"]
+    },
+    {
+      "id": "SIA-301",
+      "milestone": "M3",
+      "title": "Reviewer indépendant",
+      "status": "planned",
+      "priority": "critical",
+      "dependencies": ["SIA-202", "SIA-204"],
+      "exitCriteria": ["reviewer différent du builder", "findings structurés", "validation humaine conservée"],
+      "evidence": ["receipt builder et receipt reviewer"]
+    },
+    {
+      "id": "SIA-302",
+      "milestone": "M3",
+      "title": "Pipeline builder vers validation vers review vers receipt",
+      "status": "planned",
+      "priority": "critical",
+      "dependencies": ["SIA-301"],
+      "exitCriteria": ["étapes déterministes", "reprise à chaque checkpoint", "échec bloquant", "aucune fusion automatique"],
+      "evidence": ["test pipeline de bout en bout"]
+    },
+    {
+      "id": "SIA-303",
+      "milestone": "M3",
+      "title": "Budget de retries et détection de boucle",
+      "status": "planned",
+      "priority": "high",
+      "dependencies": ["SIA-302"],
+      "exitCriteria": ["nombre maximal d'essais", "cause d'arrêt enregistrée", "coût cumulé visible"],
+      "evidence": ["test agent volontairement en échec"]
+    },
+    {
+      "id": "SIA-401",
+      "milestone": "M4",
+      "title": "Routeur coût, capacité et qualité mesurée",
+      "status": "planned",
+      "priority": "high",
+      "dependencies": ["SIA-104", "SIA-105", "SIA-302"],
+      "exitCriteria": ["benchmark commun", "choix explicable", "plafond de coût", "fallback contrôlé"],
+      "evidence": ["rapport benchmark", "décision du routeur"]
+    },
+    {
+      "id": "SIA-402",
+      "milestone": "M4",
+      "title": "DAG de missions et détection de cycles",
+      "status": "planned",
+      "priority": "high",
+      "dependencies": ["SIA-302"],
+      "exitCriteria": ["dépendances atomiques", "cycles refusés", "tâches débloquées automatiquement"],
+      "evidence": ["tests DAG"]
+    },
+    {
+      "id": "SIA-403",
+      "milestone": "M4",
+      "title": "Interface web locale en lecture et contrôle",
+      "status": "planned",
+      "priority": "normal",
+      "dependencies": ["SIA-302", "SIA-402"],
+      "exitCriteria": ["projets", "missions", "runs", "logs", "approbations", "authentification locale"],
+      "evidence": ["tests API et captures interface"]
+    },
+    {
+      "id": "SIA-404",
+      "milestone": "M4",
+      "title": "Notifications de blocage et fin de run",
+      "status": "planned",
+      "priority": "normal",
+      "dependencies": ["SIA-302"],
+      "exitCriteria": ["notification sans doublon", "aucun secret dans le message", "canal configurable"],
+      "evidence": ["test notification"]
+    },
+    {
+      "id": "SIA-501",
+      "milestone": "M5",
+      "title": "Passer la PR en prête pour revue",
+      "status": "blocked",
+      "priority": "critical",
+      "dependencies": ["SIA-102", "SIA-103", "SIA-104", "SIA-105", "SIA-202", "SIA-203"],
+      "blockedBy": "Preuves matérielles, fournisseurs réels et sandbox manquants",
+      "exitCriteria": ["CI verte", "Pi validé", "restauration validée", "Codex/Vibe réels validés", "sécurité minimale validée"],
+      "evidence": ["docs/STATUS.md", "receipts matériels", "checklist de release"]
+    }
+  ]
+}
