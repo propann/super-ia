@@ -2,6 +2,7 @@ export type ConnectionKind =
   | "cli-session"
   | "api-key-env"
   | "openai-compatible"
+  | "cloud-identity"
   | "mcp-stdio"
   | "mcp-http"
   | "acp-stdio"
