@@ -66,7 +66,46 @@ test("managed runner times out and kills the process group", async () => {
 
     assert.equal(result.status, "failed");
     assert.equal(result.timedOut, true);
+    assert.ok(result.durationMs >= 1_400);
     assert.equal(control.getRun(result.runId).status, "failed");
+    control.close();
+  } finally {
+    await rm(home, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("timed-out runner waits for SIGKILL and leaves no detached descendant alive", async () => {
+  if (process.platform === "win32") return;
+  const home = await mkdtemp(join(tmpdir(), "superia-descendant-timeout-"));
+  const root = await mkdtemp(join(tmpdir(), "superia-project-"));
+  const pidPath = join(root, "descendant.pid");
+  try {
+    const control = await openControlPlane(home);
+    const project = control.registerProject(scan(root));
+    const descendantScript = "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)";
+    const leaderScript = [
+      "const { spawn } = require('node:child_process')",
+      "const fs = require('node:fs')",
+      `const child = spawn(process.execPath, ['-e', ${JSON.stringify(descendantScript)}], { stdio: 'ignore' })`,
+      `fs.writeFileSync(${JSON.stringify(pidPath)}, String(child.pid))`,
+      "process.on('SIGTERM', () => process.exit(0))",
+      "setInterval(() => {}, 1000)",
+    ].join(";");
+
+    const result = await runManagedProcess({
+      projectId: project.id,
+      provider: "test-runner",
+      command: process.execPath,
+      args: ["-e", leaderScript],
+      cwd: root,
+      timeoutMs: 1_000,
+      terminateGraceMs: 500,
+    }, control);
+
+    const descendantPid = Number((await readFile(pidPath, "utf8")).trim());
+    assert.equal(result.timedOut, true);
+    assert.throws(() => process.kill(descendantPid, 0));
     control.close();
   } finally {
     await rm(home, { recursive: true, force: true });
