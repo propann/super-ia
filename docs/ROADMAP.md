@@ -21,7 +21,10 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - périmètre d'écriture par mission ;
 - snapshot Git avant/après ;
 - diff et rapport de changement archivés ;
-- échec automatique en cas de modification hors périmètre.
+- échec automatique en cas de modification hors périmètre ;
+- reviewer indépendant et structuré ;
+- pipeline builder → validation → review → receipt ;
+- checkpoints atomiques et reprise contrôlée.
 
 ### Bloqué par le matériel ou les comptes
 
@@ -35,11 +38,11 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 
 ### Prochain chantier logiciel
 
-1. reviewer indépendant ;
-2. pipeline builder → validation → review → receipt ;
-3. checkpoints et budget de retries ;
-4. Restic après le test de restauration ;
-5. routeur coût/qualité à partir des benchmarks réels.
+1. budget de retries et détection de boucle ;
+2. taille maximale des diffs et chemins toujours interdits ;
+3. Restic après le test de restauration ;
+4. routeur coût/qualité à partir des benchmarks réels ;
+5. DAG de missions.
 
 ## V0.1 à V0.9 — fondations terminées
 
@@ -93,7 +96,9 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [ ] Podman optionnel pour les tâches à risque élevé ;
 - [ ] filtrage réseau plus fin pour les agents distants.
 
-## V0.13 — contrôle des modifications
+## V0.13 — contrôle, review et pipeline
+
+### Contrôle des modifications
 
 - [x] champ `allowedPaths` dans les missions ;
 - [x] option répétable `--allow-path <glob>` ;
@@ -104,23 +109,44 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [x] plan/review avec zéro modification autorisée ;
 - [x] `AGENT_CHANGES.patch` archivé ;
 - [x] `CHANGE_GUARD.json` archivé ;
-- [x] résultat inclus dans `AGENT_RESULT.json` ;
 - [x] run durable marqué `failed` en cas de violation ;
-- [x] erreur du change guard traitée en fail-closed ;
-- [x] test de bout en bout Codex avec fichier autorisé et interdit ;
-- [x] 32 tests réussis.
+- [x] comportement fail-closed ;
+- [x] tests de bout en bout.
 
-## V0.14 — reviewer et pipeline qualité
+### Reviewer indépendant
 
-- [ ] reviewer différent du builder ;
-- [ ] findings structurés par sévérité ;
-- [ ] pipeline builder → validation → review → receipt ;
-- [ ] checkpoints persistants ;
-- [ ] retries limités ;
-- [ ] détection de boucle ;
+- [x] reviewer différent du builder ;
+- [x] review en lecture seule ;
+- [x] findings structurés par sévérité ;
+- [x] preuve et recommandation obligatoires ;
+- [x] sortie non structurée bloquante ;
+- [x] approbation incohérente corrigée automatiquement ;
+- [x] rapport `REVIEW.json` archivé ;
+- [x] validation humaine conservée.
+
+### Pipeline qualité
+
+- [x] builder → garde Git → validations → reviewer → receipt ;
+- [x] échec bloquant à chaque étape ;
+- [x] receipt enrichi avec garde, patch et review ;
+- [x] checkpoints atomiques ;
+- [x] commande de statut ;
+- [x] reprise avec `--resume` ;
+- [x] reprise après builder sans double exécution ;
+- [x] reprise après review en ne recréant que le receipt ;
+- [x] aucune fusion automatique ;
+- [x] **39 tests réussis**.
+
+## V0.14 — maîtrise des boucles et coûts
+
+- [ ] nombre maximal d'essais ;
+- [ ] budget cumulé par pipeline ;
+- [ ] empreinte de tentative ;
+- [ ] détection d'une correction identique ;
+- [ ] cause d'arrêt enregistrée ;
 - [ ] taille maximale des diffs ;
 - [ ] liste de fichiers toujours interdits ;
-- [ ] aucune fusion automatique.
+- [ ] correction automatique bornée après review.
 
 ## V0.15 — validation Raspberry Pi
 
@@ -144,7 +170,6 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [ ] comparaison de plans et audit croisé ;
 - [ ] routeur coût/capacité/qualité mesurée ;
 - [ ] arrêt d'urgence global ;
-- [ ] reprise automatique contrôlée ;
 - [ ] interface web locale et notifications.
 
 ## V1.0 — publication stable
@@ -156,6 +181,8 @@ La PR ne passe en prête pour revue que lorsque :
 - [ ] Codex et Vibe réels ont produit un receipt valide ;
 - [x] Gitleaks est obligatoire ;
 - [x] les modifications hors périmètre sont bloquées ;
+- [x] le reviewer indépendant est livré ;
+- [x] le pipeline reprend depuis ses checkpoints ;
 - [ ] la sandbox commune est validée sur le noyau du Pi ;
 - [ ] la CI est verte sur le head final ;
 - [ ] les limites restantes sont documentées ;
