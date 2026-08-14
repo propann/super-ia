@@ -4,14 +4,14 @@
 
 Le Raspberry Pi 5 sert de tour de contrôle permanente. Les modèles restent chez leurs fournisseurs officiels ; aucun modèle IA local n'est requis.
 
-## État vérifié — v0.12.0
+## État vérifié — v0.13.0
 
-La CI GitHub valide actuellement :
+La CI GitHub valide :
 
 - Ubuntu 24.04 ;
 - Node.js 22.23.2 et npm 10.9.8 ;
 - compilation TypeScript réussie ;
-- **28 tests réussis, 0 échec** ;
+- **32 tests réussis, 0 échec** ;
 - 0 vulnérabilité npm signalée ;
 - scripts Pi valides ;
 - aucune commande `sudo` dans le paquet Pi.
@@ -19,19 +19,17 @@ La CI GitHub valide actuellement :
 Fonctions principales :
 
 - SQLite WAL multi-projets ;
-- missions, priorités, blocages, dépendances et tableau de suivi ;
+- missions, priorités, blocages, dépendances et suivi ;
 - Git branches et worktrees ;
 - contexte ciblé avec SHA-256 ;
 - runner avec logs, heartbeat, timeout et arrêt des descendants ;
-- adaptateurs Codex et Mistral Vibe ;
-- Gitleaks obligatoire avant tout run réel Codex/Vibe ;
-- **sandbox Bubblewrap obligatoire sous Linux avant tout run réel Codex/Vibe** ;
-- HOME jetable et accès au workspace limité selon le mode ;
-- autotest Bubblewrap destiné au Pi ;
+- Codex et Mistral Vibe ;
+- Gitleaks obligatoire ;
+- Bubblewrap obligatoire sous Linux ;
+- contrôle des fichiers modifiés après chaque agent ;
 - receipts vérifiables ;
 - sauvegardes cohérentes ;
-- daemon et service systemd utilisateur ;
-- console Matrix globale ;
+- daemon, service systemd utilisateur et console Matrix ;
 - roadmap machine-lisible contrôlée par la CI.
 
 Voir [l'état vérifié](docs/STATUS.md).
@@ -55,58 +53,85 @@ Node.js **22.5 ou supérieur** est requis.
 bash install/pi/install.sh
 ```
 
-L'installateur :
+L'installateur compile, teste, initialise `~/.superia`, installe la commande et le service utilisateur, vérifie une sauvegarde et lance l'autotest Bubblewrap lorsqu'il est disponible. Il n'utilise pas `sudo`.
 
-- compile et teste le projet ;
-- initialise `~/.superia` ;
-- installe la commande `superia` ;
-- crée un service systemd utilisateur durci ;
-- vérifie la première sauvegarde ;
-- détecte Gitleaks et Bubblewrap ;
-- exécute l'autotest Bubblewrap lorsqu'il est présent ;
-- écrit `~/.superia/sandbox-status.json` ;
-- n'utilise pas `sudo`.
-
-Le centre de contrôle reste installable sans Gitleaks ou Bubblewrap, mais les agents distants restent alors bloqués par défaut.
+Sans Gitleaks ou Bubblewrap, le centre de contrôle reste installable mais les agents réels sont bloqués par défaut.
 
 ## Flux principal
 
 ```bash
 superia init
-superia task create "Ajouter une authentification locale"
+superia task create "Modifier le module d'authentification"
 
 superia task update TASK-0001 \
   --priority high \
-  --owner max \
   --provider codex-cli \
-  --due 2026-08-20 \
-  --tag security \
+  --allow-path "src/auth/**" \
+  --allow-path "tests/auth/**" \
   --accept "tests réussis"
 
-superia task board
 superia worktree TASK-0001
 superia context build TASK-0001 --max-bytes 300000
 superia security scan --required
 superia security sandbox-check
-superia agent run codex TASK-0001 --mode plan
+superia agent run codex TASK-0001 --mode build
 superia validate
 superia receipt create <RUN-ID>
 ```
 
-## Deux préflights obligatoires
+## Trois barrières autour d'un agent
 
-Chaque run réel Codex ou Vibe vérifie :
+### 1. Gitleaks
 
 ```text
-Gitleaks absent     → agent refusé
-finding détecté     → agent refusé
-Bubblewrap absent   → agent refusé
-préflights propres  → agent autorisé
+Gitleaks absent  → agent refusé
+finding          → agent refusé
+scan propre      → préflight validé
 ```
 
-Les résultats apparaissent dans les métadonnées et dans `AGENT_RESULT.json`.
+### 2. Bubblewrap
 
-Dérogations exceptionnelles :
+- vrai HOME non monté ;
+- HOME jetable `/home/superia` ;
+- système en lecture seule ;
+- plan/review en lecture seule ;
+- build limité au worktree ;
+- état fournisseur limité ;
+- réseau isolable ;
+- dérogation explicite et journalisée.
+
+```bash
+superia security sandbox-check --json
+```
+
+La CI valide la politique avec des mocks. Le test noyau réel reste à exécuter sur le Pi.
+
+### 3. Change guard
+
+Un build exige au moins un `--allow-path`.
+
+Après le run, Super IA compare l'état Git avant/après et produit :
+
+```text
+AGENT_CHANGES.patch
+CHANGE_GUARD.json
+AGENT_RESULT.json
+```
+
+Une modification hors périmètre fait échouer le run, même lorsque l'agent renvoie le code 0.
+
+Exemple :
+
+```bash
+superia task update TASK-0001 \
+  --allow-path "src/**" \
+  --allow-path "tests/**" \
+  --allow-path "package.json"
+```
+
+Voir [Contrôle des modifications](docs/CHANGE_GUARD.md).
+
+## Dérogations exceptionnelles
 
 ```bash
 superia agent run codex TASK-0001 \
@@ -116,36 +141,6 @@ superia agent run codex TASK-0001 \
 ```
 
 Elles produisent un état `waived` et des événements durables. Une dérogation ne vaut jamais validation.
-
-Le mode `--dry-run` ne lance aucun fournisseur ni scanner :
-
-```bash
-superia agent run codex TASK-0001 --mode plan --dry-run
-```
-
-## Sandbox Bubblewrap
-
-Politique actuelle :
-
-- vrai HOME non monté ;
-- HOME jetable `/home/superia` ;
-- système et exécutables en lecture seule ;
-- plan/review : dépôt ou worktree en lecture seule ;
-- build : worktree en lecture-écriture ;
-- sortie Codex montée individuellement en écriture ;
-- état fournisseur limité à `~/.superia/providers/` ;
-- capacités supprimées ;
-- namespaces utilisateur, PID, IPC, UTS et cgroup demandés ;
-- réseau isolable pour les tâches qui n'ont pas besoin d'Internet.
-
-Codex et Vibe gardent actuellement le réseau de l'hôte pour joindre leurs services officiels.
-
-```bash
-superia security sandbox-check
-superia security sandbox-check --json
-```
-
-La CI vérifie la politique avec des mocks. Le test noyau réel reste à exécuter sur le Pi 5. Voir [Sandbox Bubblewrap](docs/SANDBOX.md).
 
 ## Suivi des tâches
 
@@ -158,34 +153,7 @@ superia task update TASK-0001 --status blocked --priority critical
 superia task update TASK-0002 --depends TASK-0001
 ```
 
-Une mission conserve statut, priorité, responsable, fournisseur, échéance, tags, dépendances, critères d'acceptation et notes.
-
-Documentation de pilotage :
-
-- [Feuille de route](docs/ROADMAP.md)
-- [Registre JSON](docs/ROADMAP_TRACKER.json)
-- [Suivi opérationnel](docs/TASK_TRACKER.md)
-
-## Agents
-
-### Codex
-
-- sandbox native conservée ;
-- sandbox externe Bubblewrap ;
-- plan/review en lecture seule ;
-- build uniquement dans un worktree ;
-- prompt par stdin ;
-- sortie JSONL ;
-- contournement de sandbox interdit.
-
-### Mistral Vibe
-
-- sandbox externe Bubblewrap ;
-- plan/review avec le profil `plan` ;
-- build avec `accept-edits` ;
-- aucun shell ;
-- prix, tokens et tours plafonnés ;
-- prompt absent d'`argv`.
+Une mission conserve : statut, priorité, responsable, fournisseur, échéance, tags, dépendances, critères d'acceptation, chemins autorisés et notes.
 
 ## Contrôle global
 
@@ -197,20 +165,6 @@ superia run list
 superia events --limit 100
 superia daemon --once
 superia matrix
-```
-
-Données principales :
-
-```text
-~/.superia/
-├── control.sqlite
-├── events/events.jsonl
-├── runs/
-├── security/
-├── providers/
-├── backups/
-├── sandbox-status.json
-└── daemon-status.json
 ```
 
 ## Sauvegardes et receipts
@@ -225,34 +179,38 @@ superia receipt verify ~/.superia/runs/<RUN-ID>/RECEIPT.json
 
 L'approbation humaine reste obligatoire. Super IA ne fusionne jamais automatiquement.
 
+## État de la feuille de route
+
+| État | Nombre |
+|---|---:|
+| Terminé | 8 |
+| En cours | 1 |
+| Planifié | 12 |
+| Bloqué | 2 |
+
+`SIA-204` — contrôle des modifications — est terminé. `SIA-203` — Bubblewrap — attend encore la preuve noyau réelle du Pi.
+
 ## Prochaines priorités
 
-1. terminer l'autotest Bubblewrap réel sur le Pi ;
-2. contrôler les fichiers modifiés après chaque agent ;
-3. installer v0.12 et tester reprise/restauration sur le Pi 5 ;
-4. tester Codex et Vibe réels sous Bubblewrap ;
-5. construire un reviewer indépendant et le pipeline complet ;
-6. intégrer Restic ;
-7. construire le routeur coût/qualité mesuré.
-
-## Limites actuelles
-
-- installation matérielle Pi non encore validée ;
-- fournisseurs réels non encore testés dans ce dépôt ;
-- politique Bubblewrap testée en CI avec mocks, frontière noyau réelle non encore prouvée ;
-- réseau distant non filtré par domaine ;
-- contrôle post-run des chemins modifiés manquant ;
-- reviewer, DAG, routeur et interface web non livrés ;
-- restauration automatisée et Restic non livrés.
+1. lancer l'autotest Bubblewrap réel sur le Pi ;
+2. installer v0.13 sur le Pi 5 ;
+3. construire le reviewer indépendant ;
+4. relier builder → validation → review → receipt ;
+5. tester reprise et restauration ;
+6. tester Codex et Vibe réels ;
+7. intégrer Restic ;
+8. construire le routeur coût/qualité.
 
 ## Documentation
 
 - [État vérifié](docs/STATUS.md)
 - [Feuille de route](docs/ROADMAP.md)
+- [Registre JSON](docs/ROADMAP_TRACKER.json)
 - [Suivi des tâches](docs/TASK_TRACKER.md)
 - [Plan de contrôle](docs/CONTROL_PLANE.md)
 - [Adaptateurs](docs/AGENT_ADAPTERS.md)
 - [Sandbox Bubblewrap](docs/SANDBOX.md)
+- [Contrôle des modifications](docs/CHANGE_GUARD.md)
 - [Receipts](docs/RECEIPTS.md)
 - [Installation Pi](docs/PI_INSTALL.md)
 - [Sécurité](docs/SECURITY.md)
