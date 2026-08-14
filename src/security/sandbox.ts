@@ -88,8 +88,12 @@ export async function prepareSandboxInvocation(
   };
 
   const statePaths = [...new Set((request.sandbox.statePaths ?? []).map((path) => resolve(path)))];
+  const writablePaths = [...new Set((request.sandbox.writablePaths ?? []).map((path) => resolve(path)))];
   const requestedReadOnly = [...new Set((request.sandbox.readOnlyPaths ?? []).map((path) => resolve(path)))];
   for (const path of statePaths) await mkdir(path, { recursive: true });
+  for (const path of writablePaths) {
+    if (!await pathExists(path)) throw new Error(`Chemin d'écriture sandbox introuvable : ${path}`);
+  }
   const commandMounts = await executableMounts(request.command);
   const readOnlyPaths = [...new Set([...commandMounts, ...requestedReadOnly])]
     .filter((path) => path !== resolve(request.cwd));
@@ -170,6 +174,9 @@ export async function prepareSandboxInvocation(
     request.sandbox.workspaceAccess === "read-write" ? "--bind" : "--ro-bind",
     workspace,
     workspace,
+  );
+  for (const path of writablePaths) args.push("--bind", path, path);
+  args.push(
     ...setEnvironmentArguments(env),
     "--chdir",
     workspace,
@@ -185,6 +192,7 @@ export async function prepareSandboxInvocation(
     workspaceAccess: request.sandbox.workspaceAccess,
     ephemeralHome: true,
     statePaths,
+    writablePaths,
     readOnlyPaths,
   };
 
