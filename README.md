@@ -4,14 +4,14 @@
 
 Le Raspberry Pi 5 sert de tour de contrôle permanente. Les modèles restent chez leurs fournisseurs officiels ; aucun modèle IA local n'est requis.
 
-## État vérifié — v0.13.0
+## État vérifié — v0.14.0
 
 La CI GitHub valide :
 
 - Ubuntu 24.04 ;
 - Node.js 22.23.2 et npm 10.9.8 ;
 - compilation TypeScript réussie ;
-- **39 tests réussis, 0 échec** ;
+- **44 tests réussis, 0 échec** ;
 - 0 vulnérabilité npm signalée ;
 - scripts Pi valides ;
 - aucune commande `sudo` dans le paquet Pi.
@@ -19,17 +19,17 @@ La CI GitHub valide :
 Fonctions principales :
 
 - SQLite WAL multi-projets ;
-- missions, priorités, blocages, dépendances et suivi ;
+- missions, dépendances, priorités, blocages et suivi ;
 - Git branches et worktrees ;
 - contexte ciblé avec SHA-256 ;
 - runner avec logs, heartbeat, timeout et arrêt des descendants ;
 - Codex et Mistral Vibe ;
-- Gitleaks obligatoire ;
-- Bubblewrap obligatoire sous Linux ;
+- Gitleaks et Bubblewrap obligatoires avant les agents réels ;
 - contrôle des fichiers modifiés après chaque agent ;
 - reviewer indépendant et structuré ;
 - pipeline builder → validation → review → receipt ;
 - checkpoints atomiques et reprise contrôlée ;
+- corrections explicites, bornées et protégées contre les boucles ;
 - receipts vérifiables ;
 - sauvegardes cohérentes ;
 - daemon, service systemd utilisateur et console Matrix ;
@@ -77,7 +77,10 @@ superia worktree TASK-0001
 
 superia pipeline run TASK-0001 \
   --builder codex \
-  --reviewer vibe
+  --reviewer vibe \
+  --max-attempts 3 \
+  --max-price 0.25 \
+  --max-total-price 0.75
 ```
 
 Le sens inverse est pris en charge :
@@ -129,6 +132,43 @@ superia pipeline run TASK-0001 \
 ```
 
 Une reprise ne relance pas une étape déjà terminée. Super IA refuse de relancer silencieusement un builder si aucun checkpoint builder complet n'existe.
+
+### Corriger une review
+
+Une nouvelle tentative n'est jamais automatique :
+
+```bash
+superia pipeline run TASK-0001 \
+  --builder codex \
+  --reviewer vibe \
+  --retry
+```
+
+Le retry est accepté uniquement après `changes-requested`. La review précédente est transmise au builder par fichier et n'apparaît pas dans la ligne de commande.
+
+Les plafonds sont figés au premier lancement :
+
+```text
+maxAttempts
+maxTotalPriceUsd
+reservedPerAttemptUsd
+```
+
+Chaque builder terminé consomme une tentative. Chaque patch reçoit une empreinte SHA-256. Un patch déjà produit arrête la boucle avant une nouvelle validation ou review.
+
+Causes d'arrêt possibles :
+
+```text
+approved
+changes-requested
+review-blocked
+retry-limit
+price-limit
+loop-detected
+technical-failure
+```
+
+Le prix affiché est un **plafond Vibe réservé**, pas une dépense réelle supposée.
 
 Voir [Pipeline multi-agent](docs/PIPELINE.md).
 
@@ -234,21 +274,21 @@ Les receipts incluent les logs, le contexte, le change guard, le patch, les vali
 
 | État | Nombre |
 |---|---:|
-| Terminé | 10 |
+| Terminé | 11 |
 | En cours | 1 |
-| Planifié | 10 |
+| Planifié | 9 |
 | Bloqué | 2 |
 
-`SIA-301` et `SIA-302` sont terminés. `SIA-203` — Bubblewrap — attend encore la preuve noyau réelle du Pi.
+Le milestone pipeline multi-agent est terminé. `SIA-203` — Bubblewrap — attend encore la preuve noyau réelle du Pi.
 
 ## Prochaines priorités
 
-1. limiter les retries et détecter les boucles ;
-2. lancer l'autotest Bubblewrap réel sur le Pi ;
-3. installer v0.13 sur le Pi 5 ;
-4. tester reprise et restauration matérielles ;
-5. tester Codex et Vibe réels ;
-6. intégrer Restic ;
+1. lancer l'autotest Bubblewrap réel sur le Pi ;
+2. installer v0.14 sur le Pi 5 ;
+3. tester reprise et restauration matérielles ;
+4. tester Codex et Vibe réels ;
+5. intégrer Restic ;
+6. renforcer les tailles de diff et chemins toujours interdits ;
 7. construire le routeur coût/qualité ;
 8. construire le DAG de missions.
 
