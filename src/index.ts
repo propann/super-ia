@@ -4,31 +4,45 @@ import { inspectLocalTools, inspectProviders } from "./core/doctor.js";
 import { scanRepository } from "./core/repository-scanner.js";
 import { createTask, getTask, listTasks } from "./core/task-store.js";
 import { createWorktree } from "./core/worktree-manager.js";
+import { handleControlCommand } from "./control/cli.js";
+import { syncRepositoryToGlobalControl } from "./control/repository-sync.js";
 import { providerCatalog } from "./providers/catalog.js";
 import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
 
 function printHelp(): void {
-  console.log(`Super IA v0.3.0
+  console.log(`Super IA v0.4.0
 
 Usage:
-  superia matrix [--once]                Ouvre la console de contrôle Matrix
-  superia doctor [--json]                Détecte les IA et outils locaux
-  superia providers [--json]             Affiche le catalogue des fournisseurs
-  superia local [--json]                 Affiche les outils locaux détectés
-  superia scan [--json]                  Analyse le dépôt courant
-  superia init                           Initialise .superia/config.json
-  superia task create <objectif>         Crée une mission persistante
-  superia task list [--json]             Liste les missions
-  superia task show <TASK-ID> [--json]   Affiche une mission
-  superia worktree <TASK-ID> [--dry-run] Crée son worktree isolé
-  superia help                           Affiche cette aide
+  superia matrix [--once]                       Ouvre la console de contrôle Matrix
+  superia doctor [--json]                       Détecte les IA et outils locaux
+  superia providers [--json]                    Affiche le catalogue des fournisseurs
+  superia local [--json]                        Affiche les outils locaux détectés
+  superia scan [--json]                         Analyse le dépôt courant
+  superia init                                  Initialise le dépôt et le plan de contrôle
+  superia control init|status [--json]          Initialise ou inspecte SQLite WAL
+  superia project add [path] [--json]           Enregistre un dépôt dans le registre global
+  superia project sync [path] [--json]          Resynchronise projet et missions JSON
+  superia project list [--json]                 Liste tous les projets suivis
+  superia project show <PROJECT-ID> [--json]    Affiche projet, missions et runs
+  superia task create <objectif>                Crée une mission persistante
+  superia task list [--json]                    Liste les missions du dépôt
+  superia task show <TASK-ID> [--json]          Affiche une mission
+  superia worktree <TASK-ID> [--dry-run]        Crée son worktree isolé
+  superia run start <provider> [TASK-ID]        Ouvre un run durable
+  superia run list [--project PROJECT-ID]       Liste les runs
+  superia run heartbeat <RUN-ID>                Rafraîchit le heartbeat
+  superia run finish <RUN-ID> <statut>          Termine un run
+  superia events [--limit N] [--json]           Consulte le journal d'événements
+  superia recover [--stale-minutes N]           Marque les runs abandonnés
+  superia help                                  Affiche cette aide
 
 Principes:
   - aucune fusion automatique sans validation humaine
   - API désactivées par défaut
   - agents d'écriture confinés dans des worktrees Git
   - secrets expurgés avant tout envoi distant
+  - état global durable dans SUPERIA_HOME ou ~/.superia
 `);
 }
 
@@ -69,6 +83,8 @@ function printScan(scan: Awaited<ReturnType<typeof scanRepository>>): void {
 async function main(): Promise<void> {
   const [command = "help", ...args] = process.argv.slice(2);
   const json = args.includes("--json");
+
+  if (await handleControlCommand(command, args, json, process.cwd())) return;
 
   if (command === "matrix" || command === "cockpit") {
     await runMatrixConsole(process.cwd(), { once: args.includes("--once") });
@@ -132,7 +148,9 @@ async function main(): Promise<void> {
   if (command === "init") {
     const scan = await scanRepository(process.cwd());
     const result = await initializeProject(scan.root);
+    const control = await syncRepositoryToGlobalControl(scan.root);
     console.log(result.created ? `Configuration créée : ${result.path}` : `Configuration déjà présente : ${result.path}`);
+    console.log(`Projet enregistré : ${control.project.id} (${control.tasksSynced} mission(s) synchronisée(s))`);
     return;
   }
 
@@ -141,6 +159,7 @@ async function main(): Promise<void> {
     const scan = await scanRepository(process.cwd());
     if (action === "create") {
       const task = await createTask(scan, taskArgs.join(" "));
+      await syncRepositoryToGlobalControl(scan.root);
       console.log(json ? JSON.stringify(task, null, 2) : `${task.id} créée sur ${task.branchName}`);
       return;
     }
@@ -168,8 +187,10 @@ async function main(): Promise<void> {
     if (!id) throw new Error("Usage : superia worktree <TASK-ID> [--dry-run]");
     const scan = await scanRepository(process.cwd());
     const task = await getTask(scan.root, id);
-    const result = await createWorktree(task, args.includes("--dry-run"));
-    console.log(args.includes("--dry-run") ? result.command.join(" ") : `Worktree créé : ${result.path}`);
+    const dryRun = args.includes("--dry-run");
+    const result = await createWorktree(task, dryRun);
+    if (!dryRun) await syncRepositoryToGlobalControl(scan.root);
+    console.log(dryRun ? result.command.join(" ") : `Worktree créé : ${result.path}`);
     return;
   }
 
