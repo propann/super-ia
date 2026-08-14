@@ -20,9 +20,9 @@
 - [x] définir la mémoire Git + SQLite + artefacts ;
 - [x] définir le pipeline multi-agent déterministe ;
 - [x] créer un protocole de benchmark par dépôt et par rôle ;
-- [ ] construire un registre séparé des outils locaux et moteurs d'inférence ;
-- [ ] détecter Ollama, llama.cpp, Repomix, Aider, mini-SWE-agent et OpenCode ;
-- [ ] générer un rapport de capacité du Pi 5.
+- [x] construire un registre séparé des outils locaux et moteurs d'inférence ;
+- [x] détecter Ollama, llama.cpp, Repomix, Aider, mini-SWE-agent, OpenCode, sandboxes et sauvegardes ;
+- [ ] générer un rapport de capacité détaillé du Pi 5.
 
 ## V0.2 — première mission réelle
 
