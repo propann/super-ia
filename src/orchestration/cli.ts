@@ -75,6 +75,17 @@ export async function handlePipelineCommand(
   if (action !== "run" || !taskId) {
     throw new Error("Usage : superia pipeline run <TASK-ID> --builder codex|vibe --reviewer codex|vibe [--resume|--retry]");
   }
+
+  const dryRun = args.includes("--dry-run");
+  const maxPriceUsd = numberOption(args, "--max-price", 0.01, 5);
+  const maxTotalPriceUsd = numberOption(args, "--max-total-price", 0.01, 50);
+  if (!dryRun && maxPriceUsd === undefined) {
+    throw new Error("Un pipeline réel utilisant Vibe exige un plafond explicite --max-price.");
+  }
+  if (!dryRun && maxTotalPriceUsd === undefined) {
+    throw new Error("Un pipeline réel exige un plafond cumulé explicite --max-total-price.");
+  }
+
   const options: PipelineOptions = {
     builder: provider(flagValue(args, "--builder"), "--builder"),
     reviewer: provider(flagValue(args, "--reviewer"), "--reviewer"),
@@ -84,10 +95,10 @@ export async function handlePipelineCommand(
     maxContextBytes: numberOption(args, "--max-context-bytes", 1, 2_000_000),
     maxTurns: numberOption(args, "--max-turns", 1, 50),
     maxTokens: numberOption(args, "--max-tokens", 1, 500_000),
-    maxPriceUsd: numberOption(args, "--max-price", 0.01, 5),
+    maxPriceUsd,
     maxAttempts: numberOption(args, "--max-attempts", 1, 10),
-    maxTotalPriceUsd: numberOption(args, "--max-total-price", 0.01, 50),
-    dryRun: args.includes("--dry-run"),
+    maxTotalPriceUsd,
+    dryRun,
     resume: args.includes("--resume"),
     retry: args.includes("--retry"),
     allowWithoutGitleaks: args.includes("--allow-without-gitleaks"),
