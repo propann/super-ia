@@ -39,6 +39,9 @@ export async function executeVibeTask(repositoryDirectory: string, taskId: strin
   const mode = resolveMode(options.mode);
   if (mode === "build" && !task.worktreePath) throw new Error(`La mission ${task.id} doit posséder un worktree avant le mode build.`);
   if (mode === "build" && !task.allowedPaths.length) throw new Error(`La mission ${task.id} doit déclarer au moins un --allow-path avant le mode build.`);
+  if (!options.dryRun && options.maxPriceUsd === undefined) {
+    throw new Error("Un run Vibe réel exige un plafond explicite --max-price.");
+  }
   const maxPriceUsd = options.maxPriceUsd ?? 0.25;
   if (!Number.isFinite(maxPriceUsd) || maxPriceUsd <= 0 || maxPriceUsd > 5) throw new Error("Le budget Vibe doit être supérieur à 0 et inférieur ou égal à 5 USD.");
   const budget = { maxTurns: positiveInteger(options.maxTurns, 8, 50, "maxTurns"), maxTokens: positiveInteger(options.maxTokens, 50_000, 500_000, "maxTokens"), maxPriceUsd };
@@ -59,7 +62,7 @@ export async function executeVibeTask(repositoryDirectory: string, taskId: strin
   });
   assertSafeVibeInvocation(invocation);
   const securityPreflight = await runAgentSecurityPreflight({ cwd, projectId: synchronized.project.id, taskId: task.id, provider: invocation.provider, dryRun: options.dryRun, allowWithoutGitleaks: options.allowWithoutGitleaks });
-  const sandbox = await prepareAgentSandbox({ projectId: synchronized.project.id, taskId: task.id, provider: invocation.provider, mode, dryRun: options.dryRun, allowWithoutBubblewrap: options.allowWithoutBubblewrap });
+  const sandbox = await prepareAgentSandbox({ projectId: synchronized.project.id, taskId: task.id, provider: invocation.provider, mode, workspaceRoot: cwd, dryRun: options.dryRun, allowWithoutBubblewrap: options.allowWithoutBubblewrap });
   invocation.metadata.securityPreflight = securityPreflight;
   invocation.metadata.sandboxPreflight = sandbox.preflight;
   invocation.metadata.allowedPaths = mode === "build" ? task.allowedPaths : [];
