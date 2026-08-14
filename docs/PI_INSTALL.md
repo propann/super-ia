@@ -248,11 +248,12 @@ Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipt
 ## Ce que la CI prouve
 
 - build TypeScript ;
-- **78 tests réussis** sur le head vérifié ;
+- **79 tests réussis** sur le head vérifié ;
 - audit npm sans vulnérabilité signalée ;
 - DAG, readiness, réseau et sauvegardes ;
 - préflight Gitleaks ;
 - construction Bubblewrap et masquage des fichiers privés ;
+- conservation exacte des chemins Git ;
 - contrôle de périmètre Git ;
 - reviewer indépendant ;
 - pipeline, checkpoints et budgets ;
