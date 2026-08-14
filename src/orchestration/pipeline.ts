@@ -18,6 +18,7 @@ import {
 import { loadPipelineCheckpoint, savePipelineCheckpoint } from "./state.js";
 import type {
   AgentRunner,
+  PipelineAttempt,
   PipelineCheckpoint,
   PipelineOptions,
   PipelinePreview,
@@ -138,6 +139,29 @@ async function recordLegacyCompletedAttempt(checkpoint: PipelineCheckpoint, opti
   });
 }
 
+function builderAttempt(checkpoint: PipelineCheckpoint, runId: string): PipelineAttempt | undefined {
+  return checkpoint.attempts?.find((attempt) => attempt.builderRunId === runId);
+}
+
+function recordBuilderAttempt(
+  checkpoint: PipelineCheckpoint,
+  build: AgentExecutionResult,
+  patchSha256: string,
+  reservedPriceCeilingUsd: number,
+): PipelineAttempt {
+  const existing = builderAttempt(checkpoint, build.process.runId);
+  if (existing) return existing;
+  const attempt: PipelineAttempt = {
+    number: (checkpoint.attempts?.length ?? 0) + 1,
+    builderRunId: build.process.runId,
+    patchSha256,
+    reservedPriceCeilingUsd,
+    completedAt: now(),
+  };
+  appendAttempt(checkpoint, attempt);
+  return attempt;
+}
+
 export async function runControlledPipeline(
   repositoryDirectory: string,
   taskId: string,
@@ -184,9 +208,7 @@ export async function runControlledPipeline(
       throw new Error("Reprise refusée : aucun checkpoint builder complet. Inspecter ou réinitialiser le worktree manuellement.");
     }
   } else {
-    if (existing) {
-      throw new Error(`Un état de pipeline existe déjà pour ${task.id}. Utiliser --resume ou --retry.`);
-    }
+    if (existing) throw new Error(`Un état de pipeline existe déjà pour ${task.id}. Utiliser --resume ou --retry.`);
     const timestamp = now();
     const budget = retryBudget(options);
     if (budget.reservedPerAttemptUsd > budget.maxTotalPriceUsd) {
@@ -235,15 +257,12 @@ export async function runControlledPipeline(
     }
 
     const patchSha256 = await fileSha256(build.changeGuard.diffPath);
-    const repeated = detectRepeatedPatch(checkpoint.attempts ?? [], patchSha256);
+    const currentAttempt = builderAttempt(checkpoint, build.process.runId);
+    const repeated = currentAttempt ? undefined : detectRepeatedPatch(checkpoint.attempts ?? [], patchSha256);
+    const attempt = currentAttempt ?? recordBuilderAttempt(checkpoint, build, patchSha256, budget.reservedPerAttemptUsd);
+    checkpoint.updatedAt = now();
+    await savePipelineCheckpoint(checkpoint);
     if (repeated) {
-      appendAttempt(checkpoint, {
-        number: (checkpoint.attempts?.length ?? 0) + 1,
-        builderRunId: build.process.runId,
-        patchSha256,
-        reservedPriceCeilingUsd: budget.reservedPerAttemptUsd,
-        completedAt: now(),
-      });
       checkpoint.status = "completed";
       checkpoint.stopReason = "loop-detected";
       checkpoint.error = `Patch identique à la tentative ${repeated.number}.`;
@@ -293,20 +312,10 @@ export async function runControlledPipeline(
     checkpoint.review = review;
     checkpoint.reviewPath = reviewPath;
     checkpoint.stage = "review-completed";
-    checkpoint.updatedAt = now();
-
-    if (!(checkpoint.attempts ?? []).some((attempt) => attempt.builderRunId === build.process.runId)) {
-      appendAttempt(checkpoint, {
-        number: (checkpoint.attempts?.length ?? 0) + 1,
-        builderRunId: build.process.runId,
-        reviewerRunId: reviewExecution.process.runId,
-        patchSha256,
-        verdict: review.verdict,
-        reviewPath,
-        reservedPriceCeilingUsd: budget.reservedPerAttemptUsd,
-        completedAt: now(),
-      });
-    }
+    attempt.reviewerRunId = reviewExecution.process.runId;
+    attempt.verdict = review.verdict;
+    attempt.reviewPath = reviewPath;
+    attempt.completedAt = now();
     checkpoint.stopReason = review.verdict === "approve"
       ? "approved"
       : review.verdict === "blocked"
@@ -314,6 +323,7 @@ export async function runControlledPipeline(
         : (checkpoint.attempts?.length ?? 0) >= budget.maxAttempts
           ? "retry-limit"
           : "changes-requested";
+    checkpoint.updatedAt = now();
     await savePipelineCheckpoint(checkpoint);
 
     let receiptPath = checkpoint.receiptPath;
