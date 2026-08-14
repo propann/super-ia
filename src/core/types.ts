@@ -3,6 +3,8 @@ export type CostProfile = "included" | "free-tier" | "low-cost" | "local" | "pai
 export type AutomationLevel = "full" | "assisted" | "manual";
 export type ProviderStatus = "ready" | "planned" | "experimental" | "conditional";
 export type TaskStatus = "planned" | "ready" | "running" | "review" | "done" | "failed" | "cancelled";
+export type LocalToolCategory = "vcs" | "search" | "utility" | "database" | "context" | "agent" | "inference" | "sandbox" | "container" | "backup";
+export type LocalToolStatus = "required" | "recommended" | "optional" | "experimental";
 
 export interface ProviderDefinition {
   id: string;
@@ -26,6 +28,22 @@ export interface ProviderDefinition {
 
 export interface ProviderCheck extends ProviderDefinition {
   installed: boolean | null;
+  executablePath?: string;
+}
+
+export interface LocalToolDefinition {
+  id: string;
+  name: string;
+  commandCandidates: string[];
+  category: LocalToolCategory;
+  status: LocalToolStatus;
+  lightweight: boolean;
+  notes: string;
+}
+
+export interface LocalToolCheck extends LocalToolDefinition {
+  installed: boolean;
+  detectedCommand?: string;
   executablePath?: string;
 }
 
