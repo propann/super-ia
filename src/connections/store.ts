@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { ensureControlHome } from "../control/home.js";
 import { findExecutable } from "../utils/command.js";
 import { defaultConnections } from "./catalog.js";
+import { evaluateEndpointPolicy } from "./network-policy.js";
 import type { AiConnection, ConnectionCheck, ConnectionKind, ConnectionState, ConnectionStore } from "./types.js";
 
 const kinds: ConnectionKind[] = ["cli-session", "api-key-env", "openai-compatible", "cloud-identity", "mcp-stdio", "mcp-http", "acp-stdio", "a2a-http", "ssh-cli", "web-assisted", "local-endpoint"];
@@ -13,18 +14,15 @@ function secretDirectory(root: string): string { return join(root, "secrets"); }
 function validId(value: string): boolean { return /^[a-z0-9][a-z0-9._-]{1,63}$/.test(value); }
 function validEnv(value: string): boolean { return /^[A-Z][A-Z0-9_]{1,127}$/.test(value); }
 
-function validateUrl(value: string | undefined, label: string): void {
-  if (!value) return;
-  const parsed = new URL(value);
-  if (!["http:", "https:"].includes(parsed.protocol)) throw new Error(`${label} doit utiliser HTTP ou HTTPS.`);
-}
-
 export function validateConnection(connection: AiConnection): void {
   if (!validId(connection.id)) throw new Error(`Identifiant de connexion invalide : ${connection.id}`);
   if (!connection.label.trim()) throw new Error("Le libellé de connexion est requis.");
   if (!kinds.includes(connection.kind)) throw new Error(`Type de connexion invalide : ${connection.kind}`);
   if (connection.requiredEnv.some((name) => !validEnv(name))) throw new Error("Nom de variable d'environnement invalide.");
-  if (["api-key-env", "openai-compatible", "mcp-http", "a2a-http", "local-endpoint"].includes(connection.kind)) validateUrl(connection.baseUrl, "baseUrl");
+  if (connection.baseUrl) {
+    const decision = evaluateEndpointPolicy(connection);
+    if (!decision.allowed) throw new Error(`baseUrl refusée : ${decision.reasons.join(" ; ")}`);
+  }
   if (["cli-session", "mcp-stdio", "acp-stdio", "ssh-cli"].includes(connection.kind) && connection.enabled && !connection.command) {
     throw new Error(`La connexion ${connection.id} exige une commande.`);
   }
