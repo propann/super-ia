@@ -85,7 +85,10 @@ case "$PHASE" in
     ;;
   system)
     step "Dépendances système"
-    exec bash "$SCRIPT_DIR/system-packages-debian.sh" --profile "$PROFILE" $([ "$WITH_CONTAINERS" -eq 1 ] && printf '%s' '--with-containers') $([ "$DRY_RUN" -eq 1 ] && printf '%s' '--dry-run')
+    args=(--profile "$PROFILE")
+    [ "$WITH_CONTAINERS" -eq 0 ] || args+=(--with-containers)
+    [ "$DRY_RUN" -eq 0 ] || args+=(--dry-run)
+    exec bash "$SCRIPT_DIR/system-packages-debian.sh" "${args[@]}"
     ;;
   user)
     [ "$(id -u)" -ne 0 ] || fail "la phase user doit être lancée avec le compte utilisateur, pas root"
