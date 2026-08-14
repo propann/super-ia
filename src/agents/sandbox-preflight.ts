@@ -36,6 +36,7 @@ export async function prepareAgentSandbox(input: {
   taskId: string;
   provider: string;
   mode: AgentMode;
+  writablePaths?: string[];
   dryRun?: boolean;
   allowWithoutBubblewrap?: boolean;
 }): Promise<AgentSandboxPreparation> {
@@ -87,11 +88,9 @@ export async function prepareAgentSandbox(input: {
   const paths = await ensureControlHome();
   const providerState = join(paths.root, "providers", input.provider);
   await mkdir(providerState, { recursive: true });
-  const env = input.provider === "codex-cli"
-    ? { CODEX_HOME: providerState }
-    : input.provider === "mistral-vibe"
-      ? { VIBE_HOME: providerState }
-      : {};
+  const env: Record<string, string> = {};
+  if (input.provider === "codex-cli") env.CODEX_HOME = providerState;
+  if (input.provider === "mistral-vibe") env.VIBE_HOME = providerState;
   const allowedEnvKeys = Object.keys(env);
   const preflight: SandboxPreflightResult = {
     status: "active",
@@ -110,6 +109,7 @@ export async function prepareAgentSandbox(input: {
       network,
       workspaceAccess: access,
       ephemeralHome: true,
+      writablePaths: input.writablePaths?.length ?? 0,
     },
   });
   return {
@@ -120,6 +120,7 @@ export async function prepareAgentSandbox(input: {
       network,
       workspaceAccess: access,
       statePaths: [providerState],
+      writablePaths: input.writablePaths,
     },
     env,
     allowedEnvKeys,
