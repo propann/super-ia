@@ -112,7 +112,8 @@ export async function executeVibeTask(
       stdin: invocation.stdin,
       timeoutMs,
       metadata: invocation.metadata,
-      allowedEnvKeys: ["MISTRAL_API_KEY", "VIBE_HOME"],
+      env: options.model ? { VIBE_ACTIVE_MODEL: options.model } : undefined,
+      allowedEnvKeys: ["MISTRAL_API_KEY", "VIBE_HOME", "VIBE_ACTIVE_MODEL"],
     }, control);
     const stdout = await readFile(processResult.stdoutPath, "utf8");
     const parsed = parseJsonLines(stdout);
@@ -142,6 +143,7 @@ export async function executeVibeTask(
       parsedEvents: result.parsedEvents,
       invalidEventLines: result.invalidEventLines,
       budget,
+      model: options.model ?? null,
       lastMessagePath: result.lastMessagePath,
       normalizedEventsPath: result.normalizedEventsPath,
     }, null, 2)}\n`, "utf8");
