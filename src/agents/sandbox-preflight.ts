@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { openControlPlane } from "../control/control-plane.js";
 import { ensureControlHome } from "../control/home.js";
 import type { ManagedSandboxRequest } from "../runtime/types.js";
+import { discoverSensitiveWorkspacePaths } from "../security/workspace-mask.js";
 import { findExecutable } from "../utils/command.js";
 import type { AgentMode, SandboxPreflightResult } from "./types.js";
 
@@ -36,6 +37,7 @@ export async function prepareAgentSandbox(input: {
   taskId: string;
   provider: string;
   mode: AgentMode;
+  workspaceRoot?: string;
   writablePaths?: string[];
   dryRun?: boolean;
   allowWithoutBubblewrap?: boolean;
@@ -85,6 +87,10 @@ export async function prepareAgentSandbox(input: {
     };
   }
 
+  if (!input.workspaceRoot) {
+    throw new Error("Préflight sandbox refusé : workspaceRoot absent, impossible de masquer les fichiers privés.");
+  }
+  const maskedPaths = await discoverSensitiveWorkspacePaths(input.workspaceRoot);
   const paths = await ensureControlHome();
   const providerState = join(paths.root, "providers", input.provider);
   await mkdir(providerState, { recursive: true });
@@ -110,6 +116,7 @@ export async function prepareAgentSandbox(input: {
       workspaceAccess: access,
       ephemeralHome: true,
       writablePaths: input.writablePaths?.length ?? 0,
+      maskedPaths: maskedPaths.map((item) => ({ path: item.path, kind: item.kind, reason: item.reason })),
     },
   });
   return {
@@ -121,6 +128,7 @@ export async function prepareAgentSandbox(input: {
       workspaceAccess: access,
       statePaths: [providerState],
       writablePaths: input.writablePaths,
+      maskedPaths,
     },
     env,
     allowedEnvKeys,
