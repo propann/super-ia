@@ -27,10 +27,11 @@ function parseStatus(output: string): Array<{ path: string; status: string }> {
   const result: Array<{ path: string; status: string }> = [];
   for (let index = 0; index < entries.length; index += 1) {
     const entry = entries[index];
+    if (entry.length < 4) continue;
     const status = entry.slice(0, 2);
-    let path = entry.slice(3);
-    if (status.includes("R") || status.includes("C")) path = entries[++index] ?? path;
+    const path = entry.slice(3);
     if (path && !path.startsWith(".superia/")) result.push({ path, status });
+    if ((status.includes("R") || status.includes("C")) && entries[index + 1]) index += 1;
   }
   return result;
 }
@@ -47,15 +48,30 @@ async function fingerprint(root: string, path: string): Promise<string> {
 
 export async function captureGitWorkspace(root: string): Promise<GitWorkspaceSnapshot> {
   const resolved = resolve(root);
-  const status = await runCommand("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], { cwd: resolved, timeoutMs: 30_000 });
+  const status = await runCommand("git", ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
+    cwd: resolved,
+    timeoutMs: 30_000,
+  });
   const files: GitWorkspaceSnapshot["files"] = {};
-  for (const entry of parseStatus(status.stdout)) files[entry.path] = { status: entry.status, sha256: await fingerprint(resolved, entry.path) };
+  for (const entry of parseStatus(status.stdout)) {
+    files[entry.path] = {
+      status: entry.status,
+      sha256: await fingerprint(resolved, entry.path),
+    };
+  }
   return { root: resolved, files };
 }
 
 function globPattern(pattern: string): RegExp {
   const normalized = pattern.replaceAll("\\", "/").replace(/^\.\//, "").replace(/\/$/, "");
-  const escaped = normalized.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*/g, "::DOUBLE_STAR::").replace(/\*/g, "[^/]*").replace(/::DOUBLE_STAR::/g, ".*");
+  if (!normalized || normalized.startsWith("/") || normalized.split("/").includes("..")) {
+    throw new Error(`Chemin autorisé invalide : ${pattern}`);
+  }
+  const escaped = normalized
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*/g, "::DOUBLE_STAR::")
+    .replace(/\*/g, "[^/]*")
+    .replace(/::DOUBLE_STAR::/g, ".*");
   return new RegExp(`^${escaped}(?:/.*)?$`);
 }
 
@@ -64,23 +80,44 @@ export function pathIsAllowed(path: string, allowedPaths: string[]): boolean {
   return allowedPaths.some((pattern) => globPattern(pattern).test(normalized));
 }
 
-export async function enforceGitChangeScope(input: { before: GitWorkspaceSnapshot; afterRoot: string; allowedPaths: string[]; artifactDirectory: string }): Promise<ChangeGuardReport> {
+export async function enforceGitChangeScope(input: {
+  before: GitWorkspaceSnapshot;
+  afterRoot: string;
+  allowedPaths: string[];
+  artifactDirectory: string;
+}): Promise<ChangeGuardReport> {
   const after = await captureGitWorkspace(input.afterRoot);
-  const changedFiles = Object.keys(after.files).filter((path) => {
+  if (after.root !== input.before.root) throw new Error("Les snapshots Git ne concernent pas le même workspace.");
+  const candidates = new Set([...Object.keys(input.before.files), ...Object.keys(after.files)]);
+  const changedFiles = [...candidates].filter((path) => {
     const previous = input.before.files[path];
     const current = after.files[path];
-    return !previous || previous.status !== current.status || previous.sha256 !== current.sha256;
+    if (!previous || !current) return true;
+    return previous.status !== current.status || previous.sha256 !== current.sha256;
   }).sort();
-  const outOfScopeFiles = changedFiles.filter((path) => !pathIsAllowed(path, input.allowedPaths));
+  const allowedPaths = [...new Set(input.allowedPaths.map((path) => path.trim()).filter(Boolean))];
+  for (const pattern of allowedPaths) globPattern(pattern);
+  const outOfScopeFiles = changedFiles.filter((path) => !pathIsAllowed(path, allowedPaths));
   const directory = resolve(input.artifactDirectory);
   await mkdir(directory, { recursive: true });
   const diffPath = join(directory, "AGENT_CHANGES.patch");
   const reportPath = join(directory, "CHANGE_GUARD.json");
-  const diff = await runCommand("git", ["diff", "--binary", "HEAD", "--"], { cwd: after.root, timeoutMs: 30_000 });
+  const diff = await runCommand("git", ["diff", "--binary", "HEAD", "--"], {
+    cwd: after.root,
+    timeoutMs: 30_000,
+  });
   const untracked = changedFiles.filter((path) => after.files[path]?.status === "??");
   const appendix = untracked.length ? `\n# Untracked files\n${untracked.join("\n")}\n` : "";
   await writeFile(diffPath, `${diff.stdout}${appendix}`, "utf8");
-  const report: ChangeGuardReport = { schemaVersion: 1, passed: outOfScopeFiles.length === 0, allowedPaths: [...input.allowedPaths], changedFiles, outOfScopeFiles, diffPath, reportPath };
+  const report: ChangeGuardReport = {
+    schemaVersion: 1,
+    passed: outOfScopeFiles.length === 0,
+    allowedPaths,
+    changedFiles,
+    outOfScopeFiles,
+    diffPath,
+    reportPath,
+  };
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
   return report;
 }
