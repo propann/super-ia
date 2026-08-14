@@ -1,185 +1,427 @@
 # Architecture locale sur Raspberry Pi 5
 
-## Rôle du Pi 5
+Dernière revue : 14 août 2026.
 
-Le Raspberry Pi 5 n'a pas besoin d'être le modèle géant. Il devient le **cerveau de coordination permanent** :
+## Décision figée
 
-- hébergement des dépôts Git complets ;
-- stockage de la mémoire et des journaux ;
-- création des missions et worktrees ;
-- lancement des CLI d'agents distants ;
-- exécution des tests légers ;
-- planification et reprise après interruption ;
-- console Matrix accessible en SSH ou navigateur ;
-- sauvegardes et synchronisation GitHub.
+Le Raspberry Pi 5 est la **tour de contrôle permanente** de Super IA. Il n'exécute aucun modèle IA dans le MVP.
 
-Cette architecture fonctionne même si le modèle principal tourne chez OpenAI, Mistral, Anthropic, Google ou sur une autre machine du réseau.
+Les modèles restent accessibles par les CLI officielles et abonnements légitimes : Codex, Claude Code, Mistral Vibe, Gemini CLI, Qwen Code ou autres agents compatibles. Le Pi lance leurs programmes clients, mais l'inférence principale se déroule chez le fournisseur.
 
-## Architecture cible
+Un Pi 4 ou Pi 5 pourra servir plus tard à une expérience séparée de petit modèle local uniquement si un benchmark démontre une utilité réelle. Cette expérimentation ne doit jamais devenir une dépendance du cœur.
+
+---
+
+# 1. Rôle du Pi
+
+- héberger les dépôts Git complets ;
+- suivre plusieurs projets ;
+- conserver branches, tags et worktrees ;
+- stocker missions, tâches, décisions et dépendances ;
+- construire et sauvegarder les paquets de contexte ;
+- lancer les agents CLI utilisant leurs services distants ;
+- exécuter les tests et builds compatibles avec ses ressources ;
+- capturer sorties, événements et transcriptions ;
+- gérer les checkpoints et reprises ;
+- exposer la console Matrix en SSH ;
+- fournir plus tard une interface web locale ;
+- sauvegarder les états et artefacts ;
+- surveiller GitHub, CI et PR lorsque configuré.
+
+Le Pi ne doit pas :
+
+- charger un LLM local en permanence ;
+- devenir un serveur GPU improvisé ;
+- exécuter de nombreux gros builds simultanément ;
+- exposer directement ses services sur Internet ;
+- contenir tous les secrets des utilisateurs sans isolation ;
+- mélanger état critique, caches et fichiers temporaires.
+
+---
+
+# 2. Architecture cible
 
 ```text
 ordinateur / téléphone
-        │ SSH ou interface web
+        │ SSH, TUI ou web local
         ▼
 Raspberry Pi 5 + NVMe
 ├── superia daemon
 ├── console Matrix
-├── SQLite + journal JSONL
-├── dépôts Git miroirs
-├── worktrees de missions
-├── index de code
+├── SQLite en WAL
+├── journal JSONL append-only
+├── dépôts Git et miroirs
+├── worktrees par mission
+├── index du code
 ├── constructeur de contexte
-├── expurgateur de secrets
-├── file de tâches
-├── lanceurs Codex / Vibe / Gemini / Qwen / Aider
-└── moteur local léger Ollama ou llama.cpp
+├── scanner de secrets
+├── file de tâches et dépendances
+├── gestionnaire de processus
+├── adaptateurs agents CLI
+├── validation et receipts
+└── sauvegardes chiffrées
         │
-        ├── IA distantes par CLI officielle
-        ├── petite IA locale utilitaire
-        └── autre machine puissante optionnelle sur le LAN
+        ├── Codex CLI → service OpenAI
+        ├── Claude Code → service Anthropic
+        ├── Mistral Vibe → service Mistral
+        ├── Gemini CLI → service Google
+        ├── Qwen Code → fournisseur configuré
+        ├── Aider/OpenCode → fournisseur configuré
+        └── web assisté légitime
 ```
 
-## Services minimaux
+Plus tard seulement :
 
-### Obligatoires
+```text
+Pi 5 control plane
+   ├── worker laptop
+   ├── worker VPS
+   ├── worker machine puissante
+   └── Pi 4/5 laboratoire local optionnel
+```
 
-- Linux 64 bits ;
-- Git ;
-- Node.js ;
+---
+
+# 3. Matériel recommandé
+
+## Pi 5 8 Go
+
+Suffisant pour :
+
+- démon Super IA ;
 - SQLite ;
-- ripgrep ;
-- systemd ;
-- stockage NVMe ;
-- SSH.
+- plusieurs dépôts sur NVMe ;
+- 2 à 4 agents CLI principalement en attente réseau ;
+- indexation raisonnable ;
+- tests légers à moyens ;
+- console Matrix ;
+- sauvegardes ;
+- petite interface web locale.
 
-### Recommandés
+Le nombre d'agents actifs est limité surtout par les processus qu'ils lancent et les builds du projet, pas par l'appel distant au modèle.
 
-- `uv` / `pipx` pour isoler les agents Python ;
-- `bwrap` ou Podman pour les sandboxes légères ;
-- `restic` ou équivalent pour les sauvegardes ;
-- `jq` pour inspecter les sorties JSON ;
-- `tmux` uniquement comme outil humain, pas comme mémoire de mission.
+## Pi 5 16 Go
 
-### Optionnels
+Apporte du confort pour :
 
-- Docker pour les projets qui l'exigent ;
-- Ollama ;
-- llama.cpp ;
-- Repomix ;
-- Aider ;
-- mini-SWE-agent ;
-- OpenCode.
+- gros monorepos ;
+- plusieurs worktrees ;
+- Docker/Podman ;
+- gros builds Node/Rust ;
+- caches et index ;
+- davantage de sessions simultanées.
 
-## Outils locaux versus modèles locaux
+Il n'est pas obligatoire pour le MVP.
 
-Il faut distinguer deux choses.
+## Stockage
 
-### Outils locaux
+NVMe fortement recommandé :
 
-Codex CLI, Claude Code, Mistral Vibe, Gemini CLI, Qwen Code, Aider et OpenCode peuvent tourner comme **programmes locaux** sur une petite machine tout en appelant un modèle distant. Leur charge principale est Git, le parsing, les commandes et l'interface. Le Pi 5 est adapté à ce rôle.
+- 256 Go minimum pratique ;
+- 500 Go confortable ;
+- système, dépôts et état séparables par dossiers ;
+- contrôle SMART et espace disque ;
+- alimentation et refroidissement stables.
 
-### Modèles locaux
+Une carte microSD seule n'est pas recommandée pour les écritures SQLite, worktrees et caches continus.
 
-L'inférence d'un LLM consomme beaucoup plus de mémoire et de calcul. Le Pi 5 doit commencer avec de petits modèles quantifiés pour :
+---
 
-- classifier une mission ;
-- extraire des mots-clés ;
-- résumer des logs ;
-- produire un titre de commit ;
-- sélectionner des fichiers candidats ;
-- détecter des doublons ou anomalies simples ;
-- compresser une conversation en mémoire de reprise.
+# 4. Services minimaux
 
-Les modèles de code lourds ne doivent pas être considérés comme moteur principal du Pi. La documentation Mistral recommande pour son modèle Devstral 24B des configurations très supérieures ; cela confirme que ce type de modèle doit rester distant ou tourner sur une autre machine.
+## Obligatoires
 
-## Moteurs locaux
+```text
+Linux ARM64
+Git
+Node.js LTS compatible
+SQLite
+ripgrep
+systemd
+SSH
+NVMe
+```
 
-### Ollama
+## Recommandés
 
-Avantages :
+```text
+jq
+uv / pipx
+Gitleaks
+Restic
+bubblewrap
+GitHub CLI
+Tree-sitter ou index symbolique
+```
 
-- paquet Linux ARM64 officiel ;
-- installation et gestion des modèles simples ;
-- API locale ;
-- bon outil de découverte.
+## Optionnels
 
-Usage recommandé : premier moteur local utilitaire.
+```text
+Podman
+Docker
+Repomix
+Aider
+OpenCode
+mini-SWE-agent
+tmux
+```
 
-### llama.cpp
+## Explicitement différés
 
-Avantages :
+```text
+Ollama
+llama.cpp
+LocalAI
+modèles GGUF
+serveur d'embeddings local
+base vectorielle obligatoire
+```
 
-- support Linux ARM64 ;
-- contrôle fin des quantifications et paramètres ;
-- serveur local léger ;
-- excellente base pour mesurer précisément la mémoire et la vitesse.
+Ces éléments restent dans la veille technologique, pas dans l'installation par défaut.
 
-Usage recommandé : moteur de production léger lorsque les modèles retenus sont connus.
+---
 
-### LocalAI
-
-Avantages : API compatible et plusieurs backends. Limite : surface plus large et davantage de composants.
-
-Usage recommandé : phase ultérieure, si plusieurs fonctions locales doivent être exposées derrière une passerelle commune.
-
-## Stockage proposé
+# 5. Arborescence
 
 ```text
 /srv/superia/
-├── repos/          # clones ou miroirs Git
-├── worktrees/      # espaces temporaires par mission
-├── state/          # SQLite, journaux et verrous
-├── contexts/       # paquets de contexte versionnés
-├── transcripts/    # sorties brutes des agents
-├── artifacts/      # rapports, patches, benchmarks
-├── models/         # modèles locaux optionnels
-└── backups/        # snapshots avant transfert externe
+├── config/
+├── repos/
+│   ├── mirrors/
+│   └── checkouts/
+├── worktrees/
+├── state/
+│   ├── superia.sqlite
+│   ├── events/
+│   ├── locks/
+│   └── runtime/
+├── contexts/
+├── transcripts/
+├── artifacts/
+├── caches/
+└── backups/
 ```
 
-Les modèles, caches et `node_modules` ne doivent pas être mélangés aux sauvegardes critiques.
+Les caches et dépendances ne sont pas des données critiques. Les événements, décisions, receipts, branches non poussées et manifests de contexte le sont.
 
-## Processus systemd
+---
 
-Le MVP doit fonctionner sans Kubernetes ni Redis :
+# 6. Processus systemd
+
+## MVP simple
 
 ```text
-superia.service          orchestrateur et API locale
-superia-worker.service   exécuteur de missions
-ollama.service           optionnel
-superia-backup.timer     sauvegarde régulière
-superia-health.timer     contrôle des dépôts et files de tâches
+superia.service
+superia-backup.timer
+superia-health.timer
 ```
 
-SQLite en mode WAL suffit pour une petite file de missions. Une base réseau ne sera ajoutée que si plusieurs machines écrivent réellement en parallèle.
+## Évolution
 
-## Sécurité
+```text
+superia-worker@.service
+superia-web.service
+superia-github.timer
+```
 
-- utilisateur Linux dédié sans `sudo` ;
-- chaque mission dans un worktree ;
-- répertoires autorisés explicitement ;
-- réseau désactivé par défaut pour les commandes de code ;
-- secrets retirés des paquets de contexte ;
-- fichiers `.env`, clés SSH et tokens exclus ;
-- aucune commande destructive sans règle et approbation ;
-- sauvegarde avant migration ou fusion importante.
+Le premier démon peut contenir scheduler et workers. La séparation en services arrive lorsque la reprise ou l'isolation le justifie.
 
-## Configuration matérielle
+---
 
-### Pi 5 avec 8 Go
+# 7. Charge et limites
 
-Adapté au coordinateur, à plusieurs CLI inactives, aux tests raisonnables et à un petit modèle local ponctuel. Limiter le nombre d'agents simultanés et éviter les gros builds parallèles.
+## Parallélisme initial
 
-### Pi 5 avec 16 Go
+```yaml
+limits:
+  activeAgents: 2
+  activeBuilds: 1
+  activeIndexers: 1
+  maxWorktreesPerProject: 4
+  minimumFreeDiskGb: 20
+```
 
-Plus confortable pour plusieurs worktrees, les index de gros dépôts, Docker et des modèles locaux quantifiés plus volumineux. Le CPU reste toutefois la limite principale de l'inférence.
+Ces valeurs sont prudentes et doivent être mesurées sur la machine réelle.
 
-## Décision
+## Ressources à surveiller
 
-Le Pi 5 sera la **tour de contrôle**, pas la centrale nucléaire. Cette séparation permet un outil disponible 24 h/24, peu coûteux, sauvegardé et indépendant du poste de travail principal.
+- mémoire disponible ;
+- charge CPU ;
+- température ;
+- I/O NVMe ;
+- espace disque ;
+- processus enfants ;
+- taille des logs ;
+- nombre de fichiers ouverts ;
+- état SQLite/WAL ;
+- connectivité réseau ;
+- temps d'exécution des tests.
 
-## Sources
+## Dégradation contrôlée
 
-- Ollama Linux ARM64 : https://github.com/ollama/ollama/blob/main/docs/linux.mdx
-- llama.cpp ARM64 : https://github.com/ggml-org/llama.cpp
-- Mistral Vibe hors ligne : https://docs.mistral.ai/vibe/code/cli/offline-models
-- LocalAI : https://github.com/mudler/LocalAI
+Si la machine manque de ressources :
+
+1. arrêter les nouveaux lancements ;
+2. conserver les runs existants ;
+3. suspendre indexation et sauvegardes non urgentes ;
+4. empêcher les gros builds parallèles ;
+5. alerter dans Matrix ;
+6. ne jamais supprimer automatiquement un worktree non archivé.
+
+---
+
+# 8. Dépôts et suivi de projet
+
+Chaque dépôt enregistré possède :
+
+- chemin ;
+- remote ;
+- branche par défaut ;
+- dernier fetch ;
+- état de travail ;
+- worktrees ;
+- instructions `AGENTS.md` ;
+- stack et checks ;
+- missions ouvertes ;
+- branches non poussées ;
+- sauvegarde ;
+- santé Git.
+
+La console doit fournir une vue globale :
+
+```text
+PROJET     BRANCHE      DIRTY   MISSIONS   CI   BACKUP   DERNIER COMMIT
+super-ia   main         non     3          OK   OK       il y a 4 min
+app-web    feature/x    oui     1          -    OK       il y a 2 h
+```
+
+---
+
+# 9. Sauvegarde
+
+## Avant chaque opération risquée
+
+- snapshot SQLite ;
+- checkpoint de mission ;
+- patch des changements non committés ;
+- hash des artefacts ;
+- vérification de l'espace disque.
+
+## Sauvegarde régulière
+
+Restic ou équivalent :
+
+- dépôt local/NAS ;
+- chiffrement ;
+- rétention ;
+- vérification périodique ;
+- test réel de restauration.
+
+## GitHub n'est pas une sauvegarde complète
+
+GitHub conserve les commits poussés, pas forcément :
+
+- base SQLite ;
+- décisions locales ;
+- transcriptions ;
+- branches non poussées ;
+- checkpoints ;
+- secrets de configuration ;
+- fichiers ignorés nécessaires à la reprise.
+
+---
+
+# 10. Sécurité
+
+## Compte Linux
+
+- utilisateur dédié `superia` ;
+- pas de `sudo` ;
+- accès limité aux dossiers projets déclarés ;
+- permissions `0700` sur état et transcriptions ;
+- secrets via fichiers `0600` ou gestionnaire adapté.
+
+## Réseau
+
+- services liés à `127.0.0.1` par défaut ;
+- SSH par clés ;
+- Tailscale ou VPN préférable à une exposition publique ;
+- reverse proxy/TLS seulement après durcissement ;
+- firewall ;
+- aucun port de debug public.
+
+## Agents
+
+- worktree obligatoire pour écriture ;
+- worktree présenté comme isolation Git, pas sandbox ;
+- bubblewrap/Podman pour les tâches risquées ;
+- réseau désactivé lorsqu'inutile ;
+- répertoire HOME temporaire si possible ;
+- variables d'environnement allowlistées ;
+- aucune clé SSH injectée par défaut ;
+- fusion humaine.
+
+---
+
+# 11. Pi 4 comme laboratoire futur
+
+Un Pi 4 peut plus tard tester :
+
+- petit classifieur ;
+- embeddings très légers ;
+- comparaison de moteurs ARM ;
+- worker de recherche ou d'indexation ;
+- sandbox secondaire.
+
+Conditions avant activation :
+
+1. cas d'usage précis ;
+2. benchmark qualité/temps/énergie ;
+3. avantage démontré face à une règle déterministe ;
+4. installation indépendante ;
+5. aucun impact sur le plan de contrôle ;
+6. arrêt possible sans perte de fonction.
+
+Sans ces preuves, aucun modèle n'est installé.
+
+---
+
+# 12. Installation cible du Pi
+
+```text
+Debian stable ARM64
+SSH sécurisé
+NVMe monté sur /srv
+Node.js
+Git + gh
+SQLite
+ripgrep + jq
+Gitleaks
+Restic
+bubblewrap
+Super IA
+agents CLI choisis
+```
+
+Pas de Kubernetes, Redis, PostgreSQL, Ollama ou interface desktop dans l'installation minimale.
+
+---
+
+# 13. Critères de réussite
+
+- redémarrage du Pi sans perte d'état ;
+- missions interrompues identifiées ;
+- récupération du contexte d'une mission ;
+- restauration d'une sauvegarde testée ;
+- lancement d'un agent CLI dans un worktree ;
+- arrêt complet de son groupe de processus ;
+- rapport de tests et receipt ;
+- utilisation depuis SSH sur téléphone ;
+- aucune dépendance à une API d'orchestration ;
+- consommation stable sur 24 h.
+
+---
+
+# Conclusion
+
+Le Pi est la mémoire, le chef de gare et le coffre-fort. Les IA sont des travailleurs externes qui viennent exécuter des missions dans des espaces contrôlés. Cette séparation garde Super IA léger, disponible, économique et réparable.
