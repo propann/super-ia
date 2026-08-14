@@ -8,10 +8,11 @@ declare module "node:fs/promises" {
   export function readFile(path: string, encoding: string): Promise<string>;
   export function readdir(path: string): Promise<string[]>;
   export function rename(oldPath: string, newPath: string): Promise<void>;
-  export function writeFile(path: string, data: string, encoding: string): Promise<void>;
+  export function writeFile(path: string, data: string, encoding?: string): Promise<void>;
 }
 
 declare module "node:path" {
+  export const sep: string;
   export function basename(path: string): string;
   export function dirname(path: string): string;
   export function join(...parts: string[]): string;
@@ -44,11 +45,20 @@ declare module "node:sqlite" {
 
 declare module "node:child_process" {
   export function execFile(...args: unknown[]): unknown;
+  export function spawn(...args: unknown[]): any;
 }
 
 declare module "node:util" {
   export function promisify(fn: unknown): (...args: unknown[]) => Promise<{ stdout: string; stderr?: string }>;
 }
+
+declare const Buffer: {
+  byteLength(value: string, encoding?: string): number;
+  from(value: string, encoding?: string): {
+    byteLength: number;
+    subarray(start: number, end?: number): { toString(encoding?: string): string };
+  };
+};
 
 declare const process: {
   platform: string;
@@ -56,6 +66,7 @@ declare const process: {
   env: Record<string, string | undefined>;
   pid: number;
   cwd(): string;
+  kill(pid: number, signal?: string): void;
   exitCode?: number;
   stdout: {
     columns?: number;
