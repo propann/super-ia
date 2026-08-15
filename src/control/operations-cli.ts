@@ -1,6 +1,7 @@
 import { handleConnectionCommand } from "../connections/cli.js";
 import { createControlBackup, listControlBackups, restoreControlBackup, verifyControlBackup } from "./backup-manager.js";
 import { runDaemon, runDaemonTick } from "./daemon.js";
+import { runControlRecoveryDrill } from "./recovery-drill.js";
 import { handleResticCommand } from "./restic-cli.js";
 
 function valueAfter(args: string[], flag: string): string | undefined {
@@ -13,7 +14,7 @@ function positionals(args: string[]): string[] {
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
     if (value.startsWith("--")) {
-      if (!["--json", "--once", "--network", "--execute"].includes(value)) index += 1;
+      if (!["--json", "--once", "--network", "--execute", "--keep"].includes(value)) index += 1;
       continue;
     }
     values.push(value);
@@ -63,7 +64,18 @@ export async function handleOperationsCommand(
       console.log(asJson ? JSON.stringify(result, null, 2) : `Restauration vérifiée : ${result.targetHome}\nReçu : ${result.receiptPath}`);
       return true;
     }
-    throw new Error("Usage : superia backup create|list|verify|restore");
+    if (action === "drill") {
+      const result = await runControlRecoveryDrill(undefined, args.includes("--keep"));
+      if (asJson) console.log(JSON.stringify(result, null, 2));
+      else {
+        console.log("DRILL DE REPRISE VALIDE");
+        console.log(`Sauvegarde : ${result.backupDirectory}`);
+        console.log(`Rapport : ${result.reportPath}`);
+        if (result.report.kept) console.log(`Copie restaurée conservée : ${result.report.restoredHome}`);
+      }
+      return true;
+    }
+    throw new Error("Usage : superia backup create|list|verify|restore|drill");
   }
 
   if (command === "daemon") {
