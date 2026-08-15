@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "source": "seed",
+  "generated_at": null,
+  "projects": [
+    {
+      "id": "propann/super-ia",
+      "name": "super-ia",
+      "owner": "propann",
+      "url": "https://github.com/propann/super-ia",
+      "description": "Plan de contrôle IA personnel sur Raspberry Pi 5.",
+      "default_branch": "agent/pi5-foundation",
+      "local_path": "/opt/azoth-ai/projects/super-ia",
+      "private": false,
+      "archived": false,
+      "updated_at": null
+    }
+  ]
+}

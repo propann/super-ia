@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "write_mode": "human_approval",
+    "shell": "allowlisted_only",
+    "browser_login": "manual",
+    "account_rotation": "forbidden",
+    "publish_merge_delete": "human_approval"
+  },
+  "agents": [
+    {
+      "id": "architect",
+      "label": "Architecte",
+      "icon": "⌘",
+      "accent": "purple",
+      "role": "Découpe le besoin, clarifie l'architecture et prépare le plan.",
+      "connectors": ["chatgpt-web", "claude-web", "gemini-web", "grok-web"],
+      "stages": ["plan", "review"],
+      "approval": "before_write"
+    },
+    {
+      "id": "builder",
+      "label": "Constructeur",
+      "icon": "⚒",
+      "accent": "orange",
+      "role": "Transforme le plan en code, documentation et configuration.",
+      "connectors": ["claude-web", "gemini-web", "grok-web", "git", "docker"],
+      "stages": ["build", "refactor"],
+      "approval": "before_push"
+    },
+    {
+      "id": "reviewer",
+      "label": "Relecteur",
+      "icon": "⌕",
+      "accent": "blue",
+      "role": "Cherche les bugs, les incohérences et les risques de sécurité.",
+      "connectors": ["chatgpt-web", "claude-web", "git"],
+      "stages": ["review", "security"],
+      "approval": "read_only"
+    },
+    {
+      "id": "tester",
+      "label": "Testeur",
+      "icon": "✓",
+      "accent": "green",
+      "role": "Lance les contrôles autorisés et remonte les résultats dans le flux.",
+      "connectors": ["git", "docker", "n8n"],
+      "stages": ["test", "health"],
+      "approval": "before_mutation"
+    },
+    {
+      "id": "release",
+      "label": "Publication",
+      "icon": "↗",
+      "accent": "orange",
+      "role": "Prépare commit, PR et déploiement ; la publication finale reste humaine.",
+      "connectors": ["github", "git", "docker"],
+      "stages": ["release", "deploy"],
+      "approval": "always_human"
+    }
+  ]
+}

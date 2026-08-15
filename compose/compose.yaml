@@ -1,5 +1,24 @@
 name: ${COMPOSE_PROJECT_NAME:-super-ia}
 
+x-browser-env: &browser-env
+  PUID: ${BROWSER_PUID:-1000}
+  PGID: ${BROWSER_PGID:-1000}
+  TZ: ${TZ:-Europe/Paris}
+  CUSTOM_USER: ${BROWSER_USER:?BROWSER_USER is required}
+  PASSWORD: ${BROWSER_PASSWORD:?BROWSER_PASSWORD is required}
+  HARDEN_DESKTOP: "true"
+  SELKIES_AUDIO_ENABLED: "false"
+  SELKIES_MICROPHONE_ENABLED: "false"
+  SELKIES_MANUAL_WIDTH: ${BROWSER_WIDTH:-1280}
+  SELKIES_MANUAL_HEIGHT: ${BROWSER_HEIGHT:-800}
+
+x-browser-common: &browser-common
+  image: ${BROWSER_IMAGE:-lscr.io/linuxserver/chromium:latest}
+  restart: unless-stopped
+  shm_size: "512mb"
+  networks:
+    - azoth-ai
+
 services:
   postgres:
     image: ${POSTGRES_IMAGE:-postgres:16-alpine}
@@ -95,12 +114,16 @@ services:
     environment:
       DASHBOARD_PORT: 8080
       DASHBOARD_CONFIG_DIR: /app/config
+      DASHBOARD_DATA_DIR: /app/data
       TZ: ${TZ:-Europe/Paris}
     ports:
       - "127.0.0.1:${DASHBOARD_PORT:-8080}:8080"
     volumes:
       - ../config/connectors.json:/app/config/connectors.json:ro
       - ../config/browser-profiles.json:/app/config/browser-profiles.json:ro
+      - ../config/agents.json:/app/config/agents.json:ro
+      - ../config/projects.json:/app/config/projects.json:ro
+      - ../data:/app/data:rw
     depends_on:
       n8n:
         condition: service_started
@@ -110,6 +133,90 @@ services:
         condition: service_started
     networks:
       - azoth-ai
+
+  browser-chatgpt:
+    <<: *browser-common
+    profiles: ["browser-chatgpt"]
+    environment:
+      <<: *browser-env
+      CHROME_CLI: https://chatgpt.com/
+      TITLE: "Azoth // ChatGPT"
+    volumes:
+      - browser_chatgpt_data:/config
+    ports:
+      - "127.0.0.1:${BROWSER_CHATGPT_PORT:-3011}:3001"
+
+  browser-claude:
+    <<: *browser-common
+    profiles: ["browser-claude"]
+    environment:
+      <<: *browser-env
+      CHROME_CLI: https://claude.ai/
+      TITLE: "Azoth // Claude"
+    volumes:
+      - browser_claude_data:/config
+    ports:
+      - "127.0.0.1:${BROWSER_CLAUDE_PORT:-3012}:3001"
+
+  browser-gemini:
+    <<: *browser-common
+    profiles: ["browser-gemini"]
+    environment:
+      <<: *browser-env
+      CHROME_CLI: https://gemini.google.com/
+      TITLE: "Azoth // Gemini"
+    volumes:
+      - browser_gemini_data:/config
+    ports:
+      - "127.0.0.1:${BROWSER_GEMINI_PORT:-3013}:3001"
+
+  browser-deepseek:
+    <<: *browser-common
+    profiles: ["browser-deepseek"]
+    environment:
+      <<: *browser-env
+      CHROME_CLI: https://chat.deepseek.com/
+      TITLE: "Azoth // DeepSeek"
+    volumes:
+      - browser_deepseek_data:/config
+    ports:
+      - "127.0.0.1:${BROWSER_DEEPSEEK_PORT:-3014}:3001"
+
+  browser-grok:
+    <<: *browser-common
+    profiles: ["browser-grok"]
+    environment:
+      <<: *browser-env
+      CHROME_CLI: https://grok.com/
+      TITLE: "Azoth // Grok"
+    volumes:
+      - browser_grok_data:/config
+    ports:
+      - "127.0.0.1:${BROWSER_GROK_PORT:-3015}:3001"
+
+  browser-mistral:
+    <<: *browser-common
+    profiles: ["browser-mistral"]
+    environment:
+      <<: *browser-env
+      CHROME_CLI: https://chat.mistral.ai/
+      TITLE: "Azoth // Mistral"
+    volumes:
+      - browser_mistral_data:/config
+    ports:
+      - "127.0.0.1:${BROWSER_MISTRAL_PORT:-3016}:3001"
+
+  browser-suno:
+    <<: *browser-common
+    profiles: ["browser-suno"]
+    environment:
+      <<: *browser-env
+      CHROME_CLI: https://suno.com/
+      TITLE: "Azoth // Suno"
+    volumes:
+      - browser_suno_data:/config
+    ports:
+      - "127.0.0.1:${BROWSER_SUNO_PORT:-3017}:3001"
 
 networks:
   azoth-ai:
@@ -122,3 +229,17 @@ volumes:
     name: azoth-ai-qdrant
   n8n_data:
     name: azoth-ai-n8n
+  browser_chatgpt_data:
+    name: azoth-ai-browser-chatgpt
+  browser_claude_data:
+    name: azoth-ai-browser-claude
+  browser_gemini_data:
+    name: azoth-ai-browser-gemini
+  browser_deepseek_data:
+    name: azoth-ai-browser-deepseek
+  browser_grok_data:
+    name: azoth-ai-browser-grok
+  browser_mistral_data:
+    name: azoth-ai-browser-mistral
+  browser_suno_data:
+    name: azoth-ai-browser-suno

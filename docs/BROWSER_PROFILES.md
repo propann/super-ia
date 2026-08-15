@@ -1,55 +1,34 @@
-# Profils navigateur isolés
+# Navigateurs et profils isolés
 
-## But
+Super IA utilise Chromium dans des conteneurs graphiques compatibles arm64. Le
+Pi garde un profil persistant par fournisseur : ChatGPT, Claude, Gemini,
+DeepSeek, Grok, Mistral et Suno.
 
-Super IA utilise d'abord les connexions les moins coûteuses et les moins fragiles.
-Pour ChatGPT, Claude, Gemini, DeepSeek, Mistral et Suno, le mode navigateur permet
-d'utiliser les interfaces web sans imposer une clé API payante.
-
-Chaque fournisseur possède son propre dossier Chromium :
-
-```text
-~/.local/share/super-ia/browser-profiles/<fournisseur>
-```
-
-Les cookies ne sont pas mélangés entre fournisseurs, ne quittent pas la machine et
-ne doivent jamais être copiés dans Git, Docker, n8n ou une sauvegarde non chiffrée.
-
-## Vérifier la machine
-
-Depuis une session graphique locale :
+Chaque profil a son propre volume Docker `/config`, son URL de départ et son
+port de bureau. Les services sont liés à `127.0.0.1` et sont ouverts depuis un
+tunnel SSH. La première connexion est manuelle.
 
 ```bash
-make browser-check
+make browser-up
+make browser-up BROWSER_PROFILES=browser-deepseek
+make browser-up BROWSER_PROFILES=browser-grok
 ```
 
-## Ouvrir une session
+Le profil par défaut démarre ChatGPT, Claude et Gemini. `make browser-up-all`
+permet de lancer toute la flotte, mais il est réservé aux tests : plusieurs
+navigateurs Chromium simultanés consomment davantage de mémoire.
 
-```bash
-make browser NAME=chatgpt
-make browser NAME=claude
-make browser NAME=gemini
-make browser NAME=deepseek
-make browser NAME=mistral
-make browser NAME=suno
-```
+## Règles
 
-La première ouverture demande une connexion humaine. MFA et CAPTCHA restent
-volontairement manuels.
+- aucun cookie n'est exporté ;
+- aucune URL arbitraire n'est injectée dans Compose ;
+- les ports ne sont pas exposés directement sur le réseau ;
+- MFA, CAPTCHA, achat, suppression, publication et modification de compte
+  restent humains ;
+- aucune rotation de comptes et aucun contournement de quota ;
+- le dashboard ne lance pas de shell arbitraire ;
+- le runner n'exécute que les contrôles Git explicitement allowlistés.
 
-## Sécurité
-
-- liste de fournisseurs fermée dans le script ;
-- aucune URL arbitraire acceptée ;
-- permissions locales privées grâce à `umask 077` ;
-- aucun export de cookies ;
-- aucune rotation de comptes pour contourner des quotas ;
-- aucun bouton du dashboard n'exécute une commande sur l'hôte ;
-- les actions sensibles restent soumises à validation humaine.
-
-## Étape suivante
-
-Le futur worker Playwright devra rester optionnel et démarré à la demande. Il devra
-recevoir uniquement des tâches structurées et autorisées, avec captures d'écran,
-journal d'audit et arrêt avant toute publication, suppression, achat ou modification
-de compte. Le Pi 5 reste un plan de contrôle léger, pas une ferme de navigateurs.
+Le worker d'automatisation web viendra ensuite, séparé du navigateur graphique,
+avec tâches structurées, journal d'audit et arrêt humain avant les actions
+irréversibles.

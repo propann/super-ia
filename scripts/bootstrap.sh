@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 if [[ -e .env ]]; then
-  echo ".env existe déjà : aucune clé n'a été remplacée."
+  echo ".env existe déjà : aucune clé existante n'a été remplacée."
 else
   command -v openssl >/dev/null || {
     echo "openssl est requis pour générer les secrets." >&2
@@ -21,6 +21,19 @@ else
   echo ".env créé avec des secrets locaux aléatoires."
 fi
 
+command -v openssl >/dev/null || {
+  echo "openssl est requis pour générer le mot de passe navigateur." >&2
+  exit 1
+}
+
+# Les anciennes installations n'ont pas encore cette variable. On l'ajoute
+# sans toucher aux secrets déjà présents.
+if ! grep -q '^BROWSER_PASSWORD=' .env; then
+  printf 'BROWSER_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> .env
+elif grep -q '^BROWSER_PASSWORD=replace_with_a_local_browser_password$' .env; then
+  sed -i "s/^BROWSER_PASSWORD=.*/BROWSER_PASSWORD=$(openssl rand -hex 24)/" .env
+fi
+
 mkdir -p data backups logs
 
 if ! docker network inspect azoth-ai >/dev/null 2>&1; then
@@ -28,5 +41,4 @@ if ! docker network inspect azoth-ai >/dev/null 2>&1; then
   echo "Réseau Docker azoth-ai créé."
 fi
 
-echo "Bootstrap terminé. Ajoute les clés API dans .env avant les appels aux modèles."
-
+echo "Bootstrap terminé. Les clés et le mot de passe navigateur restent locaux."
