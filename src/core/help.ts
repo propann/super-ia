@@ -1,5 +1,5 @@
 export function printHelp(): void {
-  console.log(`Super IA v0.16.0
+  console.log(`Super IA v0.17.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
@@ -11,6 +11,15 @@ Usage:
   superia local [--json]                        Affiche les outils locaux
   superia scan [--json]                         Analyse le dépôt courant
   superia init                                  Initialise dépôt et plan de contrôle
+
+  superia notify status [--json]                État des notifications locales
+  superia notify run [--json]                   Traite les nouveaux événements
+  superia notify list [--limit 50] [--json]     Liste les reçus dédupliqués
+  superia notify enable|disable                 Active ou désactive le moteur
+  superia notify configure [options]            Configure les sorties locales
+      --stdout|--no-stdout                      Écriture console du daemon
+      --runs|--no-runs                          Fins et interruptions de runs
+      --blocked-tasks|--no-blocked-tasks        Missions bloquées
 
   superia connection init                       Initialise le registre privé
   superia connection dashboard [--json]         Connection Matrix
@@ -73,7 +82,7 @@ Usage:
   superia restic check                          Affiche le plan de vérification
       --execute --network                       Exécution réseau volontaire
 
-  superia daemon --once                         Synchronise et récupère une fois
+  superia daemon --once                         Synchronise, récupère et notifie
   superia daemon [--interval-seconds 30]        Lance la boucle permanente
   superia run start <provider> [TASK-ID]        Ouvre un run durable manuel
   superia run list [--project PROJECT-ID]       Liste les runs
@@ -87,6 +96,8 @@ Principes:
   - Raspberry Pi 5 utilisé comme plan de contrôle, jamais comme modèle obligatoire
   - interface web uniquement sur 127.0.0.1 avec token privé et session HttpOnly
   - interface web en lecture seule, sans CORS ni contrôle destructif
+  - notifications locales dédupliquées, privées et sans payloads arbitraires
+  - aucune notification réseau activée par défaut
   - mode agent par défaut en lecture seule
   - build uniquement dans un worktree avec chemins autorisés
   - DAG sans cycle et dépendances terminées avant exécution
