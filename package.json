@@ -1,6 +1,6 @@
 {
   "name": "super-ia",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "description": "Orchestrateur local et multi-fournisseurs pour agents IA de développement.",
   "type": "module",
   "bin": {
@@ -19,6 +19,7 @@
     "sandbox-check": "npm run build --silent && node dist/index.js security sandbox-check",
     "validate": "npm run build --silent && node dist/index.js validate",
     "backup": "npm run build --silent && node dist/index.js backup create",
+    "recovery-drill": "npm run build --silent && node dist/index.js backup drill",
     "restic": "npm run build --silent && node dist/index.js restic status",
     "daemon": "npm run build --silent && node dist/index.js daemon",
     "matrix": "npm run build --silent && node dist/index.js matrix",
