@@ -4,7 +4,7 @@
 
 Le **Raspberry Pi 5 sert de tour de contrôle permanente**. Il stocke l’état, prépare les contextes, lance ou surveille les agents, vérifie les résultats et sauvegarde les preuves. Les modèles IA restent chez leurs fournisseurs : **aucun modèle local n’est requis sur le Pi**.
 
-## État — v0.15.0
+## État — v0.16.0
 
 La branche de développement couvre maintenant :
 
@@ -21,6 +21,7 @@ La branche de développement couvre maintenant :
 - politique anti-SSRF pour les endpoints ;
 - sondes réseau explicites, sans authentification ni redirection ;
 - rapport global `readiness` hors ligne ;
+- interface web locale authentifiée et en lecture seule ;
 - sauvegardes locales cohérentes et plans Restic non destructifs ;
 - daemon et service systemd utilisateur pour le Pi ;
 - CI durcie et Dependabot.
@@ -86,6 +87,21 @@ superia readiness
 - **agents réels prêts** : Gitleaks, preuve Bubblewrap récente, agent installé et politiques sûres.
 
 La commande ne contacte aucun serveur et ne lit aucune valeur de secret.
+
+## Interface web locale
+
+```bash
+superia web token
+superia web
+```
+
+Puis ouvrir :
+
+```text
+http://127.0.0.1:3210
+```
+
+L’interface montre projets, missions, runs, événements et readiness. Elle est limitée à la boucle locale, protégée par un token `0600`, utilise une session HttpOnly et ne propose aucune action destructive.
 
 ## Missions et DAG
 
@@ -209,12 +225,14 @@ superia run list
 superia events --limit 100
 superia daemon --once
 superia matrix
+superia web
 ```
 
 ## Ce qui exige encore le Pi ou les comptes
 
 - installation ARM64 réelle du profil Standard ;
 - autotest Bubblewrap sur le noyau du Pi ;
+- validation visuelle de l’interface web sur le Pi et sur mobile ;
 - choix du coffre de secrets ;
 - configuration d’un dépôt Restic et test de restauration ;
 - authentification interactive des CLI ;
@@ -227,6 +245,7 @@ superia matrix
 ## Documentation
 
 - [État vérifié](docs/STATUS.md)
+- [Interface web locale](docs/WEB.md)
 - [Toolchain](docs/TOOLCHAIN.md)
 - [Connexions](docs/CONNECTIONS.md)
 - [Feuille de route](docs/ROADMAP.md)
