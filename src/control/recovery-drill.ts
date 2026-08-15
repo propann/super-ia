@@ -11,6 +11,7 @@ export interface RecoveryCounts {
   runs: number;
   events: number;
   journalLines: number;
+  providerBenchmarks: number;
 }
 
 export interface RecoveryDrillReport {
@@ -38,12 +39,36 @@ function tableCount(database: DatabaseSync, table: string): number {
   return count;
 }
 
+function missing(error: unknown): boolean {
+  return typeof error === "object"
+    && error !== null
+    && "code" in error
+    && (error as { code?: unknown }).code === "ENOENT";
+}
+
 async function journalLineCount(path: string): Promise<number> {
   const content = await readFile(path, "utf8");
   return content.split("\n").filter((line) => line.trim()).length;
 }
 
-async function recoveryCounts(databasePath: string, journalPath: string): Promise<RecoveryCounts> {
+async function benchmarkCount(path: string): Promise<number> {
+  try {
+    const parsed = JSON.parse(await readFile(path, "utf8")) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Registre de benchmarks invalide pendant le drill.");
+    const records = (parsed as Record<string, unknown>).records;
+    if (!Array.isArray(records)) throw new Error("Registre de benchmarks invalide pendant le drill.");
+    return records.length;
+  } catch (error) {
+    if (missing(error)) return 0;
+    throw error;
+  }
+}
+
+async function recoveryCounts(
+  databasePath: string,
+  journalPath: string,
+  benchmarkPath: string,
+): Promise<RecoveryCounts> {
   const database = new DatabaseSync(databasePath);
   try {
     return {
@@ -52,6 +77,7 @@ async function recoveryCounts(databasePath: string, journalPath: string): Promis
       runs: tableCount(database, "runs"),
       events: tableCount(database, "events"),
       journalLines: await journalLineCount(journalPath),
+      providerBenchmarks: await benchmarkCount(benchmarkPath),
     };
   } finally {
     database.close();
@@ -63,7 +89,8 @@ function sameCounts(left: RecoveryCounts, right: RecoveryCounts): boolean {
     && left.tasks === right.tasks
     && left.runs === right.runs
     && left.events === right.events
-    && left.journalLines === right.journalLines;
+    && left.journalLines === right.journalLines
+    && left.providerBenchmarks === right.providerBenchmarks;
 }
 
 export async function runControlRecoveryDrill(
@@ -80,10 +107,12 @@ export async function runControlRecoveryDrill(
     const source = await recoveryCounts(
       join(backup.directory, "control.sqlite"),
       join(backup.directory, "events.jsonl"),
+      join(backup.directory, "provider-benchmarks.json"),
     );
     const restored = await recoveryCounts(
       join(restoredHome, "control.sqlite"),
       join(restoredHome, "events", "events.jsonl"),
+      join(restoredHome, "providers", "benchmarks.json"),
     );
     const report: RecoveryDrillReport = {
       schemaVersion: 1,
