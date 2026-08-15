@@ -14,6 +14,7 @@ import { syncRepositoryToGlobalControl } from "./control/repository-sync.js";
 import { handleContextCommand } from "./context/cli.js";
 import { handleNotificationCommand } from "./notifications/cli.js";
 import { handlePipelineCommand } from "./orchestration/cli.js";
+import { handleBenchmarkCommand } from "./providers/benchmark-cli.js";
 import { providerCatalog } from "./providers/catalog.js";
 import { handleProviderRoutingCommand } from "./providers/cli.js";
 import { handleReceiptCommand } from "./quality/cli.js";
@@ -71,6 +72,7 @@ async function main(): Promise<void> {
   if (await handleRuntimeCommand(command, args, json, process.cwd())) return;
   if (await handleAgentCommand(command, args, json, process.cwd())) return;
   if (await handlePipelineCommand(command, args, json, process.cwd())) return;
+  if (await handleBenchmarkCommand(command, args, json)) return;
   if (await handleProviderRoutingCommand(command, args, json, process.cwd())) return;
   if (await handleReceiptCommand(command, args, json)) return;
   if (await handleNotificationCommand(command, args, json)) return;
