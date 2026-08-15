@@ -49,7 +49,7 @@ test("notifications are local, deduplicated and never copy event metadata", asyn
     const run = control.createRun({
       projectId: project.id,
       taskId: "TASK-0001",
-      provider: "codex-cli",
+      provider: "provider-sk-hidden-secret-1234567890",
       metadata: { secret: "sk-run-secret-abcdefghijklmnopqrstuvwxyz" },
     });
     control.finishRun(run.id, "failed", { diagnostic: "ghp_hidden_secret_abcdefghijklmnopqrstuvwxyz" });
@@ -66,9 +66,8 @@ test("notifications are local, deduplicated and never copy event metadata", asyn
     assert.equal(records.length, 2);
     assert.deepEqual(new Set(records.map((record) => record.kind)), new Set(["run", "task"]));
     const serialized = JSON.stringify(records);
-    assert.doesNotMatch(serialized, /sk-notification|ghp_|private note|diagnostic|metadata/i);
+    assert.doesNotMatch(serialized, /sk-notification|ghp_|private note|diagnostic|metadata|provider-sk/i);
     assert.match(serialized, /TASK-0001/);
-    assert.match(serialized, /codex-cli/);
 
     const paths = await notificationPaths(home);
     assert.equal((await stat(paths.config)).mode & 0o777, 0o600);
