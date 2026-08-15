@@ -1,4 +1,5 @@
 import { scanRepository } from "../core/repository-scanner.js";
+import { assertExecutionAllowed } from "../safety/store.js";
 import { runControlledPipeline } from "./pipeline.js";
 import { loadPipelineCheckpoint, pipelineStatePath } from "./state.js";
 import type { PipelineOptions, PipelineProvider, PipelineResult } from "./types.js";
@@ -77,6 +78,7 @@ export async function handlePipelineCommand(
   }
 
   const dryRun = args.includes("--dry-run");
+  if (!dryRun) await assertExecutionAllowed();
   const maxPriceUsd = numberOption(args, "--max-price", 0.01, 5);
   const maxTotalPriceUsd = numberOption(args, "--max-total-price", 0.01, 50);
   if (!dryRun && maxPriceUsd === undefined) {
