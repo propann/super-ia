@@ -24,6 +24,22 @@ function request(overrides = {}) {
   };
 }
 
+function summary(providerId, overrides = {}) {
+  return {
+    providerId,
+    mode: "plan",
+    sampleCount: 3,
+    successCount: 3,
+    successRate: 1,
+    medianDurationMs: 10_000,
+    averageCostEur: 0,
+    qualitySampleCount: 3,
+    averageQualityScore: 100,
+    trustedForRouting: true,
+    ...overrides,
+  };
+}
+
 test("zero-budget routing prefers an installed included provider", () => {
   const decision = routeProvider(
     checks({ "codex-cli": true, "mistral-vibe": true }),
@@ -66,4 +82,59 @@ test("readiness can block launch without falsifying the provider recommendation"
   assert.equal(decision.recommendedProviderId, "codex-cli");
   assert.equal(decision.launchAllowed, false);
   assert.deepEqual(decision.launchBlockedBy, ["Preuve Bubblewrap: absente"]);
+});
+
+test("trusted local measurements can reorder eligible providers as a bounded secondary signal", () => {
+  const benchmarks = {
+    "codex-cli:plan": summary("codex-cli", {
+      successCount: 0,
+      successRate: 0,
+      medianDurationMs: 600_000,
+      averageQualityScore: 0,
+    }),
+    "mistral-vibe:plan": summary("mistral-vibe", {
+      averageCostEur: 0.1,
+    }),
+  };
+  const decision = routeProvider(
+    checks({ "codex-cli": true, "mistral-vibe": true }),
+    request({ budget: "low", benchmarks }),
+  );
+  assert.equal(decision.recommendedProviderId, "mistral-vibe");
+  assert.ok(decision.candidates.find((item) => item.id === "mistral-vibe").benchmarkScore > 0);
+  assert.ok(decision.candidates.find((item) => item.id === "codex-cli").benchmarkScore < 0);
+});
+
+test("insufficient measurements are visible but ignored", () => {
+  const decision = routeProvider(
+    checks({ "codex-cli": true }),
+    request({
+      benchmarks: {
+        "codex-cli:plan": summary("codex-cli", {
+          sampleCount: 2,
+          successCount: 2,
+          trustedForRouting: false,
+        }),
+      },
+    }),
+  );
+  const candidate = decision.candidates.find((item) => item.id === "codex-cli");
+  assert.equal(candidate.benchmarkScore, 0);
+  assert.ok(candidate.reasons.some((reason) => reason.includes("2/3")));
+});
+
+test("benchmarks never make a forbidden provider eligible", () => {
+  const decision = routeProvider(
+    checks({ "claude-code": true }),
+    request({
+      budget: "any",
+      benchmarks: {
+        "claude-code:plan": summary("claude-code"),
+      },
+    }),
+  );
+  const candidate = decision.candidates.find((item) => item.id === "claude-code");
+  assert.equal(candidate.eligible, false);
+  assert.equal(candidate.score, 0);
+  assert.ok(candidate.rejectedBy.some((reason) => reason.includes("adaptateur planned")));
 });
