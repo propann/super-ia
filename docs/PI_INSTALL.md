@@ -10,13 +10,12 @@ Super IA s’installe comme **plan de contrôle utilisateur**. Le Pi stocke et o
 - Node.js 22.5 ou supérieur ;
 - npm ;
 - systemd utilisateur ;
-- Gitleaks pour les agents réels ;
-- Bubblewrap pour les agents réels ;
+- Gitleaks et Bubblewrap pour les agents réels ;
 - Restic facultatif pour la copie chiffrée hors machine.
 
 Le centre de contrôle reste installable sans Gitleaks ou Bubblewrap, mais Codex et Vibe sont alors bloqués par défaut.
 
-## Installation v0.16
+## Installation v0.17
 
 ```bash
 git clone https://github.com/propann/super-ia.git
@@ -48,7 +47,8 @@ La valeur de `SUPERIA_HOME` est conservée dans :
 - l’unité systemd utilisateur ;
 - `ReadWritePaths` de l’unité ;
 - l’initialisation, les sauvegardes et la preuve Bubblewrap ;
-- le token privé de l’interface web.
+- le token privé de l’interface web ;
+- la configuration, le curseur et les reçus de notifications.
 
 Exemple :
 
@@ -57,7 +57,7 @@ export SUPERIA_HOME=/mnt/nvme/superia-control
 bash install/pi/install.sh
 ```
 
-Le daemon, la CLI et l’interface web utiliseront le même répertoire. Il ne faut pas déplacer ce répertoire sans régénérer le wrapper et le service.
+Le daemon, la CLI, l’interface web et les notifications utiliseront le même répertoire.
 
 ## Vérification initiale
 
@@ -68,7 +68,9 @@ superia connection policy
 superia security scan --required
 superia security sandbox-check --json
 superia readiness
+superia notify status
 superia daemon --once --json
+superia notify list --limit 20
 superia backup list
 superia matrix --once
 superia web token
@@ -80,19 +82,17 @@ Le rapport Bubblewrap doit avoir `passed: true`. `readiness` doit distinguer cla
 
 ## Interface web locale
 
-Démarrer l’interface dans un terminal :
-
 ```bash
 superia web
 ```
 
-Puis ouvrir depuis le navigateur **du Pi** :
+Ouvrir depuis le navigateur du Pi :
 
 ```text
 http://127.0.0.1:3210
 ```
 
-Le token affichable avec `superia web token` est stocké en `0600` dans :
+Le token est stocké en `0600` dans :
 
 ```text
 $SUPERIA_HOME/web/access.token
@@ -102,13 +102,48 @@ Vérifier :
 
 - connexion avec le token ;
 - sélection des projets ;
-- missions, runs et événements visibles ;
+- missions, runs, notifications et événements visibles ;
 - état readiness visible ;
 - affichage mobile correct ;
 - fermeture de session ;
 - refus d’accès sans session.
 
-Le serveur refuse `0.0.0.0` et toute écoute LAN. Un futur accès depuis un autre ordinateur devra passer par un tunnel SSH explicite, pas par une exposition directe.
+Le serveur refuse `0.0.0.0` et toute écoute LAN. Un accès depuis une autre machine devra passer par un tunnel SSH explicite, pas par une exposition directe.
+
+## Notifications locales
+
+État et configuration :
+
+```bash
+superia notify status
+superia notify configure --runs --blocked-tasks --no-stdout
+```
+
+Traitement manuel :
+
+```bash
+superia notify run
+superia notify list --limit 50
+```
+
+Le daemon traite les notifications à chaque tick. Vérifier les permissions :
+
+```bash
+find "$SUPERIA_HOME/notifications" -type f -maxdepth 2 -printf '%m %p\n'
+```
+
+Les fichiers doivent être en `600`.
+
+Test de déduplication :
+
+```bash
+superia notify run --json
+superia notify run --json
+```
+
+Le second passage ne doit pas créer un second reçu pour le même événement.
+
+Les reçus ne doivent contenir que des identifiants internes, des statuts contrôlés et des dates. Ils ne doivent reprendre ni prompts, ni notes, ni payloads, ni diagnostics.
 
 ## Préparer une mission et son DAG
 
@@ -154,11 +189,9 @@ superia pipeline run TASK-0001 \
   --max-total-price 0.75
 ```
 
-Pour tout pipeline réel utilisant Vibe, `--max-price` et `--max-total-price` sont obligatoires. Aucun plafond n’est inventé silencieusement.
+Pour tout pipeline réel utilisant Vibe, `--max-price` et `--max-total-price` sont obligatoires.
 
 ## Reprise et correction
-
-Reprise d’une interruption technique :
 
 ```bash
 superia pipeline run TASK-0001 \
@@ -207,16 +240,25 @@ Un run Vibe réel sans `--max-price` est refusé.
 
 Avant un agent réel, Super IA recherche les fichiers sensibles suivis, non suivis et ignorés. Bubblewrap masque notamment `.env`, credentials, clés, bases locales et répertoires de configuration cloud.
 
-Cette barrière complète Gitleaks : un fichier privé ignoré mais non reconnu comme secret reste masqué dans la sandbox.
-
 ## Test de coupure et reprise
+
+Créer ou démarrer un run contrôlé, puis simuler une interruption du service. Après redémarrage :
 
 ```bash
 systemctl --user restart superia.service
 superia recover --stale-minutes 1
 superia run list
 superia events --limit 100
+superia notify list --limit 20
 ```
+
+Le résultat attendu est :
+
+- run marqué `interrupted` ;
+- base SQLite intacte ;
+- daemon reparti ;
+- un seul reçu local d’interruption ;
+- aucun doublon au tick suivant.
 
 Le scénario de coupure brutale réelle reste à exécuter sur le Pi.
 
@@ -267,6 +309,7 @@ npm test
 bash install/pi/install.sh
 superia security sandbox-check
 superia readiness
+superia notify status
 ```
 
 Ne pas automatiser `git pull` lorsqu’il existe des modifications locales.
@@ -277,16 +320,18 @@ Ne pas automatiser `git pull` lorsqu’il existe des modifications locales.
 bash install/pi/uninstall.sh
 ```
 
-Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipts, sauvegardes, dépôts et worktrees sont conservés.
+Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipts, sauvegardes, notifications, dépôts et worktrees sont conservés.
 
 ## Ce que la CI prouve
 
 - build TypeScript ;
-- **81 tests réussis** sur le code v0.16 avant la dernière passe documentaire ;
+- **83 tests réussis** ;
 - audit npm sans vulnérabilité signalée ;
 - interface web locale authentifiée et lecture seule ;
 - refus d’écoute hors boucle locale ;
 - token privé et session HttpOnly ;
+- notifications locales dédupliquées et expurgées ;
+- intégration notifications au daemon et au web ;
 - DAG, readiness, réseau et sauvegardes ;
 - préflight Gitleaks ;
 - construction Bubblewrap et masquage des fichiers privés ;
@@ -303,7 +348,7 @@ Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipt
 
 - installation ARM64 complète ;
 - namespaces Bubblewrap réellement opérationnels ;
-- service après déconnexion ;
+- service et notifications après déconnexion ;
 - affichage réel de l’interface web sur le Pi et mobile ;
 - Codex et Vibe authentifiés ;
 - pipeline réel avec deux fournisseurs ;
