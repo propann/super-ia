@@ -12,6 +12,7 @@ import { handleControlCommand } from "./control/cli.js";
 import { handleOperationsCommand } from "./control/operations-cli.js";
 import { syncRepositoryToGlobalControl } from "./control/repository-sync.js";
 import { handleContextCommand } from "./context/cli.js";
+import { handleNotificationCommand } from "./notifications/cli.js";
 import { handlePipelineCommand } from "./orchestration/cli.js";
 import { providerCatalog } from "./providers/catalog.js";
 import { handleReceiptCommand } from "./quality/cli.js";
@@ -68,6 +69,7 @@ async function main(): Promise<void> {
   if (await handleAgentCommand(command, args, json, process.cwd())) return;
   if (await handlePipelineCommand(command, args, json, process.cwd())) return;
   if (await handleReceiptCommand(command, args, json)) return;
+  if (await handleNotificationCommand(command, args, json)) return;
   if (await handleWebCommand(command, args, json)) return;
 
   if (command === "readiness") {
