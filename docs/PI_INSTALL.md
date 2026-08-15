@@ -18,32 +18,14 @@ La préparation du support et de SSH est détaillée dans [PI_BOOTSTRAP.md](PI_B
 
 ## Préflight en lecture seule
 
-Avant toute installation :
-
 ```bash
 sh install/pi/preflight.sh
-```
-
-Mode strict pour les exigences minimales :
-
-```bash
 sh install/pi/preflight.sh --strict
 ```
 
-Le script indique notamment :
+Le script vérifie architecture, distribution, source de `/`, SD/HDD/SSD/NVMe, espace libre, Git, npm, Node, outils, SSH, systemd utilisateur et linger. Il ne contacte aucun serveur, ne demande aucun privilège et ne modifie aucun fichier.
 
-- architecture et distribution ;
-- source et type de la racine ;
-- démarrage SD, USB/HDD/SSD ou NVMe ;
-- espace libre ;
-- Git, npm et Node >= 22.5 ;
-- outils de contrôle et de sécurité ;
-- client et serveur SSH ;
-- systemd utilisateur et linger.
-
-Il ne contacte aucun serveur, ne demande aucun privilège et ne modifie aucun fichier.
-
-## Installation v0.19
+## Installation v0.20
 
 ```bash
 git clone https://github.com/propann/super-ia.git
@@ -86,17 +68,7 @@ export SUPERIA_HOME=/mnt/stockage/superia-control
 bash install/pi/install.sh
 ```
 
-La même valeur est utilisée par :
-
-- wrapper CLI ;
-- service systemd ;
-- SQLite et journal ;
-- sauvegardes ;
-- restauration et drills ;
-- preuve Bubblewrap ;
-- token web ;
-- notifications ;
-- arrêt d’urgence.
+La même valeur est utilisée par le wrapper, le service, SQLite, le journal, les sauvegardes, la restauration, les benchmarks, Bubblewrap, le web, les notifications et l’arrêt d’urgence.
 
 Le chemin choisi doit être sur un stockage monté de manière stable avant le démarrage du service.
 
@@ -111,6 +83,7 @@ superia security scan --required
 superia security sandbox-check --json
 superia safety status
 superia readiness
+superia benchmark summary
 superia route --mode plan --budget zero
 superia notify status
 superia daemon --once --json
@@ -123,15 +96,28 @@ systemctl --user status superia.service
 journalctl --user -u superia.service -n 100 --no-pager
 ```
 
-## Routeur hors ligne
+## Routeur et mesures locales
 
 ```bash
 superia route --mode plan --budget zero
 superia route --mode build --budget low --require-commands
 superia route --mode review --budget any --json
+superia benchmark summary
 ```
 
-Le routeur recommande parmi les adaptateurs prêts et commandes présentes, mais ne lance aucun fournisseur. Le verdict de lancement réel reste soumis à `readiness` et à l’arrêt d’urgence.
+Après les premiers essais réels, enregistrer uniquement des mesures bornées :
+
+```bash
+superia benchmark record codex-cli \
+  --mode plan --success \
+  --duration-ms 42000 \
+  --cost-eur 0 \
+  --quality 85
+```
+
+Le registre ne contient aucun prompt, code, réponse ou secret. Trois échantillons comparables sont nécessaires avant d’influencer le routeur. Les exclusions de sécurité, de budget, de capacité et de readiness restent absolues.
+
+Voir [BENCHMARKS.md](BENCHMARKS.md).
 
 ## Interface web locale
 
@@ -139,32 +125,19 @@ Le routeur recommande parmi les adaptateurs prêts et commandes présentes, mais
 superia web
 ```
 
-Ouvrir depuis le navigateur du Pi :
+Adresse locale :
 
 ```text
 http://127.0.0.1:3210
 ```
 
-Vérifier :
-
-- connexion avec le token ;
-- projets, missions et runs ;
-- notifications ;
-- état de l’arrêt d’urgence ;
-- readiness ;
-- fermeture de session ;
-- refus sans session ;
-- affichage mobile.
-
-Le serveur refuse `0.0.0.0` et toute écoute LAN.
-
-Pour consulter depuis un autre ordinateur, utiliser un tunnel SSH local plutôt que d’exposer le serveur :
+Depuis un autre ordinateur, utiliser un tunnel SSH :
 
 ```bash
 ssh -L 3210:127.0.0.1:3210 UTILISATEUR@ADRESSE_DU_PI
 ```
 
-Puis ouvrir `http://127.0.0.1:3210` sur le PC.
+Vérifier connexion, projets, missions, runs, notifications, safety, readiness, fermeture de session et affichage mobile. Le serveur refuse l’écoute LAN.
 
 ## Notifications locales
 
@@ -175,59 +148,30 @@ superia notify run
 superia notify list --limit 50
 ```
 
-Permissions attendues :
-
-```bash
-find "$SUPERIA_HOME/notifications" -maxdepth 2 -type f -printf '%m %p\n'
-```
-
-Les fichiers doivent être en `600`.
+Les fichiers sous `SUPERIA_HOME/notifications` doivent être en `600`.
 
 ## Arrêt d’urgence sur le Pi
 
-État initial :
-
 ```bash
 superia safety status
-```
-
-Engager sans run actif :
-
-```bash
 superia safety engage --category maintenance
-superia safety status
 superia readiness
-```
-
-Résultat attendu :
-
-- état `ENGAGÉ` ;
-- `readyForLocalControl=true` ;
-- `readyForRealAgents=false` ;
-- interface web avec bandeau rouge ;
-- run réel refusé ;
-- dry-run encore disponible.
-
-Lever ensuite :
-
-```bash
 superia safety release
-superia readiness
 ```
 
-### Test avec un run géré
+Sous arrêt : contrôle local disponible, agents réels bloqués, web informatif, dry-runs disponibles.
 
-Ce test doit être fait sur un projet de démonstration et sous surveillance :
+Pour le test avec un run géré :
 
-1. ouvrir un run contrôlé produisant un PID et un heartbeat ;
-2. confirmer sa présence avec `superia run list` ;
-3. exécuter `superia safety engage --category security` ;
+1. utiliser un projet de démonstration ;
+2. confirmer le PID et le heartbeat avec `superia run list` ;
+3. engager `superia safety engage --category security` ;
 4. vérifier le rapport `SIGTERM` / `SIGKILL` ;
-5. consulter `superia events --limit 50` ;
-6. vérifier qu’aucun processus du groupe ne subsiste ;
-7. libérer avec `superia safety release`.
+5. consulter les événements ;
+6. confirmer qu’aucun processus du groupe ne subsiste ;
+7. libérer l’arrêt.
 
-Ne pas tester en enregistrant manuellement le PID d’un service système ou d’un processus non créé par Super IA.
+Ne jamais enregistrer manuellement le PID d’un service système ou d’un processus non créé par Super IA.
 
 ## Missions et pipeline
 
@@ -245,26 +189,22 @@ superia worktree TASK-0001
 Prévisualisation :
 
 ```bash
-superia pipeline run TASK-0001 \
-  --builder codex \
-  --reviewer vibe \
-  --dry-run
+superia pipeline run TASK-0001 --builder codex --reviewer vibe --dry-run
 ```
 
 Pipeline réel après authentification :
 
 ```bash
 superia pipeline run TASK-0001 \
-  --builder codex \
-  --reviewer vibe \
+  --builder codex --reviewer vibe \
   --max-attempts 3 \
   --max-price 0.25 \
   --max-total-price 0.75
 ```
 
-Aucun plafond n’est inventé silencieusement.
+Aucun plafond n’est inventé silencieusement et aucune fusion n’est automatique.
 
-## Test de coupure et reprise
+## Coupure et reprise
 
 ```bash
 systemctl --user restart superia.service
@@ -274,13 +214,7 @@ superia events --limit 100
 superia notify list --limit 20
 ```
 
-Résultat attendu :
-
-- run abandonné marqué `interrupted` ;
-- base SQLite intacte ;
-- daemon reparti ;
-- une seule notification ;
-- aucun doublon au tick suivant.
+Résultat attendu : run abandonné `interrupted`, SQLite intact, daemon reparti, une seule notification et aucun doublon.
 
 ## Sauvegarde et restauration locale
 
@@ -294,18 +228,18 @@ superia backup restore \
 superia backup drill
 ```
 
-La restauration exige une cible inexistante et valide :
+La restauration valide :
 
-- manifeste ;
-- tailles et SHA-256 ;
+- manifeste, tailles et SHA-256 ;
 - intégrité SQLite ;
-- syntaxe du journal JSONL ;
-- état safety ;
-- configuration et curseur de notifications.
+- syntaxe JSONL ;
+- safety ;
+- configuration et curseur de notifications ;
+- registre de benchmarks lorsqu’il existe.
 
-Elle produit un reçu privé et ne remplace jamais automatiquement le contrôle actif.
+Elle produit un reçu privé et ne remplace jamais automatiquement le contrôle actif. Le drill compare projets, missions, runs, événements, journal et nombre de benchmarks.
 
-Le drill compare projets, missions, runs, événements et lignes du journal. La procédure complète se trouve dans [RECOVERY.md](RECOVERY.md).
+Voir [RECOVERY.md](RECOVERY.md).
 
 ## Restic
 
@@ -348,6 +282,7 @@ bash install/pi/install.sh
 superia security sandbox-check
 superia safety status
 superia readiness
+superia benchmark summary
 superia backup drill
 ```
 
@@ -359,27 +294,24 @@ Ne pas automatiser `git pull` lorsqu’il existe des modifications locales.
 bash install/pi/uninstall.sh
 ```
 
-Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipts, sauvegardes, notifications, safety, dépôts et worktrees sont conservés.
+Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipts, sauvegardes, benchmarks, notifications, safety, dépôts et worktrees sont conservés.
 
 ## Ce que la CI prouve
 
 - build TypeScript ;
-- **95 tests réussis** sur le lot fonctionnel v0.19 ;
+- **103 tests réussis** sur le lot fonctionnel v0.20 ;
 - audit npm sans vulnérabilité signalée ;
 - restauration atomique vers une nouvelle cible ;
-- intégrité SQLite et JSONL vérifiée ;
-- drill de reprise comparant les données durables ;
+- intégrité SQLite, JSONL et benchmarks vérifiée ;
+- drill comparant les données durables ;
+- registre de benchmarks privé et fail-closed ;
+- seuil de confiance et influence mesurée bornée ;
+- impossibilité de rendre un fournisseur interdit éligible ;
 - routeur hors ligne explicable ;
 - préflight Pi/HDD/SSH en lecture seule ;
-- arrêt d’urgence fail-closed ;
-- blocage des agents et pipelines réels ;
-- groupe de processus réel arrêté par escalade ;
-- état safety visible dans readiness et web ;
-- interface web locale authentifiée ;
-- notifications dédupliquées ;
-- DAG, réseau et sauvegardes ;
-- Gitleaks, Bubblewrap et garde Git ;
-- pipeline, checkpoints et budgets ;
+- arrêt d’urgence fail-closed et escalade de groupe ;
+- web local authentifié et notifications dédupliquées ;
+- DAG, réseau, Gitleaks, Bubblewrap, garde Git et pipeline ;
 - scripts Pi valides ;
 - propagation de `SUPERIA_HOME` ;
 - absence de `sudo` caché et de téléchargement pipé vers un shell.
@@ -392,9 +324,10 @@ Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipt
 - service après déconnexion ;
 - arrêt d’urgence sous systemd ;
 - web et notifications après redémarrage ;
-- restauration v0.19 sur le stockage réel ;
+- restauration v0.20 sur le stockage réel ;
 - Codex et Vibe authentifiés ;
 - pipeline réel ;
 - reprise après coupure ;
 - dépôt Restic et restauration hors machine ;
-- mesures coût, qualité et latence.
+- au moins trois mesures réelles comparables par fournisseur et par mode ;
+- grille de qualité et fallback du routeur.
