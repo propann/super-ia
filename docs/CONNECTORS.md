@@ -23,10 +23,11 @@ exécution et le routeur choisit le mode adapté.
 
 ## ChatGPT navigateur
 
-ChatGPT web est un connecteur `browser`/`human`, pas un fournisseur LiteLLM.
-`OPENAI_API_KEY` reste vide. Le navigateur utilise un profil local séparé et
-une connexion manuelle ; aucun mot de passe, cookie ou jeton de session ne
-doit être copié dans `.env`, n8n ou Git.
+ChatGPT web, Claude web et Gemini web sont des connecteurs `browser`/`human`,
+pas des fournisseurs LiteLLM dans cette fondation. Leurs clés API restent
+désactivées par défaut. Chaque service utilise un profil local séparé et une
+connexion manuelle ; aucun mot de passe, cookie ou jeton de session ne doit
+être copié dans `.env`, n8n ou Git.
 
 ## CLI
 

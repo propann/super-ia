@@ -19,6 +19,22 @@
       "sensitive_actions": ["send", "delete", "purchase", "account_change"]
     },
     {
+      "id": "claude-web",
+      "label": "Claude navigateur",
+      "preferred_modes": ["browser", "human"],
+      "api_mode": "disabled_by_default",
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "account_change"]
+    },
+    {
+      "id": "gemini-web",
+      "label": "Gemini navigateur",
+      "preferred_modes": ["browser", "human"],
+      "api_mode": "disabled_by_default",
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "account_change"]
+    },
+    {
       "id": "github",
       "label": "GitHub",
       "preferred_modes": ["cli", "api", "browser", "human"],
