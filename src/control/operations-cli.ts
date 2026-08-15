@@ -1,5 +1,5 @@
 import { handleConnectionCommand } from "../connections/cli.js";
-import { createControlBackup, listControlBackups, verifyControlBackup } from "./backup-manager.js";
+import { createControlBackup, listControlBackups, restoreControlBackup, verifyControlBackup } from "./backup-manager.js";
 import { runDaemon, runDaemonTick } from "./daemon.js";
 import { handleResticCommand } from "./restic-cli.js";
 
@@ -56,7 +56,14 @@ export async function handleOperationsCommand(
       if (!result.valid) process.exitCode = 1;
       return true;
     }
-    throw new Error("Usage : superia backup create|list|verify");
+    if (action === "restore") {
+      const target = valueAfter(args, "--target");
+      if (!path || !target) throw new Error("Usage : superia backup restore <dossier> --target <nouveau-SUPERIA_HOME>");
+      const result = await restoreControlBackup(path, target);
+      console.log(asJson ? JSON.stringify(result, null, 2) : `Restauration vérifiée : ${result.targetHome}\nReçu : ${result.receiptPath}`);
+      return true;
+    }
+    throw new Error("Usage : superia backup create|list|verify|restore");
   }
 
   if (command === "daemon") {
