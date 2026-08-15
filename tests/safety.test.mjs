@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { executeCodexTask } from "../dist/agents/executor.js";
@@ -70,6 +70,19 @@ async function waitForExit(pid, timeoutMs = 3_000) {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   return !processGroupExists(pid);
+}
+
+async function waitForFile(path, timeoutMs = 3_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await access(path);
+      return true;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+  return false;
 }
 
 test("emergency stop state is private, atomic and idempotent", async () => {
@@ -169,13 +182,19 @@ test("safety CLI audits controlled engage and release events", async () => {
 test("engaging the emergency stop terminates a recent managed process group", { skip: process.platform === "win32" }, async () => {
   await withHome(async (home) => {
     const projectRoot = await mkdtemp(join(tmpdir(), "superia-safety-project-"));
-    const child = spawn(process.execPath, ["-e", "process.on('SIGTERM',()=>{}); setInterval(()=>{},1000)"], {
+    const readyPath = join(projectRoot, "child-ready");
+    const child = spawn(process.execPath, [
+      "-e",
+      "const fs=require('node:fs'); const ready=process.argv[1]; process.on('SIGTERM',()=>{}); fs.writeFileSync(ready,'ready'); setInterval(()=>{},1000)",
+      readyPath,
+    ], {
       detached: true,
       stdio: "ignore",
     });
     child.unref();
     assert.ok(child.pid);
     try {
+      assert.equal(await waitForFile(readyPath), true);
       const control = await openControlPlane(home);
       const project = control.registerProject(scan(projectRoot));
       const run = control.createRun({ projectId: project.id, provider: "test-child", pid: child.pid });
