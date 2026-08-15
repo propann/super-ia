@@ -4,7 +4,7 @@
 
 Le **Raspberry Pi 5 sert de tour de contrôle permanente**. Il stocke l’état, prépare les contextes, lance ou surveille les agents, vérifie les résultats et sauvegarde les preuves. Les modèles IA restent chez leurs fournisseurs : **aucun modèle local n’est requis sur le Pi**.
 
-## État — v0.19.0
+## État — v0.20.0
 
 La branche de développement couvre :
 
@@ -20,13 +20,14 @@ La branche de développement couvre :
 - Connection Matrix pour CLI, APIs, cloud, MCP, ACP, A2A, SSH et web assisté ;
 - politique anti-SSRF et sondes réseau explicites ;
 - rapport global `readiness` hors ligne ;
-- routeur hors ligne explicable par capacités, disponibilité, coût et préférences ;
+- routeur explicable par capacités, disponibilité, coût, préférences et mesures locales bornées ;
+- registre privé de benchmarks sans prompt, code, réponse ou secret ;
 - interface web locale authentifiée et en lecture seule ;
 - notifications locales privées, expurgées et dédupliquées ;
 - arrêt d’urgence global bloquant les runs réels et arrêtant les groupes gérés récents ;
-- sauvegardes locales cohérentes incluant safety et notifications ;
+- sauvegardes locales cohérentes incluant safety, notifications et benchmarks ;
 - restauration atomique vers une nouvelle cible ;
-- drill de reprise hors ligne ;
+- drill de reprise hors ligne comparant aussi les benchmarks ;
 - préflight Pi/HDD/SSH strictement en lecture seule ;
 - plans Restic non destructifs ;
 - daemon et service systemd utilisateur pour le Pi ;
@@ -96,12 +97,19 @@ superia readiness
 
 La commande ne contacte aucun serveur et ne lit aucune valeur de secret.
 
-## Routeur de fournisseurs
+## Routeur et benchmarks locaux
 
 ```bash
 superia route --mode plan --budget zero
 superia route --mode build --budget low
 superia route --mode review --budget any --json
+
+superia benchmark record codex-cli \
+  --mode plan --success \
+  --duration-ms 42000 \
+  --cost-eur 0 \
+  --quality 85
+superia benchmark summary
 ```
 
 Le routeur :
@@ -113,9 +121,14 @@ Le routeur :
 - refuse les adaptateurs non prêts ou sans capacités suffisantes ;
 - respecte la politique API, le budget et les préférences du projet ;
 - sépare la recommandation du verdict `readiness` autorisant ou non un lancement réel ;
-- explique chaque sélection et exclusion.
+- explique chaque sélection et exclusion ;
+- utilise les mesures locales uniquement à partir de trois échantillons comparables ;
+- borne leur influence entre -40 et +45 points ;
+- ne permet jamais à une mesure de contourner sécurité, budget, capacités ou arrêt d’urgence.
 
-Il n’invente pas de classement de qualité. Les mesures coût/latence/qualité réelles restent à produire après authentification.
+Le registre se trouve dans `SUPERIA_HOME/providers/benchmarks.json` en `0600`. Il contient seulement fournisseur, mode, réussite, durée, coût, note optionnelle et horodatage. Aucun champ libre ne permet d’y stocker un prompt, du code, une réponse ou un secret.
+
+La méthode complète est dans [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Arrêt d’urgence
 
@@ -234,11 +247,12 @@ La restauration :
 - vérifie manifeste, tailles et SHA-256 ;
 - contrôle l’intégrité SQLite ;
 - valide chaque ligne JSONL ;
+- valide le registre de benchmarks lorsqu’il existe ;
 - écrit dans un dossier temporaire puis effectue un renommage atomique ;
 - produit un reçu privé ;
 - ne remplace jamais automatiquement le contrôle actif.
 
-Le drill crée et restaure une copie isolée, compare projets, missions, runs, événements et journal, puis supprime la copie sauf avec `--keep`.
+Le drill crée et restaure une copie isolée, compare projets, missions, runs, événements, journal et nombre de benchmarks, puis supprime la copie sauf avec `--keep`.
 
 La procédure complète est dans [docs/RECOVERY.md](docs/RECOVERY.md).
 
@@ -263,6 +277,7 @@ superia run list
 superia events --limit 100
 superia safety status
 superia notify list
+superia benchmark summary
 superia route --mode plan --budget zero
 superia backup drill
 superia daemon --once
@@ -279,14 +294,15 @@ superia web
 - test réel de l’arrêt d’urgence sous systemd ;
 - validation web/mobile et notifications après redémarrage ;
 - choix du coffre de secrets ;
-- restauration v0.19 sur le stockage réel ;
+- restauration v0.20 sur le stockage réel ;
 - dépôt Restic et restauration hors machine ;
 - authentification interactive des CLI ;
 - tests bornés des fournisseurs activés ;
 - handshakes MCP, ACP, A2A et worker SSH ;
 - coupure brutale et reprise ;
 - pipeline réel Codex/Vibe avec receipts ;
-- benchmark coût/qualité/latence avant routage automatique.
+- au moins trois mesures réelles comparables par fournisseur et par mode ;
+- import automatique des mesures depuis les receipts.
 
 ## Documentation
 
@@ -294,6 +310,7 @@ superia web
 - [Mise en route SD → HDD/SSD → SSH](docs/PI_BOOTSTRAP.md)
 - [Installation Pi](docs/PI_INSTALL.md)
 - [Sauvegarde et restauration](docs/RECOVERY.md)
+- [Benchmarks et routeur mesuré](docs/BENCHMARKS.md)
 - [Arrêt d’urgence](docs/SAFETY.md)
 - [Interface web locale](docs/WEB.md)
 - [Notifications locales](docs/NOTIFICATIONS.md)
