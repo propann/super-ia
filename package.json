@@ -1,6 +1,6 @@
 {
   "name": "super-ia",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "Orchestrateur local et multi-fournisseurs pour agents IA de développement.",
   "type": "module",
   "bin": {
@@ -23,7 +23,8 @@
     "daemon": "npm run build --silent && node dist/index.js daemon",
     "matrix": "npm run build --silent && node dist/index.js matrix",
     "web": "npm run build --silent && node dist/index.js web",
-    "notify": "npm run build --silent && node dist/index.js notify status"
+    "notify": "npm run build --silent && node dist/index.js notify status",
+    "safety": "npm run build --silent && node dist/index.js safety status"
   },
   "engines": {
     "node": ">=22.5"
