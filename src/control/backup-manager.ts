@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { ensureControlHome } from "./home.js";
@@ -36,6 +36,13 @@ function digest(data: unknown): string {
   return createHash("sha256").update(data).digest("hex");
 }
 
+function missing(error: unknown): boolean {
+  return typeof error === "object"
+    && error !== null
+    && "code" in error
+    && (error as { code?: unknown }).code === "ENOENT";
+}
+
 async function fileRecord(path: string): Promise<BackupFileRecord> {
   const data = await readFile(path);
   return {
@@ -43,6 +50,21 @@ async function fileRecord(path: string): Promise<BackupFileRecord> {
     bytes: data.byteLength,
     sha256: digest(data),
   };
+}
+
+async function copyOptionalPrivateFile(
+  source: string,
+  destination: string,
+): Promise<BackupFileRecord | undefined> {
+  try {
+    const content = await readFile(source, "utf8");
+    await writeFile(destination, content, { encoding: "utf8", mode: 0o600 });
+    await chmod(destination, 0o600);
+    return await fileRecord(destination);
+  } catch (error) {
+    if (missing(error)) return undefined;
+    throw error;
+  }
 }
 
 export async function createControlBackup(
@@ -68,12 +90,32 @@ export async function createControlBackup(
 
   try {
     const events = await readFile(paths.eventJournal, "utf8");
-    await writeFile(eventsPath, events, "utf8");
+    await writeFile(eventsPath, events, { encoding: "utf8", mode: 0o600 });
   } catch {
-    await writeFile(eventsPath, "", "utf8");
+    await writeFile(eventsPath, "", { encoding: "utf8", mode: 0o600 });
   }
+  await Promise.all([chmod(databasePath, 0o600), chmod(eventsPath, 0o600)]);
 
-  const files = await Promise.all([fileRecord(databasePath), fileRecord(eventsPath)]);
+  const files: BackupFileRecord[] = [
+    await fileRecord(databasePath),
+    await fileRecord(eventsPath),
+  ];
+  const optional = await Promise.all([
+    copyOptionalPrivateFile(
+      join(paths.root, "safety", "emergency-stop.json"),
+      join(directory, "emergency-stop.json"),
+    ),
+    copyOptionalPrivateFile(
+      join(paths.root, "notifications", "config.json"),
+      join(directory, "notifications-config.json"),
+    ),
+    copyOptionalPrivateFile(
+      join(paths.root, "notifications", "state.json"),
+      join(directory, "notifications-state.json"),
+    ),
+  ]);
+  for (const record of optional) if (record) files.push(record);
+
   const manifest: BackupManifest = {
     schemaVersion: 1,
     id,
@@ -81,7 +123,8 @@ export async function createControlBackup(
     sourceHome: paths.root,
     files,
   };
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  await chmod(manifestPath, 0o600);
   return { directory, manifestPath, manifest };
 }
 
