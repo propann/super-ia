@@ -9,6 +9,7 @@ import { syncRepositoryToGlobalControl } from "../control/repository-sync.js";
 import { buildGitContext } from "../context/builder.js";
 import { captureGitWorkspace, enforceGitChangeScope, type ChangeGuardReport } from "../quality/change-guard.js";
 import { runManagedProcess } from "../runtime/process-runner.js";
+import { assertExecutionAllowed } from "../safety/store.js";
 import { findExecutable } from "../utils/command.js";
 import { assertSafeCodexInvocation, buildCodexInvocation } from "./codex-adapter.js";
 import { prepareAgentSandbox } from "./sandbox-preflight.js";
@@ -28,6 +29,7 @@ function parseJsonLines(content: string): { events: unknown[]; invalid: number }
 function resolveMode(value?: AgentMode): AgentMode { return value ?? "plan"; }
 
 export async function executeCodexTask(repositoryDirectory: string, taskId: string, options: AgentExecutionOptions = {}): Promise<AgentExecutionPreview | AgentExecutionResult> {
+  if (!options.dryRun) await assertExecutionAllowed();
   const repository = await scanRepository(repositoryDirectory);
   const task = await getTask(repository.root, taskId);
   const mode = resolveMode(options.mode);
