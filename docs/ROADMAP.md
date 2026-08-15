@@ -1,6 +1,6 @@
 # Feuille de route Super IA
 
-Version courante : **0.19.0**  
+Version courante : **0.20.0**  
 Registre logiciel : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json)  
 Registre machine : [`MACHINE_TRACKER.json`](MACHINE_TRACKER.json)  
 Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
@@ -13,27 +13,38 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - runner avec logs, heartbeat, timeout et arrêt des descendants ;
 - Codex et Mistral Vibe contrôlés ;
 - budgets explicites et retries bornés ;
-- Gitleaks et Bubblewrap ;
-- masquage des fichiers privés ;
-- garde Git et limites de diff ;
-- reviewer indépendant ;
-- pipeline builder → validation → review → receipt ;
-- checkpoints, reprise et détection de boucle ;
-- receipts et sauvegardes vérifiables ;
-- restauration atomique vers une nouvelle cible ;
-- drill de reprise hors ligne ;
-- daemon, service Pi et console Matrix ;
-- interface web locale authentifiée et en lecture seule ;
-- notifications locales expurgées et dédupliquées ;
-- arrêt d’urgence global et audité ;
-- sauvegarde de l’état safety et des réglages de notifications ;
-- profils de toolchain Core, Standard et Full ;
-- préflight Pi/HDD/SSD/NVMe/SSH en lecture seule ;
-- Connection Matrix universelle ;
-- politique anti-SSRF et sondes réseau opt-in ;
-- rapport `readiness` hors ligne ;
-- routeur de fournisseurs explicable hors ligne ;
-- plans Restic non destructifs.
+- Gitleaks, Bubblewrap et masquage des fichiers privés ;
+- garde Git, reviewer indépendant et pipeline complet ;
+- checkpoints, reprise, détection de boucle et receipts ;
+- arrêt d’urgence global ;
+- interface web locale et notifications privées ;
+- Connection Matrix, anti-SSRF et readiness hors ligne ;
+- sauvegarde, restauration atomique et drill de reprise ;
+- préflight SD/HDD/SSD/NVMe/SSH ;
+- routeur explicable ;
+- registre privé de benchmarks et influence mesurée bornée ;
+- sauvegarde et restauration des benchmarks ;
+- plans Restic non destructifs ;
+- daemon et service Pi.
+
+## V0.20 — routeur mesuré et mémoire privée
+
+- [x] registre `SUPERIA_HOME/providers/benchmarks.json` en `0600` ;
+- [x] écriture atomique ;
+- [x] schéma strict et fournisseurs connus uniquement ;
+- [x] aucun champ libre pour prompt, code, réponse ou secret ;
+- [x] valeurs et volume bornés ;
+- [x] fichier invalide conservé et refus des nouvelles écritures ;
+- [x] commandes `benchmark record`, `list` et `summary` ;
+- [x] taux de succès, durée médiane, coût moyen et qualité optionnelle ;
+- [x] trois échantillons minimum avant influence ;
+- [x] score mesuré borné de -40 à +45 ;
+- [x] mesures incapables de contourner capacités, budget, API, readiness ou safety ;
+- [x] benchmarks inclus dans sauvegarde, restauration et drill ;
+- [x] test de descendant rendu déterministe avec attente bornée ;
+- [x] **103 tests réussis, 0 échec** ;
+- [x] aucune dépendance runtime supplémentaire ;
+- [x] aucune fusion automatique.
 
 ## V0.19 — reprise et préparation matérielle
 
@@ -46,81 +57,58 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [x] restauration de safety et notifications ;
 - [x] écriture temporaire et renommage atomique ;
 - [x] reçu de restauration en `0600` ;
-- [x] drill comparant projets, missions, runs, événements et journal ;
-- [x] préflight détectant SD, USB/HDD/SSD, NVMe et environnement virtuel ;
-- [x] vérification SSH, Node, outils, systemd utilisateur et linger ;
-- [x] routeur statique selon capacités, disponibilité, coût et préférences ;
-- [x] recommandation séparée de l’autorisation `readiness` ;
-- [x] **95 tests réussis, 0 échec** ;
-- [x] aucune dépendance runtime supplémentaire ;
-- [x] aucune fusion automatique.
-
-## V0.18 — sécurité opérationnelle
-
-- [x] état d’arrêt privé en `0600` ;
-- [x] état invalide conservé et bloquant ;
-- [x] Codex, Vibe, pipelines et runs manuels bloqués ;
-- [x] diagnostics et dry-runs toujours disponibles ;
-- [x] PID, heartbeat et groupe de processus vérifiés ;
-- [x] `SIGTERM` puis `SIGKILL` ;
-- [x] test avec un vrai processus résistant ;
-- [x] audit événementiel expurgé ;
-- [x] visibilité readiness et web ;
-- [x] aucune commande safety depuis le web ;
-- [x] état safety inclus dans les sauvegardes.
+- [x] drill comparant les données durables ;
+- [x] préflight matériel et SSH en lecture seule ;
+- [x] routeur statique explicable ;
+- [x] recommandation séparée de l’autorisation `readiness`.
 
 ## Préparation machine — prête dans Git
 
-- [x] profil Core ;
-- [x] profil Standard recommandé pour le Pi ;
-- [x] profil Full de laboratoire ;
-- [x] dépendances système Debian/Ubuntu explicites ;
+- [x] profils Core, Standard et Full ;
+- [x] dépendances système explicites ;
 - [x] installation utilisateur dans `~/.local` ;
 - [x] uv et outils Python isolés ;
-- [x] dry-run non destructif ;
-- [x] préflight matériel et SSH sans modification ;
-- [x] contrôle CI anti-`curl|sh` ;
-- [x] rapport privé de toolchain ;
-- [x] aucun modèle local installé ;
+- [x] dry-runs non destructifs ;
+- [x] préflight matériel et SSH ;
+- [x] contrôles anti-`curl|sh` et anti-`sudo` caché ;
+- [x] aucun modèle local ;
 - [x] aucune clé créée ou copiée.
 
 ## Prochaine phase — validation Raspberry Pi
 
-Ordre matériel :
-
 1. [ ] démarrer sur SD ;
-2. [ ] installer ou migrer le système vers HDD/SSD ou NVMe ;
-3. [ ] confirmer avec `findmnt /` la racine sur le bon support ;
+2. [ ] installer ou migrer vers HDD/SSD ou NVMe ;
+3. [ ] confirmer la racine avec `findmnt /` ;
 4. [ ] activer et tester SSH ;
 5. [ ] exécuter `install/pi/preflight.sh --strict` ;
-6. [ ] installer la v0.19 avec le profil Standard ;
-7. [ ] choisir le `SUPERIA_HOME` définitif sur le stockage persistant ;
-8. [ ] valider Bubblewrap sur le noyau ;
+6. [ ] installer la v0.20 avec le profil Standard ;
+7. [ ] choisir le `SUPERIA_HOME` définitif ;
+8. [ ] valider Bubblewrap ;
 9. [ ] vérifier le service après déconnexion ;
-10. [ ] exécuter `superia backup drill` ;
-11. [ ] restaurer une sauvegarde sur une copie du stockage réel ;
-12. [ ] tester l’arrêt d’urgence avec un run géré ;
-13. [ ] vérifier l’interface web sur le Pi et mobile ;
-14. [ ] vérifier les notifications après redémarrage ;
-15. [ ] tester coupure et reprise sans doublon ;
-16. [ ] authentifier Codex et Vibe ;
-17. [ ] produire un pipeline réel et ses receipts ;
-18. [ ] tester Restic hors machine.
+10. [ ] exécuter le drill et restaurer une copie ;
+11. [ ] tester l’arrêt d’urgence avec un run géré ;
+12. [ ] vérifier web et notifications ;
+13. [ ] tester coupure et reprise ;
+14. [ ] authentifier Codex et Vibe ;
+15. [ ] produire un pipeline réel ;
+16. [ ] tester Restic hors machine ;
+17. [ ] définir un corpus et une grille de qualité ;
+18. [ ] enregistrer au moins trois mesures par fournisseur et par mode ;
+19. [ ] vérifier le fallback du routeur.
 
 ## Après validation matérielle
 
-- [ ] tests bornés des APIs activées ;
-- [ ] authentification cloud Azure/AWS/Google ;
-- [ ] serveur MCP en lecture seule ;
-- [ ] client ACP générique ;
+- [ ] APIs activées avec tests bornés ;
+- [ ] identités cloud ;
+- [ ] MCP en lecture seule ;
+- [ ] client ACP ;
 - [ ] worker A2A ;
 - [ ] worker SSH contrôlé ;
-- [ ] détection préventive des conflits de fichiers ;
-- [ ] collecte locale des mesures de benchmark ;
-- [ ] routeur enrichi par coût, qualité et latence mesurés ;
+- [ ] détection préventive des conflits ;
+- [ ] import automatique de mesures depuis les receipts ;
 - [ ] fallback réel contrôlé ;
 - [ ] rétention des reçus de notifications ;
-- [ ] canal distant optionnel et explicitement configuré.
+- [ ] canal distant optionnel explicitement configuré.
 
 ## Publication stable
 
@@ -148,7 +136,7 @@ La fusion vers `main` reste bloquée tant que :
 - fusion automatique ;
 - clé API dans Git ou dans les arguments ;
 - navigateur automatisé ;
-- canal de notification réseau activé par défaut ;
+- notification réseau activée par défaut ;
 - arrêt complet du réseau ou de la machine ;
 - contournement de quotas ;
 - conversation libre infinie entre agents.
