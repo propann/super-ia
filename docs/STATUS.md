@@ -1,7 +1,7 @@
 # État vérifié du projet
 
 Date du contrôle : **15 août 2026**  
-Version : **0.16.0**  
+Version : **0.17.0**  
 Branche : `agent/bootstrap-universal-cli`  
 Pull request : `#1` vers `main`
 
@@ -11,7 +11,7 @@ Pull request : `#1` vers `main`
 |---|---|
 | CI GitHub | réussie |
 | Build TypeScript | réussi |
-| Tests | **81 réussis, 0 échec** |
+| Tests | **83 réussis, 0 échec** |
 | Audit npm | **0 vulnérabilité signalée** |
 | Système CI | Ubuntu 24.04.4 |
 | Node / npm | 22.23.2 / 10.9.8 |
@@ -31,7 +31,7 @@ Le Raspberry Pi 5 est un **plan de contrôle léger** :
 - préparation de contexte ;
 - déclenchement et surveillance des agents distants ;
 - validation, receipts et sauvegardes ;
-- console terminal et interface web locale ;
+- console terminal, interface web et notifications locales ;
 - daemon systemd utilisateur.
 
 Aucun profil n’installe de modèle local ni de poids IA.
@@ -49,7 +49,7 @@ Aucun profil n’installe de modèle local ni de poids IA.
 - plafond par tentative et plafond cumulé requis par la CLI pipeline ;
 - Gitleaks obligatoire avant les agents distants ;
 - Bubblewrap avec HOME jetable et contrôle du workspace ;
-- masquage des `.env`, credentials, bases privées, clés et répertoires sensibles dans la sandbox ;
+- masquage des `.env`, credentials, bases privées, clés et répertoires sensibles ;
 - noms de fichiers Git conservés au caractère près pendant le masquage ;
 - garde Git avec chemins critiques interdits et plafonds de diff ;
 - reviewer indépendant ;
@@ -58,6 +58,7 @@ Aucun profil n’installe de modèle local ni de poids IA.
 - receipts vérifiables ;
 - console Matrix et daemon ;
 - interface web locale authentifiée et en lecture seule ;
+- notifications locales privées, expurgées et dédupliquées ;
 - Connection Matrix universelle ;
 - politique anti-SSRF et validation DNS ;
 - sondes réseau opt-in sans authentification ni redirection ;
@@ -70,13 +71,11 @@ Aucun profil n’installe de modèle local ni de poids IA.
 
 ## Interface web locale
 
-La commande :
-
 ```bash
 superia web
 ```
 
-ouvre une interface sur :
+Adresse :
 
 ```text
 http://127.0.0.1:3210
@@ -85,7 +84,7 @@ http://127.0.0.1:3210
 Garanties vérifiées :
 
 - écoute limitée à `127.0.0.1` ou `::1` ;
-- token privé dans `SUPERIA_HOME/web/access.token` avec permissions `0600` ;
+- token privé dans `SUPERIA_HOME/web/access.token` en `0600` ;
 - fichier de token invalide conservé au lieu d’être remplacé ;
 - comparaison du token en temps constant ;
 - session mémoire avec cookie HttpOnly et SameSite Strict ;
@@ -94,9 +93,49 @@ Garanties vérifiées :
 - en-têtes CSP, no-referrer, no-store et anti-frame ;
 - interface et API en lecture seule ;
 - refus des méthodes destructives ;
-- projets, missions, runs, événements et readiness issus des données réelles du plan de contrôle.
+- projets, missions, runs, notifications, événements et readiness issus du plan de contrôle.
 
 L’affichage réel reste à vérifier sur le Pi et sur mobile.
+
+## Notifications locales
+
+Commandes :
+
+```bash
+superia notify status
+superia notify run
+superia notify list --limit 50
+```
+
+Le daemon traite automatiquement :
+
+- `run.completed` ;
+- `run.failed` ;
+- `run.cancelled` ;
+- `run.interrupted` ;
+- missions au statut `blocked`.
+
+Garanties vérifiées :
+
+- configuration, curseur et reçus en `0600` ;
+- écriture atomique de la configuration et du curseur ;
+- reçu créé en écriture exclusive ;
+- clé déterministe transformée en nom SHA-256 ;
+- aucun doublon après retraitement du même événement ;
+- première initialisation positionnée sur le dernier événement existant ;
+- interruption détectée pendant un tick bien notifiée ;
+- erreur de notifications non bloquante pour le daemon ;
+- configuration invalide conservée pour réparation ;
+- aucun prompt, titre libre, objectif, note, payload, métadonnée, diagnostic ou nom de fournisseur arbitraire copié dans les reçus ;
+- uniquement des identifiants internes, statuts contrôlés et dates ;
+- aucun canal réseau activé.
+
+Limites actuelles :
+
+- pas de webhook, e-mail, Telegram, Signal ou notification desktop ;
+- pas d’acquittement ;
+- pas encore de rétention automatique des reçus ;
+- validation systemd réelle encore à faire sur le Pi.
 
 ## Corrections issues de la revue
 
@@ -104,7 +143,7 @@ Cinq défauts matériels ont été corrigés et les cinq fils GitHub ont été d
 
 1. **Budget Vibe implicite** : un run réel sans `--max-price` est refusé ; un pipeline réel exige également `--max-total-price`.
 2. **Fichiers privés exposés dans le worktree** : les fichiers sensibles suivis, non suivis ou ignorés sont masqués dans Bubblewrap.
-3. **Descendant survivant après timeout** : le runner attend maintenant l’escalade `SIGKILL` avant de rendre la main.
+3. **Descendant survivant après timeout** : le runner attend l’escalade `SIGKILL` avant de rendre la main.
 4. **`SUPERIA_HOME` perdu par systemd** : la valeur personnalisée est injectée dans l’unité et dans `ReadWritePaths`.
 5. **Registre de connexions écrasé** : un fichier existant invalide provoque une erreur récupérable et reste intact.
 
@@ -133,7 +172,7 @@ Règles réseau :
 - endpoint local limité à la boucle locale ;
 - résolution DNS vers une adresse privée bloquante ;
 - query string, fragment et identifiants intégrés interdits ;
-- aucun réseau pendant `doctor`, `policy` ou `readiness` ;
+- aucun réseau pendant `doctor`, `policy`, `readiness` ou les notifications ;
 - `probe` exige `--network`, utilise `HEAD`, n’envoie aucune authentification et ne suit aucune redirection.
 
 ## Sauvegardes
@@ -161,6 +200,7 @@ Restic :
 - exécuter `superia security sandbox-check` sur le noyau du Pi ;
 - confirmer le service systemd utilisateur après déconnexion ;
 - vérifier l’interface web sur le Pi et sur mobile ;
+- vérifier les notifications après redémarrage et déconnexion ;
 - décider si un service systemd web séparé est souhaité ;
 - choisir le coffre de secrets définitif ;
 - configurer un dépôt Restic et effectuer une restauration sur copie ;
@@ -179,6 +219,7 @@ Restic :
 - aucun modèle local installé ;
 - aucun navigateur automatisé ;
 - aucune interface web distante ;
+- aucune notification réseau par défaut ;
 - aucune fusion automatique ;
 - `node:sqlite` affiche encore un avertissement expérimental sous Node 22.
 
@@ -193,7 +234,9 @@ superia control status --json
 superia backup create
 superia backup list
 superia restic status
+superia notify status
 superia daemon --once
+superia notify list
 superia web token
 superia web
 ```
