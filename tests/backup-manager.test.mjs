@@ -3,10 +3,20 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createControlBackup, listControlBackups, verifyControlBackup } from "../dist/control/backup-manager.js";
+import {
+  createControlBackup,
+  listControlBackups,
+  restoreControlBackup,
+  verifyControlBackup,
+} from "../dist/control/backup-manager.js";
 import { openControlPlane } from "../dist/control/control-plane.js";
-import { saveNotificationConfig, saveNotificationState } from "../dist/notifications/store.js";
-import { engageEmergencyStop } from "../dist/safety/store.js";
+import {
+  loadNotificationConfig,
+  loadNotificationState,
+  saveNotificationConfig,
+  saveNotificationState,
+} from "../dist/notifications/store.js";
+import { engageEmergencyStop, loadEmergencyStop } from "../dist/safety/store.js";
 
 function scan(root) {
   return {
@@ -64,5 +74,61 @@ test("control backup is consistent, private, listed and verifiable", async () =>
     assert.ok(corrupted.errors.some((error) => error.includes("emergency-stop.json")));
   } finally {
     await rm(home, { recursive: true, force: true });
+  }
+});
+
+test("verified restore recreates a private control home and refuses collisions", async () => {
+  const root = await mkdtemp(join(tmpdir(), "superia-restore-"));
+  const sourceHome = join(root, "source");
+  const targetHome = join(root, "restored");
+  try {
+    const control = await openControlPlane(sourceHome);
+    control.registerProject(scan("/srv/git/restored-demo"));
+    control.close();
+    await engageEmergencyStop("security", sourceHome);
+    await saveNotificationConfig({
+      schemaVersion: 1,
+      enabled: false,
+      stdout: false,
+      notifyRuns: true,
+      notifyBlockedTasks: true,
+    }, sourceHome);
+    await saveNotificationState({ schemaVersion: 1, lastEventId: 7 }, sourceHome);
+
+    const backup = await createControlBackup(sourceHome, () => new Date("2026-08-15T00:00:00.000Z"));
+    const restored = await restoreControlBackup(
+      backup.directory,
+      targetHome,
+      () => new Date("2026-08-15T00:01:00.000Z"),
+    );
+
+    assert.equal(restored.targetHome, targetHome);
+    assert.equal(restored.receipt.backupId, backup.manifest.id);
+    assert.equal((await stat(restored.receiptPath)).mode & 0o777, 0o600);
+    assert.equal((await stat(join(targetHome, "control.sqlite"))).mode & 0o777, 0o600);
+    assert.equal((await stat(join(targetHome, "events", "events.jsonl"))).mode & 0o777, 0o600);
+
+    const restoredControl = await openControlPlane(targetHome);
+    assert.equal(restoredControl.listProjects().length, 1);
+    assert.equal(restoredControl.listProjects()[0].name, "backup-demo");
+    restoredControl.close();
+
+    assert.equal((await loadEmergencyStop(targetHome)).engaged, true);
+    assert.equal((await loadEmergencyStop(targetHome)).category, "security");
+    assert.equal((await loadNotificationConfig(targetHome)).enabled, false);
+    assert.equal((await loadNotificationState(0, targetHome)).lastEventId, 7);
+
+    await assert.rejects(
+      restoreControlBackup(backup.directory, targetHome),
+      /cible existe déjà/,
+    );
+
+    await writeFile(join(backup.directory, "events.jsonl"), "not-json\n", "utf8");
+    await assert.rejects(
+      restoreControlBackup(backup.directory, join(root, "invalid")),
+      /Sauvegarde invalide/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
