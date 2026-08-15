@@ -1,5 +1,5 @@
 export function printHelp(): void {
-  console.log(`Super IA v0.19.0
+  console.log(`Super IA v0.20.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
@@ -13,6 +13,15 @@ Usage:
       --budget zero|low|any                     Catégories de coût autorisées
       --require-commands                        Exige l'exécution de commandes
       --strict                                  Échec si le lancement réel est bloqué
+  superia benchmark summary [options]           Résume les mesures locales
+      --provider <id> --mode plan|build|review
+  superia benchmark list [options]              Liste les mesures privées
+      --provider <id> --mode <mode> --limit 100
+  superia benchmark record <id> [options]       Enregistre une mesure sans contenu libre
+      --mode plan|build|review
+      --success|--failure
+      --duration-ms <entier> --cost-eur <nombre>
+      --quality <0..100>                        Note optionnelle et explicite
   superia local [--json]                        Affiche les outils locaux
   superia scan [--json]                         Analyse le dépôt courant
   superia init                                  Initialise dépôt et plan de contrôle
@@ -108,13 +117,18 @@ Usage:
 Principes:
   - Raspberry Pi 5 utilisé comme plan de contrôle, jamais comme modèle obligatoire
   - routeur hors ligne fondé sur disponibilité, capacités, coût et préférences explicites
+  - mesures locales privées limitées à fournisseur, mode, réussite, durée, coût et note optionnelle
+  - aucune mesure ne contient prompt, code, réponse, secret ou texte libre
+  - trois échantillons comparables minimum avant influence sur le classement
+  - influence mesurée bornée et incapable de rendre un fournisseur interdit éligible
   - recommandation séparée de l'autorisation réelle fournie par readiness
   - arrêt d'urgence privé, fail-closed et audité
   - engagement : blocage des nouveaux runs, SIGTERM puis SIGKILL des groupes récents vérifiés
   - diagnostics, status et dry-runs restent disponibles sous arrêt
   - restauration uniquement vers une cible absente, jamais par-dessus le contrôle actif
   - restauration atomique après SHA-256, intégrité SQLite et validation JSONL
-  - drill de reprise isolé avec comparaison projets, missions, runs, événements et journal
+  - benchmarks privés sauvegardés, restaurés et validés avec le plan de contrôle
+  - drill de reprise isolé avec comparaison projets, missions, runs, événements, journal et benchmarks
   - interface web uniquement sur 127.0.0.1 avec token privé et session HttpOnly
   - interface web en lecture seule, sans CORS ni contrôle destructif
   - notifications locales dédupliquées, privées et sans payloads arbitraires
