@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openControlPlane } from "../dist/control/control-plane.js";
+import { writeNotificationRecord } from "../dist/notifications/store.js";
 import { ensureWebAccessToken } from "../dist/web/auth.js";
 import { startWebServer } from "../dist/web/server.js";
 
@@ -56,6 +57,19 @@ async function fixture() {
   const run = control.createRun({ projectId: project.id, taskId: "TASK-0001", provider: "test" });
   control.finishRun(run.id, "completed");
   control.close();
+  await writeNotificationRecord({
+    schemaVersion: 1,
+    id: "NTF-WEB",
+    key: "web-test-notification",
+    createdAt: "2026-08-15T00:02:00.000Z",
+    level: "success",
+    kind: "run",
+    title: "Run terminé",
+    message: `${run.id} · TASK-0001`,
+    projectId: project.id,
+    taskId: "TASK-0001",
+    runId: run.id,
+  }, home);
   return { home, root, project };
 }
 
@@ -108,7 +122,9 @@ test("web dashboard stays local, authenticated and read-only", async () => {
 
     const page = await fetch(`${base}/`, { headers: { cookie } });
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /SUPER IA \/\/ CONTROL MATRIX/);
+    const pageHtml = await page.text();
+    assert.match(pageHtml, /SUPER IA \/\/ CONTROL MATRIX/);
+    assert.match(pageHtml, /Notifications locales/);
 
     const overview = await fetch(`${base}/api/overview`, { headers: { cookie } });
     assert.equal(overview.status, 200);
@@ -119,6 +135,8 @@ test("web dashboard stays local, authenticated and read-only", async () => {
     assert.equal(data.projects[0].id, env.project.id);
     assert.equal(data.tasks[0].id, "TASK-0001");
     assert.equal(data.runs[0].status, "completed");
+    assert.equal(data.notifications.length, 1);
+    assert.equal(data.notifications[0].title, "Run terminé");
     assert.equal(data.readiness.overall, "warn");
 
     const bearer = await fetch(`${base}/api/overview`, { headers: { authorization: `Bearer ${token}` } });
