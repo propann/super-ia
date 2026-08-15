@@ -13,10 +13,11 @@ declare module "node:fs/promises" {
   export function realpath(path: string): Promise<string>;
   export function rename(oldPath: string, newPath: string): Promise<void>;
   export function rm(path: string, options?: unknown): Promise<void>;
-  export function writeFile(path: string, data: string, encoding?: string): Promise<void>;
+  export function writeFile(path: string, data: string, options?: unknown): Promise<void>;
 }
 
 declare module "node:path" {
+  export const delimiter: string;
   export const sep: string;
   export function basename(path: string): string;
   export function dirname(path: string): string;
@@ -32,11 +33,17 @@ declare module "node:crypto" {
   export function createHash(algorithm: string): {
     update(value: unknown): { digest(encoding: "hex"): string };
   };
+  export function randomBytes(size: number): { toString(encoding: "base64url" | "hex"): string };
   export function randomUUID(): string;
+  export function timingSafeEqual(left: unknown, right: unknown): boolean;
 }
 
 declare module "node:dns/promises" {
   export function lookup(hostname: string, options: { all: true; verbatim?: boolean }): Promise<Array<{ address: string; family: number }>>;
+}
+
+declare module "node:http" {
+  export function createServer(listener: (request: any, response: any) => void): any;
 }
 
 declare module "node:sqlite" {
@@ -91,5 +98,6 @@ declare const process: {
     off(event: string, listener: (data: string) => void): void;
   };
   on(event: string, listener: () => void): void;
+  once(event: string, listener: () => void): void;
   off(event: string, listener: () => void): void;
 };
