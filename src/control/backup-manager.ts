@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
-import { chmod, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
+import { chmod, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { ensureControlHome } from "./home.js";
 
@@ -23,6 +23,30 @@ export interface BackupResult {
   manifestPath: string;
   manifest: BackupManifest;
 }
+
+export interface RestoreReceipt {
+  schemaVersion: 1;
+  backupId: string;
+  restoredAt: string;
+  sourceDirectory: string;
+  targetHome: string;
+  manifestSha256: string;
+  files: BackupFileRecord[];
+}
+
+export interface RestoreResult {
+  targetHome: string;
+  receiptPath: string;
+  receipt: RestoreReceipt;
+}
+
+const REQUIRED_BACKUP_FILES = new Set(["control.sqlite", "events.jsonl"]);
+const ALLOWED_BACKUP_FILES = new Set([
+  ...REQUIRED_BACKUP_FILES,
+  "emergency-stop.json",
+  "notifications-config.json",
+  "notifications-state.json",
+]);
 
 function safeTimestamp(date: Date): string {
   return date.toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
@@ -63,6 +87,95 @@ async function copyOptionalPrivateFile(
     return await fileRecord(destination);
   } catch (error) {
     if (missing(error)) return undefined;
+    throw error;
+  }
+}
+
+function manifestShapeErrors(value: unknown): string[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return ["MANIFEST.json: objet invalide"];
+  const manifest = value as Record<string, unknown>;
+  const errors: string[] = [];
+  if (manifest.schemaVersion !== 1) errors.push("MANIFEST.json: schemaVersion invalide");
+  if (typeof manifest.id !== "string" || !/^backup-[0-9]{14}$/.test(manifest.id)) errors.push("MANIFEST.json: identifiant invalide");
+  if (typeof manifest.createdAt !== "string" || !Number.isFinite(Date.parse(manifest.createdAt))) errors.push("MANIFEST.json: date invalide");
+  if (typeof manifest.sourceHome !== "string" || !manifest.sourceHome.trim()) errors.push("MANIFEST.json: sourceHome invalide");
+  if (!Array.isArray(manifest.files)) return [...errors, "MANIFEST.json: liste de fichiers invalide"];
+
+  const names = new Set<string>();
+  for (const entry of manifest.files) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      errors.push("MANIFEST.json: entrée de fichier invalide");
+      continue;
+    }
+    const file = entry as Record<string, unknown>;
+    if (typeof file.name !== "string" || basename(file.name) !== file.name || !ALLOWED_BACKUP_FILES.has(file.name)) {
+      errors.push(`MANIFEST.json: fichier interdit ${String(file.name)}`);
+      continue;
+    }
+    if (names.has(file.name)) errors.push(`MANIFEST.json: fichier dupliqué ${file.name}`);
+    names.add(file.name);
+    if (!Number.isInteger(file.bytes) || Number(file.bytes) < 0) errors.push(`${file.name}: taille invalide`);
+    if (typeof file.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(file.sha256)) errors.push(`${file.name}: SHA-256 invalide`);
+  }
+  for (const required of REQUIRED_BACKUP_FILES) {
+    if (!names.has(required)) errors.push(`MANIFEST.json: fichier requis absent ${required}`);
+  }
+  return errors;
+}
+
+async function readManifest(directory: string): Promise<{ manifest: BackupManifest; raw: string }> {
+  const raw = await readFile(join(directory, "MANIFEST.json"), "utf8");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    throw new Error("MANIFEST.json invalide : JSON illisible.");
+  }
+  const errors = manifestShapeErrors(parsed);
+  if (errors.length) throw new Error(errors.join("\n"));
+  return { manifest: parsed as BackupManifest, raw };
+}
+
+function restoreDestination(root: string, name: string): string {
+  if (name === "control.sqlite") return join(root, "control.sqlite");
+  if (name === "events.jsonl") return join(root, "events", "events.jsonl");
+  if (name === "emergency-stop.json") return join(root, "safety", "emergency-stop.json");
+  if (name === "notifications-config.json") return join(root, "notifications", "config.json");
+  if (name === "notifications-state.json") return join(root, "notifications", "state.json");
+  throw new Error(`Fichier de sauvegarde non pris en charge : ${name}`);
+}
+
+function assertDatabaseIntegrity(path: string): void {
+  const database = new DatabaseSync(path);
+  try {
+    const rows = database.prepare("PRAGMA integrity_check;").all();
+    const results = rows.flatMap((row) => Object.values(row).map(String));
+    if (!results.length || results.some((value) => value.toLowerCase() !== "ok")) {
+      throw new Error(`Base SQLite invalide : ${results.join(", ") || "aucun résultat"}`);
+    }
+  } finally {
+    database.close();
+  }
+}
+
+async function assertEventJournal(path: string): Promise<void> {
+  const content = await readFile(path, "utf8");
+  const lines = content.split("\n").filter((line) => line.trim());
+  for (let index = 0; index < lines.length; index += 1) {
+    try {
+      JSON.parse(lines[index]);
+    } catch {
+      throw new Error(`Journal JSONL invalide à la ligne ${index + 1}.`);
+    }
+  }
+}
+
+async function assertTargetAbsent(path: string): Promise<void> {
+  try {
+    await lstat(path);
+    throw new Error(`La cible existe déjà : ${path}`);
+  } catch (error) {
+    if (missing(error)) return;
     throw error;
   }
 }
@@ -139,11 +252,12 @@ export async function verifyControlBackup(directory: string): Promise<{
   manifest: BackupManifest;
   errors: string[];
 }> {
-  const manifest = JSON.parse(await readFile(join(directory, "MANIFEST.json"), "utf8")) as BackupManifest;
+  const resolved = resolve(directory);
+  const { manifest } = await readManifest(resolved);
   const errors: string[] = [];
   for (const expected of manifest.files) {
     try {
-      const actual = await fileRecord(join(directory, expected.name));
+      const actual = await fileRecord(join(resolved, expected.name));
       if (actual.bytes !== expected.bytes) errors.push(`${expected.name}: taille différente`);
       if (actual.sha256 !== expected.sha256) errors.push(`${expected.name}: empreinte différente`);
     } catch {
@@ -151,4 +265,65 @@ export async function verifyControlBackup(directory: string): Promise<{
     }
   }
   return { valid: errors.length === 0, manifest, errors };
+}
+
+export async function restoreControlBackup(
+  directory: string,
+  targetHome: string,
+  now: () => Date = () => new Date(),
+): Promise<RestoreResult> {
+  const source = resolve(directory);
+  const target = resolve(targetHome);
+  await assertTargetAbsent(target);
+
+  const verification = await verifyControlBackup(source);
+  if (!verification.valid) throw new Error(`Sauvegarde invalide :\n${verification.errors.join("\n")}`);
+  const { raw: manifestRaw } = await readManifest(source);
+
+  const parent = dirname(target);
+  const staging = join(parent, `.${basename(target)}.restore-${randomUUID()}`);
+  await mkdir(parent, { recursive: true });
+  await mkdir(staging, { recursive: false });
+  try {
+    await Promise.all([
+      mkdir(join(staging, "events"), { recursive: true }),
+      mkdir(join(staging, "runs"), { recursive: true }),
+      mkdir(join(staging, "backups"), { recursive: true }),
+      mkdir(join(staging, "safety"), { recursive: true }),
+      mkdir(join(staging, "notifications", "records"), { recursive: true }),
+    ]);
+
+    for (const expected of verification.manifest.files) {
+      const data = await readFile(join(source, expected.name));
+      const destination = restoreDestination(staging, expected.name);
+      await writeFile(destination, data, { mode: 0o600 });
+      await chmod(destination, 0o600);
+    }
+
+    assertDatabaseIntegrity(join(staging, "control.sqlite"));
+    await assertEventJournal(join(staging, "events", "events.jsonl"));
+
+    const receipt: RestoreReceipt = {
+      schemaVersion: 1,
+      backupId: verification.manifest.id,
+      restoredAt: now().toISOString(),
+      sourceDirectory: source,
+      targetHome: target,
+      manifestSha256: digest(manifestRaw),
+      files: verification.manifest.files,
+    };
+    const receiptPath = join(staging, "restore-receipt.json");
+    await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+    await chmod(receiptPath, 0o600);
+
+    await rename(staging, target);
+    return {
+      targetHome: target,
+      receiptPath: join(target, "restore-receipt.json"),
+      receipt,
+    };
+  } catch (error) {
+    await rm(staging, { recursive: true, force: true });
+    throw error;
+  }
 }
