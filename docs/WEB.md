@@ -10,6 +10,7 @@ Elle affiche en lecture seule :
 - projets enregistrés ;
 - missions du projet sélectionné ;
 - runs récents ;
+- notifications locales expurgées ;
 - événements récents ;
 - rapport `readiness` hors ligne.
 
@@ -100,7 +101,10 @@ Paramètres facultatifs de l’overview :
 projectId=<ID>
 runs=<1..200>
 events=<1..500>
+notifications=<1..200>
 ```
+
+Les notifications exposées par l’API sont les reçus déjà expurgés du moteur local. L’API ne reconstruit pas les messages à partir des payloads d’événements.
 
 ## Sécurité
 
@@ -118,7 +122,8 @@ Garanties actuelles :
 - `frame-ancestors 'none'` et `X-Frame-Options: DENY` ;
 - `Referrer-Policy: no-referrer` ;
 - limite de taille sur le formulaire de connexion ;
-- readiness sans réseau et sans lecture de valeurs de secrets.
+- readiness sans réseau et sans lecture de valeurs de secrets ;
+- notifications sans prompts, notes, payloads, métadonnées ou diagnostics.
 
 Le serveur n’est pas un service distant. Pour un accès depuis une autre machine, utiliser ultérieurement un tunnel SSH explicite plutôt que modifier l’adresse d’écoute.
 
@@ -142,6 +147,7 @@ Le serveur ferme les sessions mémoire et le socket HTTP.
 - accès par bearer explicite ;
 - lecture de vraies données SQLite ;
 - rendu de la page Matrix ;
+- exposition des reçus de notifications ;
 - absence de CORS ;
 - refus d’une méthode destructive ;
 - refus d’écouter sur `0.0.0.0` ;
@@ -153,5 +159,5 @@ Le serveur ferme les sessions mémoire et le socket HTTP.
 - pas d’accès distant ;
 - pas de WebSocket ;
 - rafraîchissement toutes les 30 secondes ;
-- aucune approbation ou commande d’agent depuis le navigateur ;
+- aucune approbation, suppression, acquittement ou commande d’agent depuis le navigateur ;
 - l’interface réelle reste à vérifier sur le Pi et sur mobile.
