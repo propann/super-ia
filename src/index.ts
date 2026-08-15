@@ -19,6 +19,7 @@ import { handleRuntimeCommand } from "./runtime/cli.js";
 import { handleSecurityCommand } from "./security/cli.js";
 import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
+import { handleWebCommand } from "./web/cli.js";
 
 function compactProvider(provider: typeof providerCatalog[number]) {
   return {
@@ -67,6 +68,7 @@ async function main(): Promise<void> {
   if (await handleAgentCommand(command, args, json, process.cwd())) return;
   if (await handlePipelineCommand(command, args, json, process.cwd())) return;
   if (await handleReceiptCommand(command, args, json)) return;
+  if (await handleWebCommand(command, args, json)) return;
 
   if (command === "readiness") {
     const report = await buildReadinessReport(process.cwd());
