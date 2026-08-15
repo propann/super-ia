@@ -16,7 +16,7 @@ Super IA s’installe comme **plan de contrôle utilisateur**. Le Pi stocke et o
 
 Le centre de contrôle reste installable sans Gitleaks ou Bubblewrap, mais Codex et Vibe sont alors bloqués par défaut.
 
-## Installation v0.15
+## Installation v0.16
 
 ```bash
 git clone https://github.com/propann/super-ia.git
@@ -47,7 +47,8 @@ La valeur de `SUPERIA_HOME` est conservée dans :
 - le wrapper `~/.local/bin/superia` ;
 - l’unité systemd utilisateur ;
 - `ReadWritePaths` de l’unité ;
-- l’initialisation, les sauvegardes et la preuve Bubblewrap.
+- l’initialisation, les sauvegardes et la preuve Bubblewrap ;
+- le token privé de l’interface web.
 
 Exemple :
 
@@ -56,7 +57,7 @@ export SUPERIA_HOME=/mnt/nvme/superia-control
 bash install/pi/install.sh
 ```
 
-Le daemon et la CLI utiliseront le même répertoire. Il ne faut pas déplacer ce répertoire sans régénérer le wrapper et le service.
+Le daemon, la CLI et l’interface web utiliseront le même répertoire. Il ne faut pas déplacer ce répertoire sans régénérer le wrapper et le service.
 
 ## Vérification initiale
 
@@ -70,11 +71,44 @@ superia readiness
 superia daemon --once --json
 superia backup list
 superia matrix --once
+superia web token
 systemctl --user status superia.service
 journalctl --user -u superia.service -n 100 --no-pager
 ```
 
 Le rapport Bubblewrap doit avoir `passed: true`. `readiness` doit distinguer clairement le contrôle local de l’autorisation des agents réels.
+
+## Interface web locale
+
+Démarrer l’interface dans un terminal :
+
+```bash
+superia web
+```
+
+Puis ouvrir depuis le navigateur **du Pi** :
+
+```text
+http://127.0.0.1:3210
+```
+
+Le token affichable avec `superia web token` est stocké en `0600` dans :
+
+```text
+$SUPERIA_HOME/web/access.token
+```
+
+Vérifier :
+
+- connexion avec le token ;
+- sélection des projets ;
+- missions, runs et événements visibles ;
+- état readiness visible ;
+- affichage mobile correct ;
+- fermeture de session ;
+- refus d’accès sans session.
+
+Le serveur refuse `0.0.0.0` et toute écoute LAN. Un futur accès depuis un autre ordinateur devra passer par un tunnel SSH explicite, pas par une exposition directe.
 
 ## Préparer une mission et son DAG
 
@@ -248,8 +282,11 @@ Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipt
 ## Ce que la CI prouve
 
 - build TypeScript ;
-- **79 tests réussis** sur le head vérifié ;
+- **81 tests réussis** sur le code v0.16 avant la dernière passe documentaire ;
 - audit npm sans vulnérabilité signalée ;
+- interface web locale authentifiée et lecture seule ;
+- refus d’écoute hors boucle locale ;
+- token privé et session HttpOnly ;
 - DAG, readiness, réseau et sauvegardes ;
 - préflight Gitleaks ;
 - construction Bubblewrap et masquage des fichiers privés ;
@@ -267,6 +304,7 @@ Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipt
 - installation ARM64 complète ;
 - namespaces Bubblewrap réellement opérationnels ;
 - service après déconnexion ;
+- affichage réel de l’interface web sur le Pi et mobile ;
 - Codex et Vibe authentifiés ;
 - pipeline réel avec deux fournisseurs ;
 - reprise après coupure ;
