@@ -17,6 +17,7 @@ import { handlePipelineCommand } from "./orchestration/cli.js";
 import { providerCatalog } from "./providers/catalog.js";
 import { handleReceiptCommand } from "./quality/cli.js";
 import { handleRuntimeCommand } from "./runtime/cli.js";
+import { handleSafetyCommand } from "./safety/cli.js";
 import { handleSecurityCommand } from "./security/cli.js";
 import { localToolCatalog } from "./tools/catalog.js";
 import { runMatrixConsole } from "./ui/matrix.js";
@@ -60,6 +61,7 @@ async function main(): Promise<void> {
   const [command = "help", ...args] = process.argv.slice(2);
   const json = args.includes("--json");
 
+  if (await handleSafetyCommand(command, args, json)) return;
   if (await handleOperationsCommand(command, args, json)) return;
   if (await handleControlCommand(command, args, json, process.cwd())) return;
   if (await handleTaskCommand(command, args, json, process.cwd())) return;
