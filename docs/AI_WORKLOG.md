@@ -2,230 +2,195 @@
 
 ## 14 août 2026 — fondation
 
-- Branche : `agent/bootstrap-universal-cli`.
-- Socle : CLI TypeScript, catalogue multi-fournisseurs, politiques de coût, scanner Git, missions et worktrees.
-- Règles : API désactivées par défaut, aucun contournement de quota, aucune fusion automatique.
+- branche `agent/bootstrap-universal-cli` ;
+- CLI TypeScript ;
+- catalogue multi-fournisseurs ;
+- scanner Git, missions et worktrees ;
+- APIs désactivées par défaut ;
+- aucune fusion automatique ;
+- Pi 5 choisi comme plan de contrôle, sans modèle local obligatoire.
 
-## Console Matrix et recherche
-
-- Console terminal Matrix reliée aux données réelles.
-- Étude des concurrents, agents ouverts, protocoles ACP/MCP/A2A, mémoire, contexte et architecture Pi.
-- Décision : Pi 5 comme plan de contrôle uniquement ; aucun modèle local obligatoire.
-- Catalogue de recherche machine-lisible et protocole de benchmark.
-
-## V0.4 à v0.9 — plan de contrôle, agents et preuves
+## V0.4 à v0.9 — plan de contrôle et preuves
 
 - SQLite WAL, projets, tâches, runs, événements et reprise ;
 - contexte Git ciblé et manifestes SHA-256 ;
-- runner avec logs, timeout et arrêt des descendants ;
+- runner avec logs, timeout et groupes de processus ;
 - Codex et Mistral Vibe ;
 - sauvegardes, daemon et service Pi ;
 - receipts et détection de falsification.
 
-## V0.10 à v0.12 — suivi et sécurité d’exécution
+## V0.10 à v0.14 — suivi et pipeline
 
 - priorités, blocages, dépendances et critères d’acceptation ;
 - roadmap JSON contrôlée par la CI ;
 - Gitleaks obligatoire ;
-- Bubblewrap, HOME jetable et worktree limité ;
-- dérogations explicites et journalisées.
-
-## V0.13 — contrôle et pipeline
-
-- chemins autorisés par mission ;
-- snapshot Git avant/après ;
-- patch et rapport archivés ;
-- fichiers hors périmètre bloquants ;
-- reviewer indépendant et structuré ;
+- Bubblewrap et HOME jetable ;
+- garde Git et chemins autorisés ;
+- reviewer indépendant ;
 - pipeline builder → validation → review → receipt ;
-- checkpoints atomiques et reprise contrôlée.
-
-## V0.14 — corrections bornées et garde renforcé
-
-- retry uniquement après `changes-requested` ;
-- feedback de review injecté au builder par fichier ;
-- plafonds de tentatives et de prix réservés immuables ;
-- empreinte SHA-256 de chaque patch ;
+- checkpoints, reprise et retry explicite ;
+- budgets immuables ;
 - patch identique détecté comme boucle ;
-- chemins critiques toujours interdits ;
-- limites de 50 fichiers et 1 000 000 octets effectifs.
+- limites de 50 fichiers et 1 Mo.
 
-## V0.15 — orchestration, readiness et durcissement
+## V0.15 — readiness, réseau et durcissement
 
-### Missions et état global
-
-- DAG de missions ;
-- cycles et dépendances inconnues refusés ;
-- blocage et déblocage automatiques ;
-- ordre topologique visible ;
-- rapport `superia readiness` hors ligne ;
-- distinction entre contrôle local prêt et agents réels prêts.
-
-### Connexions et réseau
-
-- politique HTTPS/public pour les endpoints distants ;
-- loopback, LAN, link-local, CGNAT, multicast et métadonnées cloud refusés ;
-- validation DNS avant sonde ;
-- query string, fragment et identifiants intégrés interdits ;
-- sonde explicite `--network`, sans authentification ni redirection ;
-- registre invalide conservé au lieu d’être écrasé.
-
-### Sandbox, coût et Pi
-
-- preuve Bubblewrap persistée en `0600` ;
-- preuve récente exigée par readiness ;
-- fichiers privés suivis, non suivis et ignorés masqués ;
-- noms Git conservés au caractère près ;
-- budget Vibe réel explicite ;
-- `SIGTERM` puis `SIGKILL` du groupe après timeout ;
-- `SUPERIA_HOME` transmis au wrapper et à systemd ;
-- sauvegarde locale et plans Restic non destructifs.
+- DAG avec cycles refusés ;
+- readiness hors ligne ;
+- politique HTTPS/public ;
+- blocage loopback, LAN, link-local et métadonnées cloud ;
+- validation DNS ;
+- sondes opt-in sans authentification ni redirection ;
+- preuve Bubblewrap en `0600` ;
+- masquage des fichiers privés suivis, non suivis et ignorés ;
+- budget Vibe obligatoire ;
+- `SIGTERM` puis `SIGKILL` après timeout ;
+- `SUPERIA_HOME` propagé à systemd ;
+- plans Restic non destructifs.
 
 ## V0.16 — interface web locale
 
-### Interface et sécurité
-
-- serveur HTTP Node natif sans dépendance runtime ;
-- design Matrix responsive sans ressource externe ;
+- serveur HTTP Node natif ;
+- design Matrix responsive ;
 - projets, missions, runs, événements et readiness ;
-- écoute uniquement sur `127.0.0.1` ou `::1` ;
-- refus explicite de `0.0.0.0` ;
-- token aléatoire en `0600` ;
-- token invalide conservé pour réparation ;
+- écoute uniquement sur loopback ;
+- token `0600` ;
 - comparaison en temps constant ;
-- session mémoire distincte du token ;
-- cookie HttpOnly et SameSite Strict ;
+- session mémoire et cookie HttpOnly ;
 - aucune CORS ;
-- CSP locale, cache désactivé et anti-frame ;
+- CSP, no-store, anti-frame et no-referrer ;
 - aucune action destructive.
-
-### Validation
-
-- tests HTTP avec de vraies données SQLite ;
-- connexion correcte et mauvais token ;
-- accès bearer explicite ;
-- données réelles du plan de contrôle ;
-- refus d’écoute distante.
-
-Une course procfs du test de descendant a également été corrigée : `ENOENT` et `ESRCH` signifient tous deux que le processus a déjà disparu.
 
 ## V0.17 — notifications locales
 
-### Moteur
+- runs terminés, échoués, annulés et interrompus ;
+- missions bloquées ;
+- traitement dans le daemon ;
+- configuration, curseur et reçus en `0600` ;
+- déduplication SHA-256 ;
+- aucun prompt, note, payload, métadonnée ou diagnostic dans les messages ;
+- affichage web en lecture seule ;
+- aucun canal réseau.
 
-- notifications pour runs terminés, échoués, annulés et interrompus ;
-- notification des missions bloquées ;
-- traitement manuel et automatique dans le daemon ;
-- erreur de notification non bloquante pour la synchronisation et la reprise ;
-- retard supérieur à 1000 événements refusé explicitement.
+## V0.18 — arrêt d’urgence global
 
-### Déduplication et stockage
+### État et commandes
 
-- configuration, curseur et reçus dans `SUPERIA_HOME/notifications` ;
+- `superia safety status` ;
+- `superia safety engage --category ...` ;
+- `superia safety release` ;
+- alias `superia stop` ;
+- état atomique dans `SUPERIA_HOME/safety/emergency-stop.json` ;
 - permissions `0600` ;
-- écritures atomiques pour configuration et curseur ;
-- reçus créés avec écriture exclusive ;
-- clé déterministe transformée en nom SHA-256 ;
-- second passage sans doublon ;
-- première initialisation positionnée sur le dernier événement existant pour éviter une rafale historique.
+- état invalide conservé et fail-closed ;
+- engagement/libération idempotents.
 
-### Expurgation
+### Barrière d’exécution
 
-Les reçus ne copient jamais :
+Sous arrêt, sont refusés :
 
-- prompts ;
-- titres ou objectifs libres ;
-- notes ;
-- payloads d’événements ;
-- métadonnées de run ;
+- Codex réel ;
+- Vibe réel ;
+- pipeline réel ;
+- run manuel.
+
+Restent accessibles :
+
 - diagnostics ;
-- noms de fournisseurs arbitraires ;
-- valeurs de secrets.
+- readiness ;
+- sauvegardes ;
+- consultation ;
+- dry-runs.
 
-Ils utilisent uniquement des identifiants internes filtrés, des statuts contrôlés et des dates.
+### Processus actifs
 
-### CLI et interface
+À l’engagement :
 
-- `superia notify status` ;
-- `superia notify run` ;
-- `superia notify list` ;
-- activation, désactivation et configuration des catégories ;
-- sortie console désactivée par défaut ;
-- affichage des reçus dans l’interface web locale ;
-- aucun canal réseau activé.
+- sélection uniquement des runs `queued`/`running` ;
+- PID supérieur à 1 et différent de Super IA ;
+- heartbeat inférieur à 60 secondes ;
+- probe du groupe ;
+- `SIGTERM` ;
+- délai d’une seconde ;
+- `SIGKILL` si le groupe résiste ;
+- skips et échecs audités uniquement avec des identifiants internes.
 
-### Validation
+Un test CI lance un vrai processus détaché qui ignore `SIGTERM`, attend sa confirmation de disponibilité, puis vérifie l’escalade et la disparition du groupe.
 
-- run échoué ;
-- mission bloquée ;
-- run interrompu par le daemon ;
-- absence de doublon ;
-- configuration invalide conservée ;
-- fichiers privés ;
-- chaînes ressemblant à des secrets absentes ;
-- exposition web authentifiée en lecture seule.
+### Intégrations
 
-## Cinq défauts matériels de revue corrigés
+- readiness refuse les agents réels mais garde le contrôle local ;
+- web affiche un bandeau sans route de commande ;
+- événements safety expurgés ;
+- sauvegarde locale inclut l’état safety et les réglages/cursor de notifications ;
+- tous les fichiers de sauvegarde sont en `0600` et couverts par SHA-256.
 
-1. budget Vibe implicite ;
-2. fichiers privés visibles dans le worktree ;
-3. descendant survivant après timeout ;
-4. `SUPERIA_HOME` personnalisé perdu par systemd ;
-5. registre de connexions invalide remplacé par défaut.
+## Corrections de revue déjà intégrées
 
-Chaque correction possède une preuve automatisée. Les cinq fils de revue GitHub ont reçu une réponse avec la preuve correspondante puis ont été résolus.
+1. budget Vibe implicite supprimé ;
+2. fichiers privés masqués dans le worktree ;
+3. descendants arrêtés après timeout ;
+4. `SUPERIA_HOME` transmis au service Pi ;
+5. registre de connexions invalide préservé.
 
-## Préparation machine complète
+## Préparation machine
 
-- profils Core, Standard et Full ;
-- installateur système Debian/Ubuntu explicite ;
+Profil Standard : Codex, Vibe, Gemini, Qwen, OpenCode, Aider, mini-SWE-agent, Repomix, Gitleaks, Bubblewrap, Restic, GitHub CLI, tmux et ShellCheck.
+
+Garanties :
+
 - installation utilisateur dans `~/.local` ;
-- Node 22 et Gitleaks vérifiés par SHA-256 ;
-- uv et outils Python isolés ;
+- dépendances système explicites ;
+- Node et Gitleaks vérifiés par SHA-256 ;
 - aucun modèle local ;
 - aucune clé configurée ;
-- aucun téléchargement transmis directement à un shell ;
-- dry-run non destructif contrôlé par la CI.
+- aucun téléchargement pipé vers un shell ;
+- dry-runs contrôlés par la CI.
 
-Profil Standard retenu pour le Pi : Codex, Vibe, Gemini, Qwen, OpenCode, Aider, mini-SWE-agent, Repomix, Gitleaks, Bubblewrap, Restic, GitHub CLI, tmux et ShellCheck.
-
-## Validation GitHub vérifiée
+## Validation GitHub
 
 - Ubuntu 24.04.4 ;
 - Node 22.23.2 ;
 - npm 10.9.8 ;
-- **83 tests réussis, 0 échec** ;
+- **89 tests réussis, 0 échec** sur le lot fonctionnel v0.18 ;
 - 0 vulnérabilité npm signalée ;
 - scripts Bash valides ;
-- absence de `curl|sh` ou `wget|sh` ;
 - dry-run complet des profils ;
 - aucune commande `sudo` cachée dans `install/pi`.
 
 ## État honnête
 
-La plomberie, les politiques, les scripts, les diagnostics, l’interface web et les notifications locales sont validés en CI Linux. Ne sont pas encore prouvés :
+Validé en CI Linux :
 
-- installation ARM64 réelle sur le Pi ;
-- affichage réel de l’interface sur le Pi et mobile ;
-- notifications après déconnexion systemd et redémarrage matériel ;
-- authentification des comptes ;
-- appels réseau et coûts réels ;
-- Bubblewrap sur le noyau du Pi ;
+- plomberie et état durable ;
+- pipeline, politiques et sécurité ;
+- interface web ;
+- notifications ;
+- arrêt d’urgence et escalade réelle sur groupe de processus ;
+- sauvegarde de l’état safety.
+
+Non encore prouvé :
+
+- installation ARM64 sur le Pi ;
+- Bubblewrap sur son noyau ;
+- service et arrêt d’urgence sous systemd ;
+- web/mobile après déconnexion ;
+- comptes et coûts réels ;
 - pipeline réel avec deux fournisseurs ;
-- handshakes MCP, ACP, A2A et SSH ;
-- coupure brutale et reprise matérielle ;
-- restauration Restic sur une copie.
+- MCP, ACP, A2A et SSH ;
+- coupure matérielle ;
+- restauration Restic sur copie.
 
 ## Prochaine phase
 
-1. installer le profil Standard sur le Pi ;
-2. vérifier le service avec le `SUPERIA_HOME` choisi ;
-3. valider l’interface web et les notifications après déconnexion ;
-4. choisir le coffre de secrets ;
-5. valider Bubblewrap et readiness ;
-6. configurer Restic et tester une restauration ;
+1. installer la v0.18 sur le Pi ;
+2. valider Bubblewrap ;
+3. tester safety sous systemd ;
+4. vérifier web et notifications après déconnexion ;
+5. choisir le coffre de secrets ;
+6. restaurer une sauvegarde ;
 7. authentifier Codex et Vibe ;
 8. exécuter un pipeline réel borné ;
-9. tester les protocoles et workers ;
+9. tester les protocoles ;
 10. mesurer coût, qualité et latence ;
 11. construire le routeur mesuré.
