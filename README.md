@@ -4,7 +4,7 @@
 
 Le **Raspberry Pi 5 sert de tour de contrôle permanente**. Il stocke l’état, prépare les contextes, lance ou surveille les agents, vérifie les résultats et sauvegarde les preuves. Les modèles IA restent chez leurs fournisseurs : **aucun modèle local n’est requis sur le Pi**.
 
-## État — v0.16.0
+## État — v0.17.0
 
 La branche de développement couvre maintenant :
 
@@ -22,6 +22,7 @@ La branche de développement couvre maintenant :
 - sondes réseau explicites, sans authentification ni redirection ;
 - rapport global `readiness` hors ligne ;
 - interface web locale authentifiée et en lecture seule ;
+- notifications locales privées, expurgées et dédupliquées ;
 - sauvegardes locales cohérentes et plans Restic non destructifs ;
 - daemon et service systemd utilisateur pour le Pi ;
 - CI durcie et Dependabot.
@@ -101,7 +102,25 @@ Puis ouvrir :
 http://127.0.0.1:3210
 ```
 
-L’interface montre projets, missions, runs, événements et readiness. Elle est limitée à la boucle locale, protégée par un token `0600`, utilise une session HttpOnly et ne propose aucune action destructive.
+L’interface montre projets, missions, runs, notifications, événements et readiness. Elle est limitée à la boucle locale, protégée par un token `0600`, utilise une session HttpOnly et ne propose aucune action destructive.
+
+## Notifications locales
+
+```bash
+superia notify status
+superia notify run
+superia notify list --limit 50
+```
+
+Le daemon produit des reçus locaux pour les fins et interruptions de runs ainsi que les missions bloquées. Les messages ne reprennent ni prompts, ni notes, ni payloads, ni métadonnées de run, ni diagnostics. Chaque reçu est dédupliqué par une clé SHA-256 et stocké en `0600`.
+
+La sortie console reste désactivée par défaut :
+
+```bash
+superia notify configure --stdout
+```
+
+Aucun canal réseau n’est activé.
 
 ## Missions et DAG
 
@@ -223,6 +242,7 @@ superia project add /chemin/du/depot
 superia project list
 superia run list
 superia events --limit 100
+superia notify list
 superia daemon --once
 superia matrix
 superia web
@@ -233,6 +253,7 @@ superia web
 - installation ARM64 réelle du profil Standard ;
 - autotest Bubblewrap sur le noyau du Pi ;
 - validation visuelle de l’interface web sur le Pi et sur mobile ;
+- validation du daemon et des notifications après déconnexion ;
 - choix du coffre de secrets ;
 - configuration d’un dépôt Restic et test de restauration ;
 - authentification interactive des CLI ;
@@ -246,6 +267,7 @@ superia web
 
 - [État vérifié](docs/STATUS.md)
 - [Interface web locale](docs/WEB.md)
+- [Notifications locales](docs/NOTIFICATIONS.md)
 - [Toolchain](docs/TOOLCHAIN.md)
 - [Connexions](docs/CONNECTIONS.md)
 - [Feuille de route](docs/ROADMAP.md)
