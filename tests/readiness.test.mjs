@@ -46,6 +46,14 @@ async function validInputs() {
       checkedAt: "2026-08-14T00:00:00.000Z",
       platform: "linux",
     },
+    emergencyStop: {
+      schemaVersion: 1,
+      engaged: false,
+      category: null,
+      generation: 0,
+      updatedAt: generatedAt,
+      releasedAt: generatedAt,
+    },
     platform: "linux",
     generatedAt,
   };
@@ -59,7 +67,25 @@ test("readiness distinguishes local control from real-agent evidence without net
   assert.equal(report.secretsRead, false);
   assert.equal(report.counts.fail, 0);
   assert.equal(report.overall, "warn");
+  assert.ok(report.checks.some((item) => item.id === "safety.emergency-stop" && item.level === "pass"));
   assert.match(renderReadinessReport(report), /Aucun accès réseau effectué/);
+});
+
+test("readiness keeps local control available but blocks real agents during emergency stop", async () => {
+  const inputs = await validInputs();
+  inputs.emergencyStop = {
+    schemaVersion: 1,
+    engaged: true,
+    category: "security",
+    generation: 3,
+    updatedAt: generatedAt,
+    engagedAt: generatedAt,
+  };
+  const report = assembleReadinessReport(inputs);
+  assert.equal(report.readyForLocalControl, true);
+  assert.equal(report.readyForRealAgents, false);
+  assert.equal(report.overall, "fail");
+  assert.ok(report.checks.some((item) => item.id === "safety.emergency-stop" && item.level === "fail"));
 });
 
 test("readiness fails closed for unsafe budget, invalid endpoint and missing sandbox evidence", async () => {
