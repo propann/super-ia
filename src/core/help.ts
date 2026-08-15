@@ -1,5 +1,5 @@
 export function printHelp(): void {
-  console.log(`Super IA v0.17.0
+  console.log(`Super IA v0.18.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
@@ -11,6 +11,12 @@ Usage:
   superia local [--json]                        Affiche les outils locaux
   superia scan [--json]                         Analyse le dépôt courant
   superia init                                  Initialise dépôt et plan de contrôle
+
+  superia safety status [--json]                État de l'arrêt d'urgence
+  superia safety engage [options]               Bloque les lancements et coupe les runs récents
+      --category manual|security|budget|maintenance
+  superia safety release [--json]               Lève explicitement l'arrêt d'urgence
+  superia stop ...                              Alias de superia safety
 
   superia notify status [--json]                État des notifications locales
   superia notify run [--json]                   Traite les nouveaux événements
@@ -94,6 +100,9 @@ Usage:
 
 Principes:
   - Raspberry Pi 5 utilisé comme plan de contrôle, jamais comme modèle obligatoire
+  - arrêt d'urgence privé, fail-closed et audité
+  - engagement : blocage des nouveaux runs, SIGTERM puis SIGKILL des groupes récents vérifiés
+  - diagnostics, status et dry-runs restent disponibles sous arrêt
   - interface web uniquement sur 127.0.0.1 avec token privé et session HttpOnly
   - interface web en lecture seule, sans CORS ni contrôle destructif
   - notifications locales dédupliquées, privées et sans payloads arbitraires
