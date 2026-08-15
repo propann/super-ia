@@ -117,13 +117,67 @@ Restent accessibles :
 
 Un test CI lance un vrai processus détaché qui ignore `SIGTERM`, attend sa confirmation de disponibilité, puis vérifie l’escalade et la disparition du groupe.
 
-### Intégrations
+## V0.19 — restauration, préflight Pi et routeur
 
-- readiness refuse les agents réels mais garde le contrôle local ;
-- web affiche un bandeau sans route de commande ;
-- événements safety expurgés ;
-- sauvegarde locale inclut l’état safety et les réglages/cursor de notifications ;
-- tous les fichiers de sauvegarde sont en `0600` et couverts par SHA-256.
+### Restauration atomique
+
+- commande `superia backup restore <backup> --target <nouveau-home>` ;
+- cible existante refusée ;
+- manifeste validé avant copie ;
+- liste fermée des fichiers restaurables ;
+- `control.sqlite` et `events.jsonl` obligatoires ;
+- vérification tailles et SHA-256 ;
+- copie binaire ;
+- contrôle `PRAGMA integrity_check` ;
+- parsing de chaque ligne JSONL ;
+- restauration de safety et notifications ;
+- staging dans un dossier frère ;
+- renommage atomique ;
+- suppression du staging en cas d’échec ;
+- reçu privé `restore-receipt.json`.
+
+### Drill de reprise
+
+- commande `superia backup drill` ;
+- option `--keep` pour conserver la copie ;
+- création d’une sauvegarde réelle ;
+- restauration dans une copie isolée ;
+- comparaison projets, missions, runs, événements et lignes JSONL ;
+- rapport `DRILL.json` en `0600` ;
+- nettoyage automatique de la copie par défaut.
+
+### Préflight SD/HDD/SSD/SSH
+
+- script `install/pi/preflight.sh` ;
+- aucune modification, aucun réseau et aucun privilège ;
+- détection Linux et architecture ;
+- distribution, source de `/`, type de système de fichiers ;
+- classification SD, USB/HDD/SSD, NVMe ou environnement virtuel ;
+- espace libre ;
+- Git, npm et Node >= 22.5 ;
+- outils locaux ;
+- client et serveur SSH ;
+- systemd utilisateur et linger ;
+- mode `--strict` exécuté par la CI.
+
+Le dépôt ne partitionne, ne formate et ne clone volontairement aucun disque.
+
+### Routeur hors ligne
+
+- commande `superia route` ;
+- modes `plan`, `build` et `review` ;
+- budgets `zero`, `low` et `any` ;
+- vérification de la commande installée ;
+- exclusion des adaptateurs non prêts ;
+- contrôle des capacités et de l’automatisation ;
+- respect de la politique API ;
+- utilisation des préférences du projet ;
+- classement déterministe ;
+- explication de chaque sélection ou exclusion ;
+- recommandation séparée de l’autorisation `readiness` ;
+- aucun appel réseau et aucun lancement.
+
+Aucun score de qualité n’est inventé. Le routeur mesuré reste en cours jusqu’aux benchmarks réels.
 
 ## Corrections de revue déjà intégrées
 
@@ -131,7 +185,9 @@ Un test CI lance un vrai processus détaché qui ignore `SIGTERM`, attend sa con
 2. fichiers privés masqués dans le worktree ;
 3. descendants arrêtés après timeout ;
 4. `SUPERIA_HOME` transmis au service Pi ;
-5. registre de connexions invalide préservé.
+5. registre de connexions invalide préservé ;
+6. restauration interdite par-dessus une cible existante ;
+7. routeur séparé du lancement réel.
 
 ## Préparation machine
 
@@ -145,18 +201,23 @@ Garanties :
 - aucun modèle local ;
 - aucune clé configurée ;
 - aucun téléchargement pipé vers un shell ;
-- dry-runs contrôlés par la CI.
+- dry-runs contrôlés par la CI ;
+- préflight matériel en lecture seule.
 
-## Validation GitHub
+## Validation GitHub v0.19
 
 - Ubuntu 24.04.4 ;
 - Node 22.23.2 ;
 - npm 10.9.8 ;
-- **89 tests réussis, 0 échec** sur le lot fonctionnel v0.18 ;
+- **95 tests réussis, 0 échec** ;
 - 0 vulnérabilité npm signalée ;
+- restauration et drill validés ;
+- routeur déterministe validé ;
+- préflight exécuté en mode strict ;
 - scripts Bash valides ;
 - dry-run complet des profils ;
-- aucune commande `sudo` cachée dans `install/pi`.
+- aucune commande `sudo` cachée dans `install/pi` ;
+- aucun téléchargement distant pipé vers un shell.
 
 ## État honnête
 
@@ -167,30 +228,37 @@ Validé en CI Linux :
 - interface web ;
 - notifications ;
 - arrêt d’urgence et escalade réelle sur groupe de processus ;
-- sauvegarde de l’état safety.
+- restauration atomique et drill isolé ;
+- routeur hors ligne explicable ;
+- préflight matériel non destructif.
 
 Non encore prouvé :
 
-- installation ARM64 sur le Pi ;
+- démarrage du Pi sur son HDD/SSD ou NVMe ;
+- installation ARM64 ;
 - Bubblewrap sur son noyau ;
 - service et arrêt d’urgence sous systemd ;
 - web/mobile après déconnexion ;
+- restauration v0.19 sur stockage réel et depuis Restic ;
 - comptes et coûts réels ;
 - pipeline réel avec deux fournisseurs ;
-- MCP, ACP, A2A et SSH ;
+- MCP, ACP, A2A et worker SSH ;
 - coupure matérielle ;
-- restauration Restic sur copie.
+- benchmarks coût, qualité et latence.
 
 ## Prochaine phase
 
-1. installer la v0.18 sur le Pi ;
-2. valider Bubblewrap ;
-3. tester safety sous systemd ;
-4. vérifier web et notifications après déconnexion ;
-5. choisir le coffre de secrets ;
-6. restaurer une sauvegarde ;
-7. authentifier Codex et Vibe ;
-8. exécuter un pipeline réel borné ;
-9. tester les protocoles ;
-10. mesurer coût, qualité et latence ;
-11. construire le routeur mesuré.
+1. terminer la SD puis installer ou migrer vers HDD/SSD ;
+2. confirmer le support racine ;
+3. activer SSH ;
+4. exécuter le préflight strict ;
+5. installer la v0.19 et le profil Standard ;
+6. valider Bubblewrap et systemd ;
+7. exécuter le drill et une restauration de copie ;
+8. tester safety, web et notifications ;
+9. choisir le coffre de secrets ;
+10. authentifier Codex et Vibe ;
+11. exécuter un pipeline réel borné ;
+12. tester les protocoles ;
+13. mesurer coût, qualité et latence ;
+14. enrichir le routeur avec les mesures.
