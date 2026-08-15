@@ -4,6 +4,7 @@ import { evaluateEndpointPolicy } from "../connections/network-policy.js";
 import { inspectSecretBackends, type SecretBackendCheck } from "../connections/secret-backends.js";
 import { inspectConnections } from "../connections/store.js";
 import type { ConnectionCheck } from "../connections/types.js";
+import { loadEmergencyStop, type EmergencyStopState } from "../safety/store.js";
 import { loadSandboxCheckReport, type SandboxCheckReport } from "../security/sandbox-check.js";
 import { localToolCatalog } from "../tools/catalog.js";
 import { loadProjectConfig } from "./config.js";
@@ -45,6 +46,7 @@ export interface ReadinessInputs {
   config: SuperIaConfig;
   graph: TaskGraphAnalysis;
   sandboxReport?: SandboxCheckReport;
+  emergencyStop?: EmergencyStopState;
   platform: string;
   generatedAt?: string;
 }
@@ -135,6 +137,17 @@ export function assembleReadinessReport(inputs: ReadinessInputs): ReadinessRepor
   const sandbox = sandboxEvidence(normalizedInputs);
   checks.push(sandbox.check);
 
+  const emergencyStop = inputs.emergencyStop;
+  checks.push(emergencyStop?.engaged
+    ? check(
+        "safety.emergency-stop",
+        "Arrêt d'urgence",
+        "fail",
+        `Engagé (${emergencyStop.category}) depuis ${emergencyStop.engagedAt ?? emergencyStop.updatedAt}.`,
+        ["Les diagnostics et dry-runs restent disponibles ; aucun lancement réel n'est autorisé."],
+      )
+    : check("safety.emergency-stop", "Arrêt d'urgence", "pass", "Aucun arrêt d'urgence n'est engagé."));
+
   checks.push(inputs.graph.valid
     ? check("tasks.dag", "DAG des missions", "pass", `${inputs.graph.order.length} mission(s), aucun cycle ni dépendance manquante.`)
     : check("tasks.dag", "DAG des missions", "fail", "Le graphe des missions est invalide.", [
@@ -188,7 +201,7 @@ export function assembleReadinessReport(inputs: ReadinessInputs): ReadinessRepor
     fail: checks.filter((item) => item.level === "fail").length,
   };
   const overall: ReadinessLevel = counts.fail > 0 ? "fail" : counts.warn > 0 ? "warn" : "pass";
-  const securityFailures = checks.filter((item) => item.level === "fail" && ["security.gitleaks", "network.policy", "policy.human-merge", "policy.redaction", "policy.api-budget"].includes(item.id));
+  const securityFailures = checks.filter((item) => item.level === "fail" && ["security.gitleaks", "safety.emergency-stop", "network.policy", "policy.human-merge", "policy.redaction", "policy.api-budget"].includes(item.id));
 
   return {
     schemaVersion: 1,
@@ -205,7 +218,7 @@ export function assembleReadinessReport(inputs: ReadinessInputs): ReadinessRepor
 }
 
 export async function buildReadinessReport(root: string): Promise<ReadinessReport> {
-  const [repository, providers, tools, connections, secretBackends, config, graph, sandboxReport] = await Promise.all([
+  const [repository, providers, tools, connections, secretBackends, config, graph, sandboxReport, emergencyStop] = await Promise.all([
     scanRepository(root),
     inspectProviders(),
     inspectLocalTools(),
@@ -214,6 +227,7 @@ export async function buildReadinessReport(root: string): Promise<ReadinessRepor
     loadProjectConfig(root),
     taskGraphFor(root),
     loadSandboxCheckReport(),
+    loadEmergencyStop(),
   ]);
   return assembleReadinessReport({
     repository,
@@ -224,6 +238,7 @@ export async function buildReadinessReport(root: string): Promise<ReadinessRepor
     config,
     graph,
     sandboxReport,
+    emergencyStop,
     platform: process.platform,
   });
 }
