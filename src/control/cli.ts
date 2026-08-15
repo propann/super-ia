@@ -1,5 +1,6 @@
 import { scanRepository } from "../core/repository-scanner.js";
 import { listTasks } from "../core/task-store.js";
+import { assertExecutionAllowed } from "../safety/store.js";
 import { openControlPlane } from "./control-plane.js";
 import { registerRepositorySnapshot } from "./repository-registry.js";
 
@@ -99,6 +100,7 @@ export async function handleControlCommand(
       const values = positional(args);
       const action = values[0] ?? "list";
       if (action === "start") {
+        await assertExecutionAllowed(control.paths.root);
         const provider = values[1];
         if (!provider) {
           throw new Error("Usage : superia run start <provider> [TASK-ID] [--project PROJECT-ID]");
