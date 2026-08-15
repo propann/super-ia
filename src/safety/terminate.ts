@@ -3,6 +3,7 @@ import type { RunRecord } from "../control/types.js";
 
 const DEFAULT_HEARTBEAT_MAX_AGE_MS = 60_000;
 const DEFAULT_GRACE_MS = 1_000;
+type ProcessSignal = 0 | "SIGTERM" | "SIGKILL";
 
 export interface EmergencyTerminationReport {
   schemaVersion: 1;
@@ -42,7 +43,7 @@ function errorCode(error: unknown): string {
   return "UNKNOWN";
 }
 
-function signalProcessGroup(pid: number, signal: NodeJS.Signals | 0): "sent" | "exited" | "failed" {
+function signalProcessGroup(pid: number, signal: ProcessSignal): "sent" | "exited" | "failed" {
   try {
     process.kill(processTarget(pid), signal);
     return "sent";
