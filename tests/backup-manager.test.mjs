@@ -10,6 +10,7 @@ import {
   verifyControlBackup,
 } from "../dist/control/backup-manager.js";
 import { openControlPlane } from "../dist/control/control-plane.js";
+import { runControlRecoveryDrill } from "../dist/control/recovery-drill.js";
 import {
   loadNotificationConfig,
   loadNotificationState,
@@ -130,5 +131,30 @@ test("verified restore recreates a private control home and refuses collisions",
     );
   } finally {
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("offline recovery drill compares durable data and removes its temporary copy", async () => {
+  const home = await mkdtemp(join(tmpdir(), "superia-drill-"));
+  try {
+    const control = await openControlPlane(home);
+    const project = control.registerProject(scan("/srv/git/drill-demo"));
+    control.createRun({ projectId: project.id, provider: "codex-cli", taskId: "TASK-0001" });
+    control.close();
+
+    const result = await runControlRecoveryDrill(
+      home,
+      false,
+      () => new Date("2026-08-15T00:02:00.000Z"),
+    );
+    assert.equal(result.report.passed, true);
+    assert.deepEqual(result.report.source, result.report.restored);
+    assert.equal(result.report.source.projects, 1);
+    assert.equal(result.report.source.runs, 1);
+    assert.equal(result.report.kept, false);
+    assert.equal((await stat(result.reportPath)).mode & 0o777, 0o600);
+    await assert.rejects(stat(result.report.restoredHome), /ENOENT/);
+  } finally {
+    await rm(home, { recursive: true, force: true });
   }
 });
