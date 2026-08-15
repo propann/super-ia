@@ -1,6 +1,7 @@
 import { loadProjectConfig } from "../core/config.js";
 import { inspectProviders } from "../core/doctor.js";
 import { buildReadinessReport } from "../core/readiness.js";
+import { benchmarkSummaries, benchmarkSummaryMap } from "./benchmark-store.js";
 import { routeProvider, type RoutingBudget, type RoutingMode } from "./router.js";
 
 function valueAfter(args: string[], flag: string): string | undefined {
@@ -20,6 +21,10 @@ function routingBudget(value: string | undefined, monthlyBudget: number): Routin
   throw new Error("Budget de routage invalide : zero, low ou any attendu.");
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function handleProviderRoutingCommand(
   command: string,
   args: string[],
@@ -35,6 +40,15 @@ export async function handleProviderRoutingCommand(
     inspectProviders(),
     buildReadinessReport(repositoryRoot),
   ]);
+
+  let benchmarks = {};
+  const measurementWarnings: string[] = [];
+  try {
+    benchmarks = benchmarkSummaryMap(await benchmarkSummaries());
+  } catch (error) {
+    measurementWarnings.push(`Mesures locales ignorées : ${errorMessage(error)}`);
+  }
+
   const decision = routeProvider(providers, {
     mode,
     budget,
@@ -45,10 +59,11 @@ export async function handleProviderRoutingCommand(
     readinessBlockers: readiness.checks
       .filter((check) => check.level === "fail")
       .map((check) => `${check.label}: ${check.summary}`),
+    benchmarks,
   });
 
   if (asJson) {
-    console.log(JSON.stringify({ decision, readiness: {
+    console.log(JSON.stringify({ decision, measurementWarnings, readiness: {
       overall: readiness.overall,
       readyForLocalControl: readiness.readyForLocalControl,
       readyForRealAgents: readiness.readyForRealAgents,
@@ -60,10 +75,11 @@ export async function handleProviderRoutingCommand(
     console.log(`Recommandation : ${decision.recommendedProviderId ?? "aucun fournisseur éligible"}`);
     console.log(`Lancement réel : ${decision.launchAllowed ? "AUTORISÉ" : "BLOQUÉ"}`);
     for (const blocker of decision.launchBlockedBy) console.log(`  - ${blocker}`);
+    for (const warning of measurementWarnings) console.log(`  - AVERTISSEMENT : ${warning}`);
     console.log("\nClassement :");
     for (const item of decision.candidates) {
       const state = item.eligible ? "ÉLIGIBLE" : "EXCLU";
-      console.log(`${state.padEnd(8)} ${item.id.padEnd(29)} score=${String(item.score).padStart(3)} coût=${item.cost}`);
+      console.log(`${state.padEnd(8)} ${item.id.padEnd(29)} score=${String(item.score).padStart(3)} mesure=${item.benchmarkScore >= 0 ? "+" : ""}${item.benchmarkScore} coût=${item.cost}`);
       for (const reason of item.eligible ? item.reasons : item.rejectedBy) console.log(`           - ${reason}`);
     }
   }
