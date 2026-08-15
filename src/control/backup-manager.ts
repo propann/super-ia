@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { chmod, copyFile, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { loadBenchmarkStore } from "../providers/benchmark-store.js";
 import { ensureControlHome } from "./home.js";
 
 export interface BackupFileRecord {
@@ -46,6 +47,7 @@ const ALLOWED_BACKUP_FILES = new Set([
   "emergency-stop.json",
   "notifications-config.json",
   "notifications-state.json",
+  "provider-benchmarks.json",
 ]);
 
 function safeTimestamp(date: Date): string {
@@ -142,6 +144,7 @@ function restoreDestination(root: string, name: string): string {
   if (name === "emergency-stop.json") return join(root, "safety", "emergency-stop.json");
   if (name === "notifications-config.json") return join(root, "notifications", "config.json");
   if (name === "notifications-state.json") return join(root, "notifications", "state.json");
+  if (name === "provider-benchmarks.json") return join(root, "providers", "benchmarks.json");
   throw new Error(`Fichier de sauvegarde non pris en charge : ${name}`);
 }
 
@@ -226,6 +229,10 @@ export async function createControlBackup(
       join(paths.root, "notifications", "state.json"),
       join(directory, "notifications-state.json"),
     ),
+    copyOptionalPrivateFile(
+      join(paths.root, "providers", "benchmarks.json"),
+      join(directory, "provider-benchmarks.json"),
+    ),
   ]);
   for (const record of optional) if (record) files.push(record);
 
@@ -291,6 +298,7 @@ export async function restoreControlBackup(
       mkdir(join(staging, "backups"), { recursive: true }),
       mkdir(join(staging, "safety"), { recursive: true }),
       mkdir(join(staging, "notifications", "records"), { recursive: true }),
+      mkdir(join(staging, "providers"), { recursive: true }),
     ]);
 
     for (const expected of verification.manifest.files) {
@@ -301,6 +309,9 @@ export async function restoreControlBackup(
 
     assertDatabaseIntegrity(join(staging, "control.sqlite"));
     await assertEventJournal(join(staging, "events", "events.jsonl"));
+    if (verification.manifest.files.some((file) => file.name === "provider-benchmarks.json")) {
+      await loadBenchmarkStore(staging);
+    }
 
     const receipt: RestoreReceipt = {
       schemaVersion: 1,
