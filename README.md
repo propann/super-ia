@@ -4,7 +4,7 @@
 
 Le **Raspberry Pi 5 sert de tour de contrôle permanente**. Il stocke l’état, prépare les contextes, lance ou surveille les agents, vérifie les résultats et sauvegarde les preuves. Les modèles IA restent chez leurs fournisseurs : **aucun modèle local n’est requis sur le Pi**.
 
-## État — v0.18.0
+## État — v0.19.0
 
 La branche de développement couvre :
 
@@ -20,10 +20,14 @@ La branche de développement couvre :
 - Connection Matrix pour CLI, APIs, cloud, MCP, ACP, A2A, SSH et web assisté ;
 - politique anti-SSRF et sondes réseau explicites ;
 - rapport global `readiness` hors ligne ;
+- routeur hors ligne explicable par capacités, disponibilité, coût et préférences ;
 - interface web locale authentifiée et en lecture seule ;
 - notifications locales privées, expurgées et dédupliquées ;
-- **arrêt d’urgence global** bloquant les runs réels et arrêtant les groupes gérés récents ;
-- sauvegardes locales cohérentes incluant l’état safety et les réglages de notifications ;
+- arrêt d’urgence global bloquant les runs réels et arrêtant les groupes gérés récents ;
+- sauvegardes locales cohérentes incluant safety et notifications ;
+- restauration atomique vers une nouvelle cible ;
+- drill de reprise hors ligne ;
+- préflight Pi/HDD/SSH strictement en lecture seule ;
 - plans Restic non destructifs ;
 - daemon et service systemd utilisateur pour le Pi ;
 - CI durcie et Dependabot.
@@ -45,13 +49,26 @@ Node.js **22.5 ou supérieur** est requis.
 
 ## Préparer le Raspberry Pi 5
 
+Ordre matériel retenu :
+
+```text
+SD → installation ou migration vers HDD/SSD → vérification du boot → SSH → Super IA
+```
+
+Le guide détaillé est dans [docs/PI_BOOTSTRAP.md](docs/PI_BOOTSTRAP.md).
+
+Après le boot HDD/SSD et l’accès SSH :
+
 ```bash
+sh install/pi/preflight.sh
 bash install/tools/prepare-machine.sh --phase plan --profile standard
 sudo bash install/tools/prepare-machine.sh --phase system --profile standard
 bash install/tools/prepare-machine.sh --phase user --profile standard
 bash install/tools/prepare-machine.sh --phase superia
 bash install/tools/prepare-machine.sh --phase verify --profile standard
 ```
+
+Le préflight ne modifie rien et ne contacte aucun serveur. Il indique notamment si `/` est encore sur SD ou déjà sur USB/HDD/SSD/NVMe.
 
 Profils :
 
@@ -78,6 +95,27 @@ superia readiness
 - **agents réels prêts** : Gitleaks, Bubblewrap récent, agent installé, politiques sûres et arrêt d’urgence libre.
 
 La commande ne contacte aucun serveur et ne lit aucune valeur de secret.
+
+## Routeur de fournisseurs
+
+```bash
+superia route --mode plan --budget zero
+superia route --mode build --budget low
+superia route --mode review --budget any --json
+```
+
+Le routeur :
+
+- ne lance aucun agent ;
+- n’effectue aucun appel réseau ;
+- ne dépense rien ;
+- examine les commandes réellement présentes ;
+- refuse les adaptateurs non prêts ou sans capacités suffisantes ;
+- respecte la politique API, le budget et les préférences du projet ;
+- sépare la recommandation du verdict `readiness` autorisant ou non un lancement réel ;
+- explique chaque sélection et exclusion.
+
+Il n’invente pas de classement de qualité. Les mesures coût/latence/qualité réelles restent à produire après authentification.
 
 ## Arrêt d’urgence
 
@@ -179,23 +217,30 @@ superia connection probe <ID> --network --timeout-ms 5000
 
 Elle utilise `HEAD`, n’envoie aucune authentification et ne suit aucune redirection.
 
-## Sauvegardes
+## Sauvegardes et reprise
 
 ```bash
 superia backup create
 superia backup list
 superia backup verify ~/.superia/backups/backup-YYYYMMDDHHMMSS
+superia backup restore ~/.superia/backups/backup-YYYYMMDDHHMMSS \
+  --target "$HOME/superia-restored-check"
+superia backup drill
 ```
 
-Chaque sauvegarde locale contient :
+La restauration :
 
-- copie SQLite cohérente ;
-- journal JSONL ;
-- état d’arrêt d’urgence lorsqu’il existe ;
-- configuration et curseur des notifications lorsqu’ils existent ;
-- manifeste tailles + SHA-256.
+- exige une cible absente ;
+- vérifie manifeste, tailles et SHA-256 ;
+- contrôle l’intégrité SQLite ;
+- valide chaque ligne JSONL ;
+- écrit dans un dossier temporaire puis effectue un renommage atomique ;
+- produit un reçu privé ;
+- ne remplace jamais automatiquement le contrôle actif.
 
-Les fichiers sont privés en `0600`.
+Le drill crée et restaure une copie isolée, compare projets, missions, runs, événements et journal, puis supprime la copie sauf avec `--keep`.
+
+La procédure complète est dans [docs/RECOVERY.md](docs/RECOVERY.md).
 
 Restic reste opt-in :
 
@@ -218,6 +263,8 @@ superia run list
 superia events --limit 100
 superia safety status
 superia notify list
+superia route --mode plan --budget zero
+superia backup drill
 superia daemon --once
 superia matrix
 superia web
@@ -226,26 +273,30 @@ superia web
 ## Ce qui exige encore le Pi ou les comptes
 
 - installation ARM64 réelle du profil Standard ;
+- preuve que la racine boote sur le HDD/SSD cible ;
 - autotest Bubblewrap sur le noyau du Pi ;
 - validation du service après déconnexion ;
 - test réel de l’arrêt d’urgence sous systemd ;
 - validation web/mobile et notifications après redémarrage ;
 - choix du coffre de secrets ;
-- dépôt Restic et restauration sur copie ;
+- restauration v0.19 sur le stockage réel ;
+- dépôt Restic et restauration hors machine ;
 - authentification interactive des CLI ;
 - tests bornés des fournisseurs activés ;
-- handshakes MCP, ACP, A2A et SSH ;
+- handshakes MCP, ACP, A2A et worker SSH ;
 - coupure brutale et reprise ;
 - pipeline réel Codex/Vibe avec receipts ;
-- benchmark coût/qualité avant routage automatique.
+- benchmark coût/qualité/latence avant routage automatique.
 
 ## Documentation
 
 - [État vérifié](docs/STATUS.md)
+- [Mise en route SD → HDD/SSD → SSH](docs/PI_BOOTSTRAP.md)
+- [Installation Pi](docs/PI_INSTALL.md)
+- [Sauvegarde et restauration](docs/RECOVERY.md)
 - [Arrêt d’urgence](docs/SAFETY.md)
 - [Interface web locale](docs/WEB.md)
 - [Notifications locales](docs/NOTIFICATIONS.md)
-- [Installation Pi](docs/PI_INSTALL.md)
 - [Feuille de route](docs/ROADMAP.md)
 - [Suivi des tâches](docs/TASK_TRACKER.md)
 - [Registre projet](docs/ROADMAP_TRACKER.json)
