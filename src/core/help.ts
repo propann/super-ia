@@ -8,6 +8,11 @@ Usage:
   superia readiness [--json]                    Verdict global hors ligne
   superia doctor [--json]                       Détecte les IA et outils locaux
   superia providers [--json]                    Affiche les fournisseurs
+  superia route [options]                       Recommande un fournisseur sans lancement
+      --mode plan|build|review                  Capacité attendue
+      --budget zero|low|any                     Catégories de coût autorisées
+      --require-commands                        Exige l'exécution de commandes
+      --strict                                  Échec si le lancement réel est bloqué
   superia local [--json]                        Affiche les outils locaux
   superia scan [--json]                         Analyse le dépôt courant
   superia init                                  Initialise dépôt et plan de contrôle
@@ -102,6 +107,8 @@ Usage:
 
 Principes:
   - Raspberry Pi 5 utilisé comme plan de contrôle, jamais comme modèle obligatoire
+  - routeur hors ligne fondé sur disponibilité, capacités, coût et préférences explicites
+  - recommandation séparée de l'autorisation réelle fournie par readiness
   - arrêt d'urgence privé, fail-closed et audité
   - engagement : blocage des nouveaux runs, SIGTERM puis SIGKILL des groupes récents vérifiés
   - diagnostics, status et dry-runs restent disponibles sous arrêt
