@@ -2,6 +2,8 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { listTasks } from "../core/task-store.js";
 import { scanRepository } from "../core/repository-scanner.js";
+import { processNotifications } from "../notifications/engine.js";
+import { loadNotificationState } from "../notifications/store.js";
 import { openControlPlane } from "./control-plane.js";
 import { registerRepositorySnapshot } from "./repository-registry.js";
 
@@ -12,6 +14,8 @@ export interface DaemonTickResult {
   projectsSynced: number;
   projectsFailed: number;
   recoveredRuns: number;
+  notificationsCreated: number;
+  notificationError?: string;
   errors: Array<{ projectId: string; root: string; message: string }>;
 }
 
@@ -19,6 +23,9 @@ export async function runDaemonTick(staleAfterMs = 5 * 60_000): Promise<DaemonTi
   const startedAt = new Date().toISOString();
   const control = await openControlPlane();
   try {
+    const eventBeforeTick = control.listEvents(1)[0]?.id ?? 0;
+    await loadNotificationState(eventBeforeTick, control.paths.root);
+
     const recovered = control.reconcileStaleRuns(staleAfterMs);
     const projects = control.listProjects().filter((project) => project.status === "active");
     let projectsSynced = 0;
@@ -35,6 +42,26 @@ export async function runDaemonTick(staleAfterMs = 5 * 60_000): Promise<DaemonTi
         control.appendEvent("project", project.id, "project.sync_failed", { root: project.root, message });
       }
     }
+
+    control.appendEvent("daemon", "superia", "daemon.tick", {
+      projectsSeen: projects.length,
+      projectsSynced,
+      projectsFailed: errors.length,
+      recoveredRuns: recovered.length,
+    });
+
+    let notificationsCreated = 0;
+    let notificationError: string | undefined;
+    try {
+      const notifications = await processNotifications(control);
+      notificationsCreated = notifications.created;
+    } catch (error) {
+      notificationError = error instanceof Error ? error.message : String(error);
+      control.appendEvent("notifications", "local", "notifications.failed", {
+        message: notificationError,
+      });
+    }
+
     const result: DaemonTickResult = {
       startedAt,
       finishedAt: new Date().toISOString(),
@@ -42,15 +69,11 @@ export async function runDaemonTick(staleAfterMs = 5 * 60_000): Promise<DaemonTi
       projectsSynced,
       projectsFailed: errors.length,
       recoveredRuns: recovered.length,
+      notificationsCreated,
+      notificationError,
       errors,
     };
     await writeFile(join(control.paths.root, "daemon-status.json"), `${JSON.stringify(result, null, 2)}\n`, "utf8");
-    control.appendEvent("daemon", "superia", "daemon.tick", {
-      projectsSeen: result.projectsSeen,
-      projectsSynced: result.projectsSynced,
-      projectsFailed: result.projectsFailed,
-      recoveredRuns: result.recoveredRuns,
-    });
     return result;
   } finally {
     control.close();
