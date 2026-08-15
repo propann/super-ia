@@ -36,11 +36,14 @@ jobs:
       - name: Validate installer syntax
         run: |
           bash -n install/pi/install.sh
+          bash -n install/pi/preflight.sh
           bash -n install/pi/uninstall.sh
           bash -n install/tools/system-packages-debian.sh
           bash -n install/tools/bootstrap-user-tools.sh
           bash -n install/tools/verify-toolchain.sh
           bash -n install/tools/prepare-machine.sh
+      - name: Run read-only Pi preflight
+        run: sh install/pi/preflight.sh --strict
       - name: Reject privileged Pi installer commands
         run: |
           if grep -RInE '(^|[[:space:]])sudo([[:space:]]|$)' install/pi; then
