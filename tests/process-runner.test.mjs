@@ -31,6 +31,16 @@ async function linuxProcessState(pid) {
   }
 }
 
+async function waitForProcessExit(pid, timeoutMs = 2_000) {
+  const deadline = Date.now() + timeoutMs;
+  let state = await linuxProcessState(pid);
+  while (state !== undefined && state !== "Z" && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    state = await linuxProcessState(pid);
+  }
+  return state;
+}
+
 test("managed runner stores output and completes the durable run", async () => {
   const home = await mkdtemp(join(tmpdir(), "superia-runtime-"));
   const root = await mkdtemp(join(tmpdir(), "superia-project-"));
@@ -115,7 +125,7 @@ test("timed-out runner waits for SIGKILL and leaves no running descendant", asyn
 
     const descendantPid = Number((await readFile(pidPath, "utf8")).trim());
     assert.equal(result.timedOut, true);
-    const state = await linuxProcessState(descendantPid);
+    const state = await waitForProcessExit(descendantPid);
     assert.ok(state === undefined || state === "Z", `descendant still running with state ${state}`);
     control.close();
   } finally {
