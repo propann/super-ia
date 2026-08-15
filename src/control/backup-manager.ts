@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { chmod, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, lstat, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { ensureControlHome } from "./home.js";
@@ -294,9 +294,8 @@ export async function restoreControlBackup(
     ]);
 
     for (const expected of verification.manifest.files) {
-      const data = await readFile(join(source, expected.name));
       const destination = restoreDestination(staging, expected.name);
-      await writeFile(destination, data, { mode: 0o600 });
+      await copyFile(join(source, expected.name), destination);
       await chmod(destination, 0o600);
     }
 
