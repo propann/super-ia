@@ -1,5 +1,5 @@
 export function printHelp(): void {
-  console.log(`Super IA v0.18.0
+  console.log(`Super IA v0.19.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
@@ -82,6 +82,8 @@ Usage:
   superia receipt verify <RECEIPT.json>         Vérifie empreinte et artefacts
 
   superia backup create|list|verify             Sauvegardes locales cohérentes
+  superia backup restore <backup> --target DIR  Restaure vers un nouveau SUPERIA_HOME
+  superia backup drill [--keep]                 Teste sauvegarde et restauration hors ligne
   superia restic init|status                    Prépare la sauvegarde chiffrée
   superia restic backup                         Affiche le plan sans réseau
   superia restic retention-preview              Prévisualise la rétention sans prune
@@ -103,6 +105,9 @@ Principes:
   - arrêt d'urgence privé, fail-closed et audité
   - engagement : blocage des nouveaux runs, SIGTERM puis SIGKILL des groupes récents vérifiés
   - diagnostics, status et dry-runs restent disponibles sous arrêt
+  - restauration uniquement vers une cible absente, jamais par-dessus le contrôle actif
+  - restauration atomique après SHA-256, intégrité SQLite et validation JSONL
+  - drill de reprise isolé avec comparaison projets, missions, runs, événements et journal
   - interface web uniquement sur 127.0.0.1 avec token privé et session HttpOnly
   - interface web en lecture seule, sans CORS ni contrôle destructif
   - notifications locales dédupliquées, privées et sans payloads arbitraires
