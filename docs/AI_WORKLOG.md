@@ -98,14 +98,50 @@
 - rétention limitée à `forget --dry-run` ;
 - aucune commande `--prune` automatique.
 
-### Livraison
+## V0.16 — interface web locale
 
-- workflow GitHub en permissions lecture seule ;
-- credentials Git non persistés ;
-- actions épinglées par SHA ;
-- timeout et concurrence ;
-- audit npm bloquant ;
-- Dependabot npm et GitHub Actions.
+### Interface
+
+- serveur HTTP Node natif sans dépendance runtime ;
+- design Matrix responsive sans ressource externe ;
+- projets, missions, runs, événements et readiness ;
+- sélection du projet et actualisation automatique toutes les 30 secondes ;
+- aucune action destructive ni lancement d’agent depuis le navigateur.
+
+### Authentification et exposition
+
+- écoute uniquement sur `127.0.0.1` ou `::1` ;
+- refus explicite de `0.0.0.0` et des adresses LAN ;
+- token aléatoire dans `SUPERIA_HOME/web/access.token` ;
+- permissions `0600` ;
+- token invalide conservé pour réparation au lieu d’être écrasé ;
+- vérification en temps constant ;
+- sessions mémoire distinctes du token ;
+- cookie HttpOnly et SameSite Strict ;
+- bearer accepté seulement lorsqu’il est fourni explicitement.
+
+### Sécurité HTTP
+
+- aucune CORS ;
+- CSP locale ;
+- cache désactivé ;
+- refus d’intégration en iframe ;
+- politique no-referrer ;
+- limite du corps de connexion ;
+- API d’overview en lecture seule ;
+- méthodes destructives refusées.
+
+### Validation
+
+- tests HTTP avec de vraies données SQLite ;
+- connexion correcte et mauvais token ;
+- cookie de session ;
+- accès bearer ;
+- rendu HTML ;
+- données projets, missions, runs et readiness ;
+- refus d’écoute distante.
+
+Une course procfs du test de descendant a également été corrigée : `ENOENT` et `ESRCH` signifient tous deux que le processus a déjà disparu.
 
 ## Cinq défauts matériels de revue corrigés
 
@@ -115,7 +151,7 @@
 4. `SUPERIA_HOME` personnalisé perdu par systemd ;
 5. registre de connexions invalide remplacé par défaut.
 
-Chaque correction possède une preuve automatisée.
+Chaque correction possède une preuve automatisée. Les cinq fils de revue GitHub ont reçu une réponse avec la preuve correspondante puis ont été résolus.
 
 ## Préparation machine complète
 
@@ -149,7 +185,7 @@ Profil Standard retenu pour le Pi :
 - Ubuntu 24.04.4 ;
 - Node 22.23.2 ;
 - npm 10.9.8 ;
-- suite TypeScript et Node entièrement verte ;
+- suite TypeScript et Node entièrement verte sur le lot web avant la passe documentaire ;
 - 0 vulnérabilité npm signalée ;
 - scripts Bash valides ;
 - absence de `curl|sh` ou `wget|sh` ;
@@ -160,9 +196,10 @@ Le nombre exact de tests est publié dans `docs/STATUS.md` et dans la dernière 
 
 ## État honnête
 
-La plomberie, les politiques, les scripts et les diagnostics sont validés en CI Linux. Ne sont pas encore prouvés :
+La plomberie, les politiques, les scripts, les diagnostics et l’interface web locale sont validés en CI Linux. Ne sont pas encore prouvés :
 
 - installation ARM64 réelle sur le Pi ;
+- affichage réel de l’interface sur le Pi et mobile ;
 - authentification des comptes ;
 - appels réseau et coûts réels ;
 - Bubblewrap sur le noyau du Pi ;
@@ -173,13 +210,15 @@ La plomberie, les politiques, les scripts et les diagnostics sont validés en CI
 
 ## Prochaine phase
 
-1. installer le profil Standard sur le Pi ;
-2. vérifier le service avec le `SUPERIA_HOME` choisi ;
-3. choisir le coffre de secrets ;
-4. valider Bubblewrap et readiness ;
-5. configurer Restic et tester une restauration ;
-6. authentifier Codex et Vibe ;
-7. exécuter un pipeline réel borné ;
-8. tester les protocoles et workers ;
-9. mesurer coût, qualité et latence ;
-10. construire le routeur mesuré et l’interface web locale.
+1. produire des notifications locales dédupliquées sans réseau ;
+2. installer le profil Standard sur le Pi ;
+3. vérifier le service avec le `SUPERIA_HOME` choisi ;
+4. valider l’interface web sur écran et mobile ;
+5. choisir le coffre de secrets ;
+6. valider Bubblewrap et readiness ;
+7. configurer Restic et tester une restauration ;
+8. authentifier Codex et Vibe ;
+9. exécuter un pipeline réel borné ;
+10. tester les protocoles et workers ;
+11. mesurer coût, qualité et latence ;
+12. construire le routeur mesuré.
