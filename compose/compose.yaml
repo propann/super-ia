@@ -87,6 +87,26 @@ services:
     networks:
       - azoth-ai
 
+  dashboard:
+    profiles: ["ai"]
+    build:
+      context: ../dashboard
+    restart: unless-stopped
+    environment:
+      DASHBOARD_PORT: 8080
+      TZ: ${TZ:-Europe/Paris}
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-8080}:8080"
+    depends_on:
+      n8n:
+        condition: service_started
+      litellm:
+        condition: service_started
+      qdrant:
+        condition: service_started
+    networks:
+      - azoth-ai
+
 networks:
   azoth-ai:
     external: true
@@ -98,4 +118,3 @@ volumes:
     name: azoth-ai-qdrant
   n8n_data:
     name: azoth-ai-n8n
-

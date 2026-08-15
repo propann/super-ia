@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "mode_order": ["api", "oauth", "cli", "browser", "human"],
+  "principle": "Use the least fragile and least privileged connector that can complete the task.",
+  "safety": {
+    "api_keys": "local_only",
+    "browser_profiles": "local_only",
+    "cookies": "never_export",
+    "sensitive_actions": "human_approval",
+    "arbitrary_shell": "disabled"
+  },
+  "connectors": [
+    {
+      "id": "chatgpt-web",
+      "label": "ChatGPT navigateur",
+      "preferred_modes": ["browser", "human"],
+      "api_mode": "disabled_by_default",
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "purchase", "account_change"]
+    },
+    {
+      "id": "github",
+      "label": "GitHub",
+      "preferred_modes": ["cli", "api", "browser", "human"],
+      "cli": "gh",
+      "interactive_login": true,
+      "sensitive_actions": ["merge", "delete", "publish"]
+    },
+    {
+      "id": "gmail",
+      "label": "Gmail",
+      "preferred_modes": ["oauth", "api", "browser", "human"],
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "forward"]
+    },
+    {
+      "id": "suno",
+      "label": "Suno",
+      "preferred_modes": ["browser", "human"],
+      "interactive_login": true,
+      "sensitive_actions": ["publish", "delete"]
+    },
+    {
+      "id": "docker",
+      "label": "Docker",
+      "preferred_modes": ["cli"],
+      "cli": "docker",
+      "sensitive_actions": ["rm", "rmi", "volume prune", "system prune"]
+    },
+    {
+      "id": "git",
+      "label": "Git",
+      "preferred_modes": ["cli"],
+      "cli": "git",
+      "sensitive_actions": ["push", "reset", "clean"]
+    },
+    {
+      "id": "n8n",
+      "label": "n8n",
+      "preferred_modes": ["api", "browser"],
+      "interactive_login": true,
+      "sensitive_actions": ["activate", "delete", "credential_change"]
+    }
+  ]
+}
