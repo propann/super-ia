@@ -2,27 +2,23 @@
 
 ## Objectif
 
-L’interface web donne une vue mobile et desktop du plan de contrôle sans ajouter de framework ni de dépendance runtime.
+L’interface web donne une vue mobile et desktop du plan de contrôle sans framework ni dépendance runtime.
 
 Elle affiche en lecture seule :
 
-- état SQLite du plan de contrôle ;
-- projets enregistrés ;
-- missions du projet sélectionné ;
+- état SQLite ;
+- projets ;
+- missions ;
 - runs récents ;
-- notifications locales expurgées ;
-- événements récents ;
+- notifications expurgées ;
+- arrêt d’urgence ;
+- événements ;
 - rapport `readiness` hors ligne.
 
 ## Démarrage
 
 ```bash
 superia web
-```
-
-Port personnalisé :
-
-```bash
 superia web --port 3210
 ```
 
@@ -36,37 +32,22 @@ Le serveur refuse toute écoute hors `127.0.0.1` ou `::1`.
 
 ## Token local
 
-Le premier démarrage crée :
-
 ```text
 SUPERIA_HOME/web/access.token
 ```
 
-Par défaut :
-
-```text
-~/.superia/web/access.token
-```
-
-Le fichier est protégé en `0600`.
-
-Afficher volontairement le token :
+Le fichier est en `0600`.
 
 ```bash
 superia web token
-```
-
-Sortie JSON :
-
-```bash
 superia web token --json
 ```
 
-Un fichier de token existant mais invalide n’est jamais remplacé automatiquement.
+Un token existant mais invalide n’est jamais remplacé automatiquement.
 
 ## Authentification
 
-La page `/login` reçoit le token local. Après vérification en temps constant, le serveur crée une session mémoire distincte du token et renvoie un cookie :
+Après vérification en temps constant, le serveur crée une session mémoire distincte du token avec un cookie :
 
 ```text
 HttpOnly
@@ -74,28 +55,24 @@ SameSite=Strict
 Path=/
 ```
 
-Le token n’est donc pas conservé comme cookie de session.
-
 L’API accepte aussi explicitement :
 
 ```text
 Authorization: Bearer <token>
 ```
 
-Cette méthode est destinée aux outils locaux contrôlés.
-
 ## Routes
 
 ```text
-GET  /healthz       état minimal, sans données de projet
-GET  /login         formulaire local
-POST /session       ouverture de session
-POST /logout        fermeture de session
-GET  /              tableau de bord
-GET  /api/overview  état agrégé authentifié
+GET  /healthz
+GET  /login
+POST /session
+POST /logout
+GET  /
+GET  /api/overview
 ```
 
-Paramètres facultatifs de l’overview :
+Paramètres facultatifs :
 
 ```text
 projectId=<ID>
@@ -104,60 +81,73 @@ events=<1..500>
 notifications=<1..200>
 ```
 
-Les notifications exposées par l’API sont les reçus déjà expurgés du moteur local. L’API ne reconstruit pas les messages à partir des payloads d’événements.
+## Arrêt d’urgence
+
+L’overview expose :
+
+```text
+engaged
+category
+generation
+updatedAt
+engagedAt
+releasedAt
+```
+
+Lorsque l’arrêt est engagé, la page affiche un bandeau rouge et indique que seuls les diagnostics et dry-runs restent autorisés.
+
+Aucune route web ne permet :
+
+- d’engager l’arrêt ;
+- de le libérer ;
+- de tuer un processus ;
+- de lancer un agent ;
+- de fusionner une branche.
+
+Les commandes safety restent réservées à la CLI locale.
 
 ## Sécurité
 
-Garanties actuelles :
+Garanties :
 
-- écoute sur boucle locale uniquement ;
+- boucle locale uniquement ;
 - aucune CORS ;
-- aucune route d’écriture métier ;
-- aucune action de fusion, suppression ou exécution ;
-- token privé en `0600` ;
-- sessions uniquement en mémoire ;
+- aucune route métier d’écriture ;
+- token privé ;
+- sessions en mémoire ;
 - expiration des sessions ;
 - `Cache-Control: no-store` ;
 - CSP locale ;
-- `frame-ancestors 'none'` et `X-Frame-Options: DENY` ;
-- `Referrer-Policy: no-referrer` ;
-- limite de taille sur le formulaire de connexion ;
-- readiness sans réseau et sans lecture de valeurs de secrets ;
-- notifications sans prompts, notes, payloads, métadonnées ou diagnostics.
+- anti-frame ;
+- no-referrer ;
+- limite du formulaire de connexion ;
+- readiness sans réseau ni lecture de secrets ;
+- notifications sans payloads libres ;
+- état safety informatif uniquement.
 
-Le serveur n’est pas un service distant. Pour un accès depuis une autre machine, utiliser ultérieurement un tunnel SSH explicite plutôt que modifier l’adresse d’écoute.
-
-## Arrêt
-
-Dans un terminal :
-
-```text
-Ctrl+C
-```
-
-Le serveur ferme les sessions mémoire et le socket HTTP.
+Pour un accès depuis une autre machine, utiliser un tunnel SSH explicite plutôt qu’une écoute LAN.
 
 ## Validation CI
 
-`tests/web.test.mjs` vérifie notamment :
+`tests/web.test.mjs` vérifie :
 
-- refus d’accès sans session ;
-- refus d’un mauvais token ;
+- refus sans session ;
+- mauvais token ;
 - cookie HttpOnly et SameSite ;
-- accès par bearer explicite ;
-- lecture de vraies données SQLite ;
-- rendu de la page Matrix ;
-- exposition des reçus de notifications ;
+- bearer explicite ;
+- données SQLite réelles ;
+- notifications ;
+- état safety libre puis engagé ;
 - absence de CORS ;
 - refus d’une méthode destructive ;
-- refus d’écouter sur `0.0.0.0` ;
-- conservation d’un fichier de token invalide.
+- refus de `0.0.0.0` ;
+- conservation d’un token invalide.
 
-## Limites actuelles
+## Limites
 
-- pas encore de service systemd séparé pour le web ;
+- pas de service systemd web séparé ;
 - pas d’accès distant ;
 - pas de WebSocket ;
 - rafraîchissement toutes les 30 secondes ;
-- aucune approbation, suppression, acquittement ou commande d’agent depuis le navigateur ;
-- l’interface réelle reste à vérifier sur le Pi et sur mobile.
+- aucune approbation ni commande d’agent depuis le navigateur ;
+- rendu réel à vérifier sur le Pi et mobile.
