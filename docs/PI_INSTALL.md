@@ -2,10 +2,13 @@
 
 Super IA s’installe comme **plan de contrôle utilisateur**. Le Pi stocke et orchestre l’état ; aucun modèle IA local n’est obligatoire. L’installateur Pi lui-même n’utilise pas `sudo`.
 
+La préparation du support et de SSH est détaillée dans [PI_BOOTSTRAP.md](PI_BOOTSTRAP.md).
+
 ## Prérequis
 
 - Raspberry Pi 5 sous Linux 64 bits ;
-- NVMe recommandé ;
+- système démarré sur HDD/SSD ou NVMe recommandé ;
+- accès SSH opérationnel ;
 - Git ;
 - Node.js 22.5 ou supérieur ;
 - npm ;
@@ -13,7 +16,34 @@ Super IA s’installe comme **plan de contrôle utilisateur**. Le Pi stocke et o
 - Gitleaks et Bubblewrap pour les agents réels ;
 - Restic facultatif.
 
-## Installation v0.18
+## Préflight en lecture seule
+
+Avant toute installation :
+
+```bash
+sh install/pi/preflight.sh
+```
+
+Mode strict pour les exigences minimales :
+
+```bash
+sh install/pi/preflight.sh --strict
+```
+
+Le script indique notamment :
+
+- architecture et distribution ;
+- source et type de la racine ;
+- démarrage SD, USB/HDD/SSD ou NVMe ;
+- espace libre ;
+- Git, npm et Node >= 22.5 ;
+- outils de contrôle et de sécurité ;
+- client et serveur SSH ;
+- systemd utilisateur et linger.
+
+Il ne contacte aucun serveur, ne demande aucun privilège et ne modifie aucun fichier.
+
+## Installation v0.19
 
 ```bash
 git clone https://github.com/propann/super-ia.git
@@ -26,7 +56,7 @@ L’installateur :
 
 1. vérifie Git, npm et Node ;
 2. détecte Bubblewrap et Gitleaks ;
-3. installe les dépendances ;
+3. installe les dépendances JavaScript ;
 4. compile et exécute les tests ;
 5. initialise le plan de contrôle ;
 6. installe `~/.local/bin/superia` ;
@@ -37,10 +67,22 @@ L’installateur :
 11. enregistre `sandbox-status.json` en `0600` ;
 12. active le service lorsque systemd utilisateur est disponible.
 
+## Préparation complète du profil Standard
+
+```bash
+bash install/tools/prepare-machine.sh --phase plan --profile standard
+sudo bash install/tools/prepare-machine.sh --phase system --profile standard
+bash install/tools/prepare-machine.sh --phase user --profile standard
+bash install/tools/prepare-machine.sh --phase superia
+bash install/tools/prepare-machine.sh --phase verify --profile standard
+```
+
+Le privilège administrateur apparaît uniquement dans la phase système explicitement lancée par l’utilisateur.
+
 ## Répertoire de contrôle personnalisé
 
 ```bash
-export SUPERIA_HOME=/mnt/nvme/superia-control
+export SUPERIA_HOME=/mnt/stockage/superia-control
 bash install/pi/install.sh
 ```
 
@@ -50,14 +92,18 @@ La même valeur est utilisée par :
 - service systemd ;
 - SQLite et journal ;
 - sauvegardes ;
+- restauration et drills ;
 - preuve Bubblewrap ;
 - token web ;
 - notifications ;
 - arrêt d’urgence.
 
+Le chemin choisi doit être sur un stockage monté de manière stable avant le démarrage du service.
+
 ## Vérification initiale
 
 ```bash
+sh install/pi/preflight.sh
 superia control status --json
 superia doctor
 superia connection policy
@@ -65,15 +111,27 @@ superia security scan --required
 superia security sandbox-check --json
 superia safety status
 superia readiness
+superia route --mode plan --budget zero
 superia notify status
 superia daemon --once --json
 superia backup create
 superia backup list
+superia backup drill
 superia matrix --once
 superia web token
 systemctl --user status superia.service
 journalctl --user -u superia.service -n 100 --no-pager
 ```
+
+## Routeur hors ligne
+
+```bash
+superia route --mode plan --budget zero
+superia route --mode build --budget low --require-commands
+superia route --mode review --budget any --json
+```
+
+Le routeur recommande parmi les adaptateurs prêts et commandes présentes, mais ne lance aucun fournisseur. Le verdict de lancement réel reste soumis à `readiness` et à l’arrêt d’urgence.
 
 ## Interface web locale
 
@@ -100,6 +158,14 @@ Vérifier :
 
 Le serveur refuse `0.0.0.0` et toute écoute LAN.
 
+Pour consulter depuis un autre ordinateur, utiliser un tunnel SSH local plutôt que d’exposer le serveur :
+
+```bash
+ssh -L 3210:127.0.0.1:3210 UTILISATEUR@ADRESSE_DU_PI
+```
+
+Puis ouvrir `http://127.0.0.1:3210` sur le PC.
+
 ## Notifications locales
 
 ```bash
@@ -112,7 +178,7 @@ superia notify list --limit 50
 Permissions attendues :
 
 ```bash
-find "$SUPERIA_HOME/notifications" -type f -maxdepth 2 -printf '%m %p\n'
+find "$SUPERIA_HOME/notifications" -maxdepth 2 -type f -printf '%m %p\n'
 ```
 
 Les fichiers doivent être en `600`.
@@ -216,25 +282,30 @@ Résultat attendu :
 - une seule notification ;
 - aucun doublon au tick suivant.
 
-## Sauvegarde locale
+## Sauvegarde et restauration locale
 
 ```bash
 superia backup create
 superia backup list
 superia backup verify "$SUPERIA_HOME/backups/backup-YYYYMMDDHHMMSS"
+superia backup restore \
+  "$SUPERIA_HOME/backups/backup-YYYYMMDDHHMMSS" \
+  --target "$HOME/superia-restored-check"
+superia backup drill
 ```
 
-Vérifier que le manifeste contient, lorsqu’ils existent :
+La restauration exige une cible inexistante et valide :
 
-```text
-control.sqlite
-events.jsonl
-emergency-stop.json
-notifications-config.json
-notifications-state.json
-```
+- manifeste ;
+- tailles et SHA-256 ;
+- intégrité SQLite ;
+- syntaxe du journal JSONL ;
+- état safety ;
+- configuration et curseur de notifications.
 
-Tous les fichiers et le manifeste doivent être en `600`.
+Elle produit un reçu privé et ne remplace jamais automatiquement le contrôle actif.
+
+Le drill compare projets, missions, runs, événements et lignes du journal. La procédure complète se trouve dans [RECOVERY.md](RECOVERY.md).
 
 ## Restic
 
@@ -269,6 +340,7 @@ Cette opération peut demander une autorisation administrative. L’installateur
 
 ```bash
 cd /chemin/vers/super-ia
+git status
 git pull
 npm install
 npm test
@@ -276,6 +348,7 @@ bash install/pi/install.sh
 superia security sandbox-check
 superia safety status
 superia readiness
+superia backup drill
 ```
 
 Ne pas automatiser `git pull` lorsqu’il existe des modifications locales.
@@ -291,13 +364,17 @@ Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipt
 ## Ce que la CI prouve
 
 - build TypeScript ;
-- **89 tests réussis** sur le lot fonctionnel v0.18 ;
+- **95 tests réussis** sur le lot fonctionnel v0.19 ;
 - audit npm sans vulnérabilité signalée ;
+- restauration atomique vers une nouvelle cible ;
+- intégrité SQLite et JSONL vérifiée ;
+- drill de reprise comparant les données durables ;
+- routeur hors ligne explicable ;
+- préflight Pi/HDD/SSH en lecture seule ;
 - arrêt d’urgence fail-closed ;
 - blocage des agents et pipelines réels ;
 - groupe de processus réel arrêté par escalade ;
 - état safety visible dans readiness et web ;
-- sauvegarde privée de l’état safety ;
 - interface web locale authentifiée ;
 - notifications dédupliquées ;
 - DAG, réseau et sauvegardes ;
@@ -305,16 +382,19 @@ Le service et le wrapper sont retirés. Le répertoire de contrôle, les receipt
 - pipeline, checkpoints et budgets ;
 - scripts Pi valides ;
 - propagation de `SUPERIA_HOME` ;
-- absence de `sudo` caché.
+- absence de `sudo` caché et de téléchargement pipé vers un shell.
 
 ## Ce que le Pi doit encore prouver
 
 - installation ARM64 complète ;
+- racine réellement démarrée sur le HDD/SSD cible ;
 - namespaces Bubblewrap opérationnels ;
 - service après déconnexion ;
 - arrêt d’urgence sous systemd ;
 - web et notifications après redémarrage ;
+- restauration v0.19 sur le stockage réel ;
 - Codex et Vibe authentifiés ;
 - pipeline réel ;
 - reprise après coupure ;
-- dépôt Restic et restauration sur copie.
+- dépôt Restic et restauration hors machine ;
+- mesures coût, qualité et latence.
