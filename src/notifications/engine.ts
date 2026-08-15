@@ -36,7 +36,6 @@ function runNotification(event: EventRecord, run: RunRecord | undefined): Notifi
   const descriptor = RUN_EVENTS.get(event.type);
   if (!descriptor) return undefined;
   const runId = safeIdentifier(event.aggregateId);
-  const provider = safeIdentifier(run?.provider, "agent-inconnu");
   const taskId = safeIdentifier(run?.taskId, "sans-mission");
   const projectId = safeIdentifier(run?.projectId, "projet-inconnu");
   return {
@@ -47,7 +46,7 @@ function runNotification(event: EventRecord, run: RunRecord | undefined): Notifi
     level: descriptor.level,
     kind: "run",
     title: `Run ${descriptor.label}`,
-    message: `${runId} · ${provider} · ${taskId}`,
+    message: `${runId} · ${taskId}`,
     projectId,
     taskId: run?.taskId ? taskId : undefined,
     runId,
@@ -87,8 +86,9 @@ export async function processNotifications(control: ControlPlane): Promise<Notif
   const state = await loadNotificationState(latestEventId, control.paths.root);
 
   if (!config.enabled) {
-    if (state.lastEventId !== latestEventId) {
-      await saveNotificationState({ schemaVersion: 1, lastEventId: latestEventId }, control.paths.root);
+    const nextEventId = Math.max(state.lastEventId, latestEventId);
+    if (state.lastEventId !== nextEventId) {
+      await saveNotificationState({ schemaVersion: 1, lastEventId: nextEventId }, control.paths.root);
     }
     return {
       enabled: false,
@@ -96,7 +96,7 @@ export async function processNotifications(control: ControlPlane): Promise<Notif
       blockedTasksSeen: 0,
       created: 0,
       duplicates: 0,
-      lastEventId: latestEventId,
+      lastEventId: nextEventId,
     };
   }
 
