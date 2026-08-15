@@ -15,6 +15,7 @@ import { handleContextCommand } from "./context/cli.js";
 import { handleNotificationCommand } from "./notifications/cli.js";
 import { handlePipelineCommand } from "./orchestration/cli.js";
 import { providerCatalog } from "./providers/catalog.js";
+import { handleProviderRoutingCommand } from "./providers/cli.js";
 import { handleReceiptCommand } from "./quality/cli.js";
 import { handleRuntimeCommand } from "./runtime/cli.js";
 import { handleSafetyCommand } from "./safety/cli.js";
@@ -70,6 +71,7 @@ async function main(): Promise<void> {
   if (await handleRuntimeCommand(command, args, json, process.cwd())) return;
   if (await handleAgentCommand(command, args, json, process.cwd())) return;
   if (await handlePipelineCommand(command, args, json, process.cwd())) return;
+  if (await handleProviderRoutingCommand(command, args, json, process.cwd())) return;
   if (await handleReceiptCommand(command, args, json)) return;
   if (await handleNotificationCommand(command, args, json)) return;
   if (await handleWebCommand(command, args, json)) return;
