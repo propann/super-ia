@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b1118">
+    <title>AZOTH // SUPER IA</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">AZOTH // PI-5 // LOCAL CONTROL PLANE</p>
+          <h1>SUPER IA</h1>
+          <p class="subtitle">Une porte d'entrée pour les connexions, les projets, les navigateurs et l'armée d'agents.</p>
+        </div>
+        <div class="status-chip"><span class="dot" id="overall-dot"></span><span id="overall-label">Vérification…</span></div>
+      </header>
+
+      <section class="section">
+        <div class="section-heading"><h2>Services du Pi</h2><span id="last-check">—</span></div>
+        <div class="grid services" id="services"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><h2>Plan de contrôle</h2><span>local seulement</span></div>
+        <div class="grid tools">
+          <article class="card tool-card accent-orange">
+            <div class="card-top"><span class="icon">↯</span><span class="mode">WORKFLOWS</span></div>
+            <h3>n8n</h3><p>Automatisations, déclencheurs et validations humaines.</p>
+            <a class="button" href="http://127.0.0.1:5678/" target="_blank" rel="noreferrer">Ouvrir n8n</a>
+          </article>
+          <article class="card tool-card accent-blue">
+            <div class="card-top"><span class="icon">◈</span><span class="mode">MÉMOIRE</span></div>
+            <h3>Qdrant</h3><p>Collections et mémoire vectorielle locale des projets.</p>
+            <a class="button" href="http://127.0.0.1:6333/dashboard" target="_blank" rel="noreferrer">Ouvrir Qdrant</a>
+          </article>
+          <article class="card tool-card accent-purple">
+            <div class="card-top"><span class="icon">✦</span><span class="mode">API OPTIONNELLE</span></div>
+            <h3>LiteLLM</h3><p>Passerelle facultative pour les fournisseurs possédant une clé.</p>
+            <a class="button" href="http://127.0.0.1:4000/" target="_blank" rel="noreferrer">Ouvrir LiteLLM</a>
+          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><h2>Toutes les connexions</h2><span>API · OAuth · CLI · navigateur · humain</span></div>
+        <div class="notice">Le cockpit choisit la voie la moins fragile. Les navigateurs restent isolés ; les actions sensibles restent humaines.</div>
+        <div class="grid tools" id="connectors"><article class="card empty-card">Chargement des connecteurs…</article></div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><h2>Navigateurs du Pi</h2><span>Chromium persistant à la demande</span></div>
+        <div class="notice">Les boutons « Ouvrir sur le Pi » utilisent le tunnel SSH. La première ouverture demande une connexion manuelle dans chaque profil.</div>
+        <div class="grid tools" id="browser-tools"><article class="card empty-card">Chargement du registre navigateur…</article></div>
+      </section>
+
+      <section class="section split">
+        <article class="card panel">
+          <div class="section-heading"><h2>Projets GitHub</h2><span id="project-count">non synchronisés</span></div>
+          <p class="muted">Synchronise la liste avec <code>make projects-sync</code>. Aucun token GitHub ne passe dans le navigateur.</p>
+          <label for="project-select">Dépôt cible</label>
+          <select id="project-select"><option value="">Synchronise d'abord tes dépôts</option></select>
+          <div id="project-summary" class="project-summary"></div>
+        </article>
+        <article class="card panel">
+          <div class="section-heading"><h2>Armer une mission</h2><span>file locale</span></div>
+          <label for="agent-select">Agent</label>
+          <select id="agent-select"><option value="">Choisir un rôle</option></select>
+          <label for="action-select">Opération</label>
+          <select id="action-select">
+            <option value="inspect">Inspecter le dépôt</option>
+            <option value="validate">Vérifier la cohérence Git</option>
+          </select>
+          <label for="task-input">Note de mission</label>
+          <textarea id="task-input" rows="3" maxlength="2000" placeholder="Ex. faire un état des lieux du projet…"></textarea>
+          <button class="button primary" id="queue-task" type="button">Armer la mission</button>
+          <span id="queue-state" class="form-state" aria-live="polite"></span>
+        </article>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><h2>Armée des agents</h2><span>rôles et connexions autorisées</span></div>
+        <div class="grid tools" id="agents"><article class="card empty-card">Chargement des agents…</article></div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><h2>Flux des commandes</h2><span>journal local en temps réel</span></div>
+        <div class="card activity" id="activity"><p class="muted">Aucune activité pour le moment.</p></div>
+      </section>
+
+      <section class="section split">
+        <article class="card panel">
+          <div class="section-heading"><h2>Commandes utiles</h2><span>local</span></div>
+          <div class="cli-row"><code>make browser-up</code><button data-copy="make browser-up">Copier</button></div>
+          <div class="cli-row"><code>make browser-up BROWSER_PROFILES=browser-grok</code><button data-copy="make browser-up BROWSER_PROFILES=browser-grok">Copier</button></div>
+          <div class="cli-row"><code>make projects-sync</code><button data-copy="make projects-sync">Copier</button></div>
+          <div class="cli-row"><code>make agents-run</code><button data-copy="make agents-run">Copier</button></div>
+        </article>
+        <article class="card panel">
+          <div class="section-heading"><h2>Règles de sécurité</h2><span>garde-fous</span></div>
+          <ul class="rules">
+            <li><strong>Web</strong> : connexion manuelle dans chaque profil.</li>
+            <li><strong>CLI</strong> : Git et Docker passent par une allowlist.</li>
+            <li><strong>Humain</strong> : MFA, CAPTCHA, paiement, suppression, fusion et publication.</li>
+            <li><strong>Jamais</strong> d'export de cookies ni de rotation de comptes.</li>
+          </ul>
+        </article>
+      </section>
+
+      <footer><span>SSH tunnel recommandé</span><span>127.0.0.1 uniquement</span><span id="toast" aria-live="polite"></span></footer>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

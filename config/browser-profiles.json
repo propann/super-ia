@@ -1,0 +1,104 @@
+{
+  "schema_version": 2,
+  "policy": {
+    "profile_storage": "docker_named_volume_local_only",
+    "cookies": "never_export",
+    "login": "interactive_once_per_provider",
+    "automation": "human_first",
+    "account_rotation": "forbidden",
+    "network": "localhost_only"
+  },
+  "profiles": [
+    {
+      "id": "chatgpt",
+      "label": "ChatGPT",
+      "url": "https://chatgpt.com/",
+      "remote_url": "https://127.0.0.1:3011/",
+      "probe_url": "http://browser-chatgpt:3000/",
+      "container_profile": "browser-chatgpt",
+      "icon": "◎",
+      "accent": "green",
+      "description": "Chromium sur le Pi, profil persistant séparé.",
+      "command": "make browser-up BROWSER_PROFILES=browser-chatgpt",
+      "capabilities": ["chat", "files", "projects"]
+    },
+    {
+      "id": "claude",
+      "label": "Claude",
+      "url": "https://claude.ai/",
+      "remote_url": "https://127.0.0.1:3012/",
+      "probe_url": "http://browser-claude:3000/",
+      "container_profile": "browser-claude",
+      "icon": "◌",
+      "accent": "orange",
+      "description": "Chromium sur le Pi, connexion humaine isolée.",
+      "command": "make browser-up BROWSER_PROFILES=browser-claude",
+      "capabilities": ["chat", "artifacts", "projects"]
+    },
+    {
+      "id": "gemini",
+      "label": "Gemini",
+      "url": "https://gemini.google.com/",
+      "remote_url": "https://127.0.0.1:3013/",
+      "probe_url": "http://browser-gemini:3000/",
+      "container_profile": "browser-gemini",
+      "icon": "◇",
+      "accent": "blue",
+      "description": "Profil Google isolé, sans clé API obligatoire.",
+      "command": "make browser-up BROWSER_PROFILES=browser-gemini",
+      "capabilities": ["chat", "files", "google"]
+    },
+    {
+      "id": "deepseek",
+      "label": "DeepSeek",
+      "url": "https://chat.deepseek.com/",
+      "remote_url": "https://127.0.0.1:3014/",
+      "probe_url": "http://browser-deepseek:3000/",
+      "container_profile": "browser-deepseek",
+      "icon": "⌁",
+      "accent": "purple",
+      "description": "Profil optionnel pour code et raisonnement.",
+      "command": "make browser-up BROWSER_PROFILES=browser-deepseek",
+      "capabilities": ["chat", "code", "reasoning"]
+    },
+    {
+      "id": "grok",
+      "label": "Grok",
+      "url": "https://grok.com/",
+      "remote_url": "https://127.0.0.1:3015/",
+      "probe_url": "http://browser-grok:3000/",
+      "container_profile": "browser-grok",
+      "icon": "✕",
+      "accent": "blue",
+      "description": "Profil X/Grok séparé, activé à la demande.",
+      "command": "make browser-up BROWSER_PROFILES=browser-grok",
+      "capabilities": ["chat", "research", "web"]
+    },
+    {
+      "id": "mistral",
+      "label": "Le Chat Mistral",
+      "url": "https://chat.mistral.ai/",
+      "remote_url": "https://127.0.0.1:3016/",
+      "probe_url": "http://browser-mistral:3000/",
+      "container_profile": "browser-mistral",
+      "icon": "▦",
+      "accent": "orange",
+      "description": "Profil optionnel pour code et fichiers.",
+      "command": "make browser-up BROWSER_PROFILES=browser-mistral",
+      "capabilities": ["chat", "code", "files"]
+    },
+    {
+      "id": "suno",
+      "label": "Suno",
+      "url": "https://suno.com/",
+      "remote_url": "https://127.0.0.1:3017/",
+      "probe_url": "http://browser-suno:3000/",
+      "container_profile": "browser-suno",
+      "icon": "♫",
+      "accent": "blue",
+      "description": "Profil créatif optionnel pour Suno et la bibliothèque.",
+      "command": "make browser-up BROWSER_PROFILES=browser-suno",
+      "capabilities": ["music", "library", "create"]
+    }
+  ]
+}

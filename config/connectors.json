@@ -1,0 +1,130 @@
+{
+  "schema_version": 2,
+  "mode_order": ["api", "oauth", "cli", "browser", "human"],
+  "principle": "Use the least fragile and least privileged connector that can complete the task.",
+  "safety": {
+    "api_keys": "local_only",
+    "browser_profiles": "local_only",
+    "cookies": "never_export",
+    "sensitive_actions": "human_approval",
+    "arbitrary_shell": "disabled"
+  },
+  "connectors": [
+    {
+      "id": "chatgpt-web",
+      "label": "ChatGPT navigateur",
+      "icon": "◎",
+      "accent": "green",
+      "preferred_modes": ["browser", "human"],
+      "api_mode": "disabled_by_default",
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "purchase", "account_change"]
+    },
+    {
+      "id": "claude-web",
+      "label": "Claude navigateur",
+      "icon": "◌",
+      "accent": "orange",
+      "preferred_modes": ["browser", "human"],
+      "api_mode": "disabled_by_default",
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "account_change"]
+    },
+    {
+      "id": "gemini-web",
+      "label": "Gemini navigateur",
+      "icon": "◇",
+      "accent": "blue",
+      "preferred_modes": ["browser", "human"],
+      "api_mode": "disabled_by_default",
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "account_change"]
+    },
+    {
+      "id": "deepseek-web",
+      "label": "DeepSeek navigateur",
+      "icon": "⌁",
+      "accent": "purple",
+      "preferred_modes": ["browser", "human"],
+      "api_mode": "disabled_by_default",
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "account_change"]
+    },
+    {
+      "id": "grok-web",
+      "label": "Grok navigateur",
+      "icon": "✕",
+      "accent": "blue",
+      "preferred_modes": ["browser", "human"],
+      "api_mode": "disabled_by_default",
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "account_change"]
+    },
+    {
+      "id": "mistral-web",
+      "label": "Le Chat Mistral navigateur",
+      "icon": "▦",
+      "accent": "orange",
+      "preferred_modes": ["browser", "human"],
+      "api_mode": "disabled_by_default",
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "account_change"]
+    },
+    {
+      "id": "suno-web",
+      "label": "Suno navigateur",
+      "icon": "♫",
+      "accent": "blue",
+      "preferred_modes": ["browser", "human"],
+      "api_mode": "disabled_by_default",
+      "interactive_login": true,
+      "sensitive_actions": ["publish", "delete", "account_change"]
+    },
+    {
+      "id": "github",
+      "label": "GitHub",
+      "icon": "◒",
+      "accent": "green",
+      "preferred_modes": ["cli", "api", "browser", "human"],
+      "cli": "gh",
+      "interactive_login": true,
+      "sensitive_actions": ["merge", "delete", "publish"]
+    },
+    {
+      "id": "gmail",
+      "label": "Gmail",
+      "icon": "✉",
+      "accent": "orange",
+      "preferred_modes": ["oauth", "api", "browser", "human"],
+      "interactive_login": true,
+      "sensitive_actions": ["send", "delete", "forward"]
+    },
+    {
+      "id": "docker",
+      "label": "Docker",
+      "icon": "◫",
+      "accent": "blue",
+      "preferred_modes": ["cli"],
+      "cli": "docker",
+      "sensitive_actions": ["rm", "rmi", "volume prune", "system prune"]
+    },
+    {
+      "id": "git",
+      "label": "Git",
+      "icon": "⌘",
+      "accent": "purple",
+      "preferred_modes": ["cli"],
+      "cli": "git",
+      "sensitive_actions": ["push", "reset", "clean"]
+    },
+    {
+      "id": "n8n",
+      "label": "n8n",
+      "icon": "↯",
+      "accent": "orange",
+      "preferred_modes": ["api", "browser"],
+      "interactive_login": true,
+      "sensitive_actions": ["activate", "delete", "credential_change"]
+    }
+  ]
+}
