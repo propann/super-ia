@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -36,6 +37,39 @@ async function captureFailure(action) {
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   }
+}
+
+function scan(root) {
+  return {
+    root,
+    name: "safety-demo",
+    isGitRepository: true,
+    branch: "main",
+    dirty: false,
+    manifests: [],
+    languages: ["TypeScript"],
+    instructions: [],
+    scripts: {},
+    recommendedChecks: [],
+  };
+}
+
+function processGroupExists(pid) {
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code !== "ESRCH";
+  }
+}
+
+async function waitForExit(pid, timeoutMs = 3_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!processGroupExists(pid)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return !processGroupExists(pid);
 }
 
 test("emergency stop state is private, atomic and idempotent", async () => {
@@ -121,12 +155,54 @@ test("safety CLI audits controlled engage and release events", async () => {
     const control = await openControlPlane(home);
     try {
       const types = control.listEvents(20).map((event) => event.type);
+      assert.ok(types.includes("safety.active_runs_termination_requested"));
       assert.ok(types.includes("safety.emergency_stop_engaged"));
       assert.ok(types.includes("safety.emergency_stop_released"));
       const safetyEvents = control.listEvents(20).filter((event) => event.aggregateId === "emergency-stop");
       assert.equal(JSON.stringify(safetyEvents).includes("maintenance"), true);
     } finally {
       control.close();
+    }
+  });
+});
+
+test("engaging the emergency stop terminates a recent managed process group", { skip: process.platform === "win32" }, async () => {
+  await withHome(async (home) => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "superia-safety-project-"));
+    const child = spawn(process.execPath, ["-e", "process.on('SIGTERM',()=>{}); setInterval(()=>{},1000)"], {
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+    assert.ok(child.pid);
+    try {
+      const control = await openControlPlane(home);
+      const project = control.registerProject(scan(projectRoot));
+      const run = control.createRun({ projectId: project.id, provider: "test-child", pid: child.pid });
+      control.heartbeatRun(run.id, child.pid);
+      control.close();
+
+      const originalLog = console.log;
+      console.log = () => {};
+      try {
+        await handleSafetyCommand("safety", ["engage", "--category", "security"], false);
+      } finally {
+        console.log = originalLog;
+      }
+
+      assert.equal(await waitForExit(child.pid), true);
+      const checked = await openControlPlane(home);
+      try {
+        const terminationEvent = checked.listEvents(20).find((event) => event.type === "safety.active_runs_termination_requested");
+        assert.ok(terminationEvent);
+        assert.deepEqual(terminationEvent.payload.signalledRunIds, [run.id]);
+        assert.deepEqual(terminationEvent.payload.escalatedRunIds, [run.id]);
+      } finally {
+        checked.close();
+      }
+    } finally {
+      try { process.kill(-child.pid, "SIGKILL"); } catch {}
+      await rm(projectRoot, { recursive: true, force: true });
     }
   });
 });
