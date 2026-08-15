@@ -82,7 +82,7 @@ declare const process: {
   env: Record<string, string | undefined>;
   pid: number;
   cwd(): string;
-  kill(pid: number, signal?: string): void;
+  kill(pid: number, signal?: string | number): void;
   exitCode?: number;
   stdout: {
     columns?: number;
