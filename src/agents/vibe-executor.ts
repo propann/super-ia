@@ -9,6 +9,7 @@ import { syncRepositoryToGlobalControl } from "../control/repository-sync.js";
 import { buildGitContext } from "../context/builder.js";
 import { captureGitWorkspace, enforceGitChangeScope, type ChangeGuardReport } from "../quality/change-guard.js";
 import { runManagedProcess } from "../runtime/process-runner.js";
+import { assertExecutionAllowed } from "../safety/store.js";
 import { findExecutable } from "../utils/command.js";
 import { prepareAgentSandbox } from "./sandbox-preflight.js";
 import type { AgentExecutionOptions, AgentExecutionPreview, AgentExecutionResult, AgentMode } from "./types.js";
@@ -34,6 +35,7 @@ function positiveInteger(value: number | undefined, fallback: number, maximum: n
 function resolveMode(value?: AgentMode): AgentMode { return value ?? "plan"; }
 
 export async function executeVibeTask(repositoryDirectory: string, taskId: string, options: AgentExecutionOptions = {}): Promise<AgentExecutionPreview | AgentExecutionResult> {
+  if (!options.dryRun) await assertExecutionAllowed();
   const repository = await scanRepository(repositoryDirectory);
   const task = await getTask(repository.root, taskId);
   const mode = resolveMode(options.mode);
