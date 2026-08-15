@@ -70,78 +70,100 @@
 - sonde explicite `--network`, sans authentification ni redirection ;
 - registre invalide conservé au lieu d’être écrasé.
 
-### Sandbox et secrets
+### Sandbox, coût et Pi
 
 - preuve Bubblewrap persistée en `0600` ;
-- preuve récente exigée par readiness sous Linux ;
-- détection des fichiers privés suivis, non suivis et ignorés ;
-- masquage des fichiers par `/dev/null` ;
-- masquage des répertoires privés par tmpfs ;
+- preuve récente exigée par readiness ;
+- fichiers privés suivis, non suivis et ignorés masqués ;
 - noms Git conservés au caractère près ;
-- masque tracé sans enregistrer les valeurs privées.
-
-### Coût et processus
-
-- run Vibe réel refusé sans `--max-price` ;
-- pipeline réel refusé sans plafond par tentative et plafond total ;
+- budget Vibe réel explicite ;
 - `SIGTERM` puis `SIGKILL` du groupe après timeout ;
-- résultat rendu seulement après l’escalade ;
-- descendant absent ou non exécutable avant le garde Git.
-
-### Pi et sauvegardes
-
-- `SUPERIA_HOME` personnalisé transmis au wrapper et à systemd ;
-- `ReadWritePaths` aligné sur ce même répertoire ;
-- sauvegarde locale cohérente ;
-- configuration Restic privée ;
-- opérations Restic réelles uniquement avec `--execute --network` ;
-- rétention limitée à `forget --dry-run` ;
-- aucune commande `--prune` automatique.
+- `SUPERIA_HOME` transmis au wrapper et à systemd ;
+- sauvegarde locale et plans Restic non destructifs.
 
 ## V0.16 — interface web locale
 
-### Interface
+### Interface et sécurité
 
 - serveur HTTP Node natif sans dépendance runtime ;
 - design Matrix responsive sans ressource externe ;
 - projets, missions, runs, événements et readiness ;
-- sélection du projet et actualisation automatique toutes les 30 secondes ;
-- aucune action destructive ni lancement d’agent depuis le navigateur.
-
-### Authentification et exposition
-
 - écoute uniquement sur `127.0.0.1` ou `::1` ;
-- refus explicite de `0.0.0.0` et des adresses LAN ;
-- token aléatoire dans `SUPERIA_HOME/web/access.token` ;
-- permissions `0600` ;
-- token invalide conservé pour réparation au lieu d’être écrasé ;
-- vérification en temps constant ;
-- sessions mémoire distinctes du token ;
+- refus explicite de `0.0.0.0` ;
+- token aléatoire en `0600` ;
+- token invalide conservé pour réparation ;
+- comparaison en temps constant ;
+- session mémoire distincte du token ;
 - cookie HttpOnly et SameSite Strict ;
-- bearer accepté seulement lorsqu’il est fourni explicitement.
-
-### Sécurité HTTP
-
 - aucune CORS ;
-- CSP locale ;
-- cache désactivé ;
-- refus d’intégration en iframe ;
-- politique no-referrer ;
-- limite du corps de connexion ;
-- API d’overview en lecture seule ;
-- méthodes destructives refusées.
+- CSP locale, cache désactivé et anti-frame ;
+- aucune action destructive.
 
 ### Validation
 
 - tests HTTP avec de vraies données SQLite ;
 - connexion correcte et mauvais token ;
-- cookie de session ;
-- accès bearer ;
-- rendu HTML ;
-- données projets, missions, runs et readiness ;
+- accès bearer explicite ;
+- données réelles du plan de contrôle ;
 - refus d’écoute distante.
 
 Une course procfs du test de descendant a également été corrigée : `ENOENT` et `ESRCH` signifient tous deux que le processus a déjà disparu.
+
+## V0.17 — notifications locales
+
+### Moteur
+
+- notifications pour runs terminés, échoués, annulés et interrompus ;
+- notification des missions bloquées ;
+- traitement manuel et automatique dans le daemon ;
+- erreur de notification non bloquante pour la synchronisation et la reprise ;
+- retard supérieur à 1000 événements refusé explicitement.
+
+### Déduplication et stockage
+
+- configuration, curseur et reçus dans `SUPERIA_HOME/notifications` ;
+- permissions `0600` ;
+- écritures atomiques pour configuration et curseur ;
+- reçus créés avec écriture exclusive ;
+- clé déterministe transformée en nom SHA-256 ;
+- second passage sans doublon ;
+- première initialisation positionnée sur le dernier événement existant pour éviter une rafale historique.
+
+### Expurgation
+
+Les reçus ne copient jamais :
+
+- prompts ;
+- titres ou objectifs libres ;
+- notes ;
+- payloads d’événements ;
+- métadonnées de run ;
+- diagnostics ;
+- noms de fournisseurs arbitraires ;
+- valeurs de secrets.
+
+Ils utilisent uniquement des identifiants internes filtrés, des statuts contrôlés et des dates.
+
+### CLI et interface
+
+- `superia notify status` ;
+- `superia notify run` ;
+- `superia notify list` ;
+- activation, désactivation et configuration des catégories ;
+- sortie console désactivée par défaut ;
+- affichage des reçus dans l’interface web locale ;
+- aucun canal réseau activé.
+
+### Validation
+
+- run échoué ;
+- mission bloquée ;
+- run interrompu par le daemon ;
+- absence de doublon ;
+- configuration invalide conservée ;
+- fichiers privés ;
+- chaînes ressemblant à des secrets absentes ;
+- exposition web authentifiée en lecture seule.
 
 ## Cinq défauts matériels de revue corrigés
 
@@ -165,41 +187,27 @@ Chaque correction possède une preuve automatisée. Les cinq fils de revue GitHu
 - aucun téléchargement transmis directement à un shell ;
 - dry-run non destructif contrôlé par la CI.
 
-Profil Standard retenu pour le Pi :
-
-- Codex ;
-- Vibe ;
-- Gemini ;
-- Qwen ;
-- OpenCode ;
-- Aider ;
-- mini-SWE-agent ;
-- Repomix ;
-- Gitleaks ;
-- Bubblewrap ;
-- Restic ;
-- GitHub CLI, tmux et ShellCheck.
+Profil Standard retenu pour le Pi : Codex, Vibe, Gemini, Qwen, OpenCode, Aider, mini-SWE-agent, Repomix, Gitleaks, Bubblewrap, Restic, GitHub CLI, tmux et ShellCheck.
 
 ## Validation GitHub vérifiée
 
 - Ubuntu 24.04.4 ;
 - Node 22.23.2 ;
 - npm 10.9.8 ;
-- suite TypeScript et Node entièrement verte sur le lot web avant la passe documentaire ;
+- **83 tests réussis, 0 échec** ;
 - 0 vulnérabilité npm signalée ;
 - scripts Bash valides ;
 - absence de `curl|sh` ou `wget|sh` ;
 - dry-run complet des profils ;
 - aucune commande `sudo` cachée dans `install/pi`.
 
-Le nombre exact de tests est publié dans `docs/STATUS.md` et dans la dernière CI afin d’éviter de conserver plusieurs compteurs divergents.
-
 ## État honnête
 
-La plomberie, les politiques, les scripts, les diagnostics et l’interface web locale sont validés en CI Linux. Ne sont pas encore prouvés :
+La plomberie, les politiques, les scripts, les diagnostics, l’interface web et les notifications locales sont validés en CI Linux. Ne sont pas encore prouvés :
 
 - installation ARM64 réelle sur le Pi ;
 - affichage réel de l’interface sur le Pi et mobile ;
+- notifications après déconnexion systemd et redémarrage matériel ;
 - authentification des comptes ;
 - appels réseau et coûts réels ;
 - Bubblewrap sur le noyau du Pi ;
@@ -210,15 +218,14 @@ La plomberie, les politiques, les scripts, les diagnostics et l’interface web 
 
 ## Prochaine phase
 
-1. produire des notifications locales dédupliquées sans réseau ;
-2. installer le profil Standard sur le Pi ;
-3. vérifier le service avec le `SUPERIA_HOME` choisi ;
-4. valider l’interface web sur écran et mobile ;
-5. choisir le coffre de secrets ;
-6. valider Bubblewrap et readiness ;
-7. configurer Restic et tester une restauration ;
-8. authentifier Codex et Vibe ;
-9. exécuter un pipeline réel borné ;
-10. tester les protocoles et workers ;
-11. mesurer coût, qualité et latence ;
-12. construire le routeur mesuré.
+1. installer le profil Standard sur le Pi ;
+2. vérifier le service avec le `SUPERIA_HOME` choisi ;
+3. valider l’interface web et les notifications après déconnexion ;
+4. choisir le coffre de secrets ;
+5. valider Bubblewrap et readiness ;
+6. configurer Restic et tester une restauration ;
+7. authentifier Codex et Vibe ;
+8. exécuter un pipeline réel borné ;
+9. tester les protocoles et workers ;
+10. mesurer coût, qualité et latence ;
+11. construire le routeur mesuré.
