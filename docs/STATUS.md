@@ -1,7 +1,7 @@
 # État vérifié du projet
 
 Date du contrôle : **15 août 2026**  
-Version : **0.19.0**  
+Version : **0.20.0**  
 Branche : `agent/bootstrap-universal-cli`  
 Pull request : `#1` vers `main`
 
@@ -9,9 +9,9 @@ Pull request : `#1` vers `main`
 
 | Élément | Résultat |
 |---|---|
-| CI GitHub | réussie sur le lot fonctionnel v0.19 |
+| CI GitHub | réussie sur le lot fonctionnel v0.20 |
 | Build TypeScript | réussi |
-| Tests | **95 réussis, 0 échec** |
+| Tests | **103 réussis, 0 échec** |
 | Audit npm | **0 vulnérabilité signalée** |
 | Système CI | Ubuntu 24.04.4 |
 | Node / npm | 22.23.2 / 10.9.8 |
@@ -33,7 +33,7 @@ Le Raspberry Pi 5 est un **plan de contrôle léger** :
 - agents distants contrôlés ;
 - validation, receipts et sauvegardes ;
 - restauration et drills hors ligne ;
-- routeur de fournisseurs explicable ;
+- routeur explicable avec mesures locales bornées ;
 - console, web local, notifications et arrêt d’urgence ;
 - daemon systemd utilisateur.
 
@@ -61,18 +61,57 @@ Aucun profil n’installe de modèle local ni de poids IA.
 - Connection Matrix universelle ;
 - politique anti-SSRF ;
 - readiness hors ligne ;
-- routeur hors ligne par disponibilité, capacité, coût et préférences ;
+- routeur hors ligne par disponibilité, capacité, coût, préférences et benchmarks ;
+- registre privé de mesures avec seuil de confiance ;
 - sauvegardes locales cohérentes ;
 - restauration atomique vérifiée ;
-- drill de reprise isolé ;
+- drill de reprise isolé incluant les benchmarks ;
 - préflight SD/HDD/SSD/NVMe/SSH en lecture seule ;
 - plans Restic non destructifs ;
 - service Pi respectant `SUPERIA_HOME` ;
 - CI durcie et Dependabot.
 
-## Restauration et reprise v0.19
+## Benchmarks et routeur v0.20
 
 Commandes :
+
+```bash
+superia benchmark record <provider> --mode plan|build|review \
+  --success|--failure --duration-ms N --cost-eur N [--quality 0..100]
+superia benchmark list
+superia benchmark summary
+superia route --mode plan|build|review --budget zero|low|any
+```
+
+Garanties vérifiées :
+
+- stockage dans `SUPERIA_HOME/providers/benchmarks.json` ;
+- permissions `0600` ;
+- écriture atomique ;
+- fournisseurs connus uniquement ;
+- valeurs numériques bornées ;
+- maximum 10 000 mesures ;
+- fichier invalide conservé et nouvelles écritures refusées ;
+- aucune donnée libre : pas de prompt, code, réponse, fichier, diagnostic ou secret ;
+- résumés par fournisseur et par mode ;
+- taux de succès, durée médiane, coût moyen et qualité moyenne optionnelle ;
+- trois échantillons minimum avant influence ;
+- influence secondaire bornée entre -40 et +45 points ;
+- mesures insuffisantes visibles mais ignorées ;
+- une mesure ne peut jamais rendre éligible un adaptateur interdit ;
+- `readiness`, budget, capacités, politique API et arrêt d’urgence restent prioritaires ;
+- registre invalide ignoré par le routeur avec avertissement, sans réinitialisation ;
+- benchmarks inclus dans la sauvegarde et validés pendant la restauration.
+
+Limites :
+
+- l’enregistrement reste manuel ;
+- l’import depuis les receipts n’est pas encore livré ;
+- les essais CI sont synthétiques et ne prouvent pas la qualité d’un modèle ;
+- les benchmarks réels exigent les comptes et un corpus commun ;
+- aucun routage automatique de production n’est activé.
+
+## Restauration et reprise
 
 ```bash
 superia backup restore <sauvegarde> --target <nouveau-SUPERIA_HOME>
@@ -82,49 +121,21 @@ superia backup drill --keep
 
 Garanties vérifiées :
 
-- la cible finale doit être absente ;
-- les noms de fichiers autorisés sont limités ;
-- `control.sqlite` et `events.jsonl` sont obligatoires ;
-- tailles et SHA-256 sont vérifiés ;
-- la copie est binaire ;
-- `PRAGMA integrity_check` doit retourner `ok` ;
-- chaque ligne JSONL doit être valide ;
-- safety et notifications sont restaurés lorsqu’ils existent ;
-- l’écriture se fait dans un dossier temporaire frère ;
-- le renommage final est atomique ;
-- un échec supprime le temporaire sans créer la cible ;
-- `restore-receipt.json` est écrit en `0600` ;
-- le drill compare projets, missions, runs, événements et lignes du journal ;
-- la copie du drill est supprimée par défaut.
+- cible finale obligatoirement absente ;
+- noms de fichiers autorisés limités ;
+- `control.sqlite` et `events.jsonl` obligatoires ;
+- tailles et SHA-256 vérifiés ;
+- copie binaire ;
+- `PRAGMA integrity_check` ;
+- validation ligne par ligne du JSONL ;
+- safety, notifications et benchmarks restaurés lorsqu’ils existent ;
+- registre de benchmarks revalidé après copie ;
+- dossier temporaire frère et renommage atomique ;
+- suppression du temporaire en cas d’échec ;
+- reçu `0600` ;
+- drill comparant projets, missions, runs, événements, journal et nombre de benchmarks.
 
-Limites :
-
-- la bascule d’un `SUPERIA_HOME` actif reste manuelle ;
-- la restauration Restic hors machine n’est pas encore prouvée ;
-- le service systemd n’est pas démarré automatiquement sur la copie ;
-- le comportement du stockage réel du Pi reste à tester.
-
-## Routeur de fournisseurs v0.19
-
-Commande :
-
-```bash
-superia route --mode plan|build|review --budget zero|low|any
-```
-
-Le routeur :
-
-- n’appelle aucun réseau ;
-- ne lance aucun agent ;
-- examine les commandes présentes dans le `PATH` ;
-- exclut les adaptateurs non prêts ;
-- vérifie les capacités requises ;
-- respecte le budget, la politique API et les préférences du projet ;
-- expose les raisons de sélection ou de rejet ;
-- distingue `recommendedProviderId` de `launchAllowed` ;
-- laisse `readiness` et l’arrêt d’urgence décider si un lancement réel est autorisé.
-
-Il ne contient pas encore de score de qualité mesuré. Les benchmarks réels restent nécessaires avant un routage automatique.
+La bascule d’un `SUPERIA_HOME` actif reste volontairement manuelle.
 
 ## Préflight Raspberry Pi
 
@@ -133,19 +144,9 @@ sh install/pi/preflight.sh
 sh install/pi/preflight.sh --strict
 ```
 
-Le script vérifie en lecture seule :
+Le script vérifie sans modification ni réseau : Linux, architecture, distribution, source de `/`, SD/HDD/SSD/NVMe, espace, Node, outils, SSH, systemd utilisateur et linger.
 
-- Linux et architecture ;
-- distribution ;
-- source et type de la racine ;
-- SD, USB/HDD/SSD, NVMe ou environnement virtuel ;
-- espace libre ;
-- Git, npm et Node >= 22.5 ;
-- outils locaux ;
-- client et serveur SSH ;
-- systemd utilisateur et linger.
-
-La CI exécute ce préflight en mode strict. Le Pi ARM64 et son support réel restent à vérifier après SSH.
+La CI l’exécute en mode strict. L’exécution ARM64 sur le stockage réel reste à faire après SSH.
 
 ## Arrêt d’urgence
 
@@ -155,56 +156,26 @@ superia safety engage --category security
 superia safety release
 ```
 
-Garanties vérifiées :
-
-- état privé en `0600` et écriture atomique ;
-- état invalide conservé et bloquant ;
-- engagement et libération idempotents ;
-- Codex, Vibe, pipeline et run manuel réels refusés ;
-- diagnostics et dry-runs encore disponibles ;
-- `readiness` conserve le contrôle local mais refuse les agents réels ;
-- état visible dans le web sans route de modification ;
-- processus gérés ciblés uniquement avec PID sûr et heartbeat récent ;
-- `SIGTERM`, délai d’une seconde, puis `SIGKILL` si nécessaire ;
-- test CI avec un vrai groupe résistant à `SIGTERM` ;
-- état safety intégré au manifeste de sauvegarde.
-
-## Interface web et notifications
-
-Le serveur web :
-
-- écoute uniquement sur `127.0.0.1` ou `::1` ;
-- utilise un token `0600` et une session HttpOnly ;
-- n’active aucune CORS ;
-- refuse les méthodes destructives ;
-- affiche projets, missions, runs, notifications, safety, événements et readiness.
-
-Les notifications :
-
-- couvrent runs terminés, échoués, annulés et interrompus ;
-- couvrent les missions bloquées ;
-- sont dédupliquées par SHA-256 ;
-- ne copient ni prompts, notes, payloads, métadonnées ni diagnostics ;
-- n’utilisent aucun canal réseau.
+Garanties vérifiées : état privé fail-closed, blocage des agents/pipelines/runs réels, diagnostics disponibles, visibilité web/readiness, PID et heartbeat sûrs, `SIGTERM` puis `SIGKILL`, audit expurgé et sauvegarde de l’état.
 
 ## Ce qui attend encore le Pi ou les comptes
 
 - démarrer réellement le Pi sur son HDD/SSD ou NVMe ;
-- installer la v0.19 et le profil Standard sur ARM64 ;
+- installer la v0.20 et le profil Standard sur ARM64 ;
 - exécuter l’autotest Bubblewrap sur le noyau du Pi ;
 - confirmer le service après déconnexion ;
-- tester l’arrêt d’urgence avec un run géré sous systemd ;
-- vérifier web et notifications sur le Pi et mobile ;
+- tester l’arrêt d’urgence sous systemd ;
+- vérifier web et notifications sur Pi et mobile ;
 - choisir le coffre de secrets ;
-- restaurer une sauvegarde v0.19 sur le stockage réel ;
-- configurer un dépôt Restic réel et restaurer hors machine ;
+- restaurer une sauvegarde v0.20 sur le stockage réel ;
+- configurer Restic et restaurer hors machine ;
 - authentifier Codex et Vibe ;
-- tester les fournisseurs avec des requêtes bornées ;
+- exécuter des requêtes bornées et un pipeline réel ;
 - tester MCP, ACP, A2A et worker SSH ;
 - simuler une coupure brutale ;
-- produire un pipeline réel avec receipts ;
-- mesurer coût, qualité et latence ;
-- enrichir le routeur avec ces mesures.
+- produire au moins trois mesures comparables par fournisseur et par mode ;
+- définir une grille de qualité commune ;
+- importer automatiquement les mesures depuis les receipts.
 
 ## Limites volontaires
 
@@ -228,6 +199,7 @@ superia connection policy
 superia security sandbox-check
 superia safety status
 superia readiness
+superia benchmark summary
 superia route --mode plan --budget zero
 superia control status --json
 superia backup create
