@@ -64,7 +64,11 @@ export async function handleOperationsCommand(
     const staleMinutes = positive(valueAfter(args, "--stale-minutes"), 5);
     if (args.includes("--once")) {
       const result = await runDaemonTick(staleMinutes * 60_000);
-      console.log(asJson ? JSON.stringify(result, null, 2) : `Tick terminé : ${result.projectsSynced}/${result.projectsSeen} projet(s), ${result.recoveredRuns} run(s) récupéré(s)`);
+      if (asJson) console.log(JSON.stringify(result, null, 2));
+      else {
+        console.log(`Tick terminé : ${result.projectsSynced}/${result.projectsSeen} projet(s), ${result.recoveredRuns} run(s) récupéré(s), ${result.notificationsCreated} notification(s)`);
+        if (result.notificationError) console.log(`Alerte notifications : ${result.notificationError}`);
+      }
       return true;
     }
     await runDaemon(intervalSeconds * 1_000, staleMinutes * 60_000);
