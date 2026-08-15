@@ -1,6 +1,6 @@
 # Feuille de route Super IA
 
-Version courante : **0.17.0**  
+Version courante : **0.18.0**  
 Registre logiciel : [`ROADMAP_TRACKER.json`](ROADMAP_TRACKER.json)  
 Registre machine : [`MACHINE_TRACKER.json`](MACHINE_TRACKER.json)  
 Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
@@ -11,11 +11,11 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - scanner Git, missions, DAG et worktrees ;
 - contexte ciblé avec SHA-256 et barrière anti-secrets ;
 - runner avec logs, heartbeat, timeout et arrêt des descendants ;
-- adaptateurs Codex et Mistral Vibe ;
+- Codex et Mistral Vibe contrôlés ;
 - budgets explicites et retries bornés ;
 - Gitleaks et Bubblewrap ;
-- masquage des fichiers privés du worktree ;
-- périmètre Git, chemins critiques et limites de diff ;
+- masquage des fichiers privés ;
+- garde Git et limites de diff ;
 - reviewer indépendant ;
 - pipeline builder → validation → review → receipt ;
 - checkpoints, reprise et détection de boucle ;
@@ -23,28 +23,28 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - daemon, service Pi et console Matrix ;
 - interface web locale authentifiée et en lecture seule ;
 - notifications locales expurgées et dédupliquées ;
+- arrêt d’urgence global et audité ;
+- sauvegarde de l’état safety et des réglages de notifications ;
 - profils de toolchain Core, Standard et Full ;
-- installation rootless des CLI ;
-- Node et Gitleaks vérifiés par SHA-256 ;
 - Connection Matrix universelle ;
-- registre privé de connexions sans valeur de secret ;
 - politique anti-SSRF et sondes réseau opt-in ;
 - rapport `readiness` hors ligne ;
 - plans Restic non destructifs.
 
-## V0.17 — contrôle local complet dans Git
+## V0.18 — sécurité opérationnelle
 
-- [x] DAG avec détection de cycles ;
-- [x] readiness hors ligne ;
-- [x] interface web locale ;
-- [x] authentification locale et écoute loopback ;
-- [x] notifications de fin et interruption de run ;
-- [x] notifications de missions bloquées ;
-- [x] reçus privés et dédupliqués ;
-- [x] aucun prompt, payload ou secret dans les messages ;
-- [x] intégration au daemon ;
-- [x] affichage web en lecture seule ;
-- [x] 83 tests réussis en CI ;
+- [x] état d’arrêt privé en `0600` ;
+- [x] état invalide conservé et bloquant ;
+- [x] Codex, Vibe, pipelines et runs manuels bloqués ;
+- [x] diagnostics et dry-runs toujours disponibles ;
+- [x] PID, heartbeat et groupe de processus vérifiés ;
+- [x] `SIGTERM` puis `SIGKILL` ;
+- [x] test avec un vrai processus résistant ;
+- [x] audit événementiel expurgé ;
+- [x] visibilité readiness et web ;
+- [x] aucune commande safety depuis le web ;
+- [x] état safety inclus dans les sauvegardes ;
+- [x] 89 tests réussis sur le lot fonctionnel ;
 - [x] aucune fusion automatique.
 
 ## Préparation machine — prête dans Git
@@ -61,69 +61,50 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [x] aucun modèle local installé ;
 - [x] aucune clé créée ou copiée.
 
-## Connexions universelles — registre livré
-
-- [x] sessions CLI ;
-- [x] APIs officielles ;
-- [x] endpoints compatibles OpenAI ;
-- [x] identités cloud Azure, AWS et Google ;
-- [x] GitHub Models, Hugging Face et Together ;
-- [x] MCP stdio et HTTP ;
-- [x] ACP ;
-- [x] A2A ;
-- [x] worker SSH ;
-- [x] web assisté ;
-- [x] endpoints locaux expérimentaux désactivés ;
-- [x] toutes les connexions désactivées par défaut ;
-- [x] stockage `0600` ;
-- [x] diagnostic sans réseau et sans secret ;
-- [x] migration additive sans écraser les choix.
-
 ## Prochaine phase — validation Raspberry Pi
 
-- [ ] installer la v0.17 avec le profil Standard ;
-- [ ] exécuter `connection init` et la Connection Matrix ;
-- [ ] choisir Age, keyring ou credentials systemd pour le Pi ;
+- [ ] installer la v0.18 avec le profil Standard ;
+- [ ] choisir le `SUPERIA_HOME` définitif sur NVMe ;
 - [ ] valider Bubblewrap sur le noyau ;
 - [ ] vérifier le service après déconnexion ;
+- [ ] tester l’arrêt d’urgence avec un run géré ;
 - [ ] vérifier l’interface web sur le Pi et mobile ;
 - [ ] vérifier les notifications après redémarrage ;
-- [ ] tester coupure et reprise sans doublon de notification ;
-- [ ] tester sauvegarde et restauration ;
+- [ ] tester coupure et reprise sans doublon ;
+- [ ] restaurer une sauvegarde sur copie ;
 - [ ] authentifier Codex et Vibe ;
 - [ ] produire un pipeline réel et ses receipts ;
 - [ ] tester Restic hors machine.
 
 ## Après validation matérielle
 
-- [ ] test borné des APIs activées ;
+- [ ] tests bornés des APIs activées ;
 - [ ] authentification cloud Azure/AWS/Google ;
 - [ ] serveur MCP en lecture seule ;
 - [ ] client ACP générique ;
 - [ ] worker A2A ;
 - [ ] worker SSH contrôlé ;
-- [ ] détection préventive des conflits de fichiers entre missions ;
+- [ ] détection préventive des conflits de fichiers ;
 - [ ] routeur coût/capacité/qualité mesurée ;
-- [ ] arrêt d’urgence global ;
 - [ ] rétention des reçus de notifications ;
-- [ ] canal distant optionnel, explicitement configuré et sans secret.
+- [ ] canal distant optionnel et explicitement configuré.
 
 ## Publication stable
 
-La fusion vers `main` reste bloquée tant que les preuves suivantes manquent :
+La fusion vers `main` reste bloquée tant que :
 
-- [ ] Pi réel validé ;
-- [ ] restauration prouvée ;
-- [ ] Bubblewrap fonctionnel sur le noyau cible ;
-- [ ] Codex et Vibe réels avec receipts valides ;
-- [ ] coffre de secrets choisi et restaurable ;
-- [ ] service et notifications validés après déconnexion ;
-- [x] Gitleaks obligatoire ;
-- [x] modifications hors périmètre bloquées ;
-- [x] corrections bornées ;
-- [x] installation sans téléchargement pipé vers un shell ;
-- [x] aucune connexion ou dépense activée automatiquement ;
-- [ ] revue humaine finale autorisant la fusion.
+- [ ] le Pi réel n’est pas validé ;
+- [ ] la restauration n’est pas prouvée ;
+- [ ] Bubblewrap n’est pas fonctionnel sur le noyau cible ;
+- [ ] l’arrêt d’urgence n’est pas validé sous systemd ;
+- [ ] Codex et Vibe réels n’ont pas produit de receipts valides ;
+- [ ] le coffre de secrets n’est pas choisi et restaurable ;
+- [x] Gitleaks est obligatoire ;
+- [x] les modifications hors périmètre sont bloquées ;
+- [x] les corrections sont bornées ;
+- [x] l’installation ne pipe aucun téléchargement vers un shell ;
+- [x] aucune connexion ou dépense n’est activée automatiquement ;
+- [ ] une revue humaine finale n’a pas autorisé la fusion.
 
 ## Hors périmètre par défaut
 
@@ -131,8 +112,9 @@ La fusion vers `main` reste bloquée tant que les preuves suivantes manquent :
 - poids de modèle dans le kit Pi ;
 - Kubernetes, Redis ou PostgreSQL dans le MVP ;
 - fusion automatique ;
-- clé API dans Git ou dans les arguments de processus ;
+- clé API dans Git ou dans les arguments ;
 - navigateur automatisé ;
 - canal de notification réseau activé par défaut ;
+- arrêt complet du réseau ou de la machine ;
 - contournement de quotas ;
 - conversation libre infinie entre agents.
