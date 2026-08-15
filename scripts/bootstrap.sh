@@ -26,6 +26,11 @@ command -v openssl >/dev/null || {
   exit 1
 }
 
+# Les anciennes installations n'ont pas encore ces paramètres de bureau.
+if ! grep -q '^BROWSER_USER=' .env; then
+  printf 'BROWSER_USER=azoth\n' >> .env
+fi
+
 # Les anciennes installations n'ont pas encore cette variable. On l'ajoute
 # sans toucher aux secrets déjà présents.
 if ! grep -q '^BROWSER_PASSWORD=' .env; then
