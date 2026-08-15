@@ -23,9 +23,10 @@ events.jsonl
 emergency-stop.json
 notifications-config.json
 notifications-state.json
+provider-benchmarks.json
 ```
 
-`control.sqlite` et `events.jsonl` sont obligatoires. Les trois autres fichiers sont présents lorsqu’ils existent dans le plan de contrôle.
+`control.sqlite` et `events.jsonl` sont obligatoires. Les autres fichiers sont ajoutés lorsqu’ils existent dans le plan de contrôle.
 
 ## Restaurer vers une copie
 
@@ -46,6 +47,9 @@ Avant le renommage final, la restauration :
 - exécute `PRAGMA integrity_check` sur SQLite ;
 - parse chaque ligne du journal JSONL ;
 - restaure safety et notifications lorsqu’ils existent ;
+- restaure le registre de benchmarks en `0600` lorsqu’il existe ;
+- revalide strictement le schéma du registre de benchmarks ;
+- refuse toute la cible si ce registre est invalide, même avec un hash cohérent ;
 - écrit `restore-receipt.json` en `0600` ;
 - renomme atomiquement le dossier temporaire vers la cible.
 
@@ -59,6 +63,7 @@ SUPERIA_HOME="$HOME/superia-restored-check" superia project list --json
 SUPERIA_HOME="$HOME/superia-restored-check" superia run list --json
 SUPERIA_HOME="$HOME/superia-restored-check" superia safety status --json
 SUPERIA_HOME="$HOME/superia-restored-check" superia notify status --json
+SUPERIA_HOME="$HOME/superia-restored-check" superia benchmark summary --json
 ```
 
 Ne pas démarrer le daemon de production avec ce répertoire de test.
@@ -73,7 +78,7 @@ Le drill :
 
 1. crée une nouvelle sauvegarde cohérente ;
 2. restaure une copie dans le dossier de cette sauvegarde ;
-3. compare les compteurs de projets, missions, runs, événements et lignes JSONL ;
+3. compare projets, missions, runs, événements, lignes JSONL et nombre de benchmarks ;
 4. écrit `DRILL.json` en `0600` ;
 5. supprime la copie restaurée.
 
@@ -90,6 +95,7 @@ Le rapport indique alors son emplacement exact.
 - le manifeste et ses empreintes sont cohérents ;
 - la base restaurée est lisible et intègre ;
 - le journal restauré est syntaxiquement valide ;
+- le registre de benchmarks restauré est lisible lorsqu’il existe ;
 - les principaux compteurs durables sont identiques ;
 - la restauration ne modifie pas le contrôle actif.
 
@@ -99,6 +105,7 @@ Le rapport indique alors son emplacement exact.
 - la restauration depuis un dépôt Restic hors machine ;
 - le démarrage du service systemd depuis la copie ;
 - le comportement du stockage HDD/SSD ou NVMe du Raspberry Pi ;
+- la qualité réelle des fournisseurs mesurés ;
 - l’intégrité d’artefacts externes non inclus dans la sauvegarde locale.
 
 Ces preuves restent à produire sur le Pi 5 cible.
