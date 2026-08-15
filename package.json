@@ -1,0 +1,37 @@
+{
+  "name": "super-ia",
+  "version": "0.20.0",
+  "description": "Orchestrateur local et multi-fournisseurs pour agents IA de développement.",
+  "type": "module",
+  "bin": {
+    "superia": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "check": "npm run build && npm test",
+    "start": "node dist/index.js",
+    "doctor": "npm run build --silent && node dist/index.js doctor",
+    "readiness": "npm run build --silent && node dist/index.js readiness",
+    "control": "npm run build --silent && node dist/index.js control status",
+    "context": "npm run build --silent && node dist/index.js context build",
+    "security": "npm run build --silent && node dist/index.js security scan",
+    "sandbox-check": "npm run build --silent && node dist/index.js security sandbox-check",
+    "validate": "npm run build --silent && node dist/index.js validate",
+    "backup": "npm run build --silent && node dist/index.js backup create",
+    "recovery-drill": "npm run build --silent && node dist/index.js backup drill",
+    "restic": "npm run build --silent && node dist/index.js restic status",
+    "daemon": "npm run build --silent && node dist/index.js daemon",
+    "matrix": "npm run build --silent && node dist/index.js matrix",
+    "web": "npm run build --silent && node dist/index.js web",
+    "notify": "npm run build --silent && node dist/index.js notify status",
+    "safety": "npm run build --silent && node dist/index.js safety status"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

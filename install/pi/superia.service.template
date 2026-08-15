@@ -1,0 +1,27 @@
+[Unit]
+Description=Super IA control-plane daemon
+Documentation=file://@REPO@/docs/PI_INSTALL.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@REPO@
+Environment=SUPERIA_HOME=@SUPERIA_HOME@
+ExecStart=@NODE@ @REPO@/dist/index.js daemon --interval-seconds 30 --stale-minutes 5
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@SUPERIA_HOME@
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=default.target
