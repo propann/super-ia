@@ -94,9 +94,13 @@ services:
     restart: unless-stopped
     environment:
       DASHBOARD_PORT: 8080
+      DASHBOARD_CONFIG_DIR: /app/config
       TZ: ${TZ:-Europe/Paris}
     ports:
       - "127.0.0.1:${DASHBOARD_PORT:-8080}:8080"
+    volumes:
+      - ../config/connectors.json:/app/config/connectors.json:ro
+      - ../config/browser-profiles.json:/app/config/browser-profiles.json:ro
     depends_on:
       n8n:
         condition: service_started

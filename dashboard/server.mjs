@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(fileURLToPath(new URL('.', import.meta.url)));
 const publicRoot = resolve(root, 'public');
+const configRoot = resolve(process.env.DASHBOARD_CONFIG_DIR || join(root, 'config'));
 const port = Number(process.env.DASHBOARD_PORT || 8080);
 
 const services = [
@@ -21,6 +22,18 @@ const contentTypes = {
   '.svg': 'image/svg+xml'
 };
 
+const securityHeaders = {
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'referrer-policy': 'no-referrer',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+  'content-security-policy': "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+};
+
+function writeHead(response, status, headers = {}) {
+  response.writeHead(status, { ...securityHeaders, ...headers });
+}
+
 async function probe(service) {
   try {
     const response = await fetch(service.url, { signal: AbortSignal.timeout(2500) });
@@ -31,8 +44,17 @@ async function probe(service) {
 }
 
 function sendJson(response, status, body) {
-  response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  writeHead(response, status, {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store'
+  });
   response.end(JSON.stringify(body));
+}
+
+async function readConfig(name) {
+  const path = resolve(join(configRoot, name));
+  if (!path.startsWith(`${configRoot}/`)) throw new Error('invalid_config_path');
+  return JSON.parse(await readFile(path, 'utf8'));
 }
 
 async function serveStatic(request, response, pathname) {
@@ -45,7 +67,10 @@ async function serveStatic(request, response, pathname) {
 
   try {
     const body = await readFile(filePath);
-    response.writeHead(200, { 'content-type': contentTypes[extname(filePath)] || 'application/octet-stream' });
+    writeHead(response, 200, {
+      'content-type': contentTypes[extname(filePath)] || 'application/octet-stream',
+      'cache-control': extname(filePath) === '.html' ? 'no-store' : 'public, max-age=300'
+    });
     if (request.method !== 'HEAD') response.end(body);
     else response.end();
   } catch {
@@ -68,6 +93,24 @@ const server = createServer(async (request, response) => {
   if (url.pathname === '/api/status') {
     const result = await Promise.all(services.map(probe));
     sendJson(response, 200, { generated_at: new Date().toISOString(), services: result });
+    return;
+  }
+
+  if (url.pathname === '/api/connectors') {
+    try {
+      sendJson(response, 200, await readConfig('connectors.json'));
+    } catch {
+      sendJson(response, 503, { error: 'connectors_unavailable' });
+    }
+    return;
+  }
+
+  if (url.pathname === '/api/browser-profiles') {
+    try {
+      sendJson(response, 200, await readConfig('browser-profiles.json'));
+    } catch {
+      sendJson(response, 503, { error: 'browser_profiles_unavailable' });
+    }
     return;
   }
 

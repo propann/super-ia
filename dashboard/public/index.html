@@ -13,7 +13,7 @@
         <div>
           <p class="eyebrow">AZOTH // PI-5 // LOCAL CONTROL PLANE</p>
           <h1>SUPER IA</h1>
-          <p class="subtitle">Une seule porte d'entrée pour les outils, les agents et les connecteurs.</p>
+          <p class="subtitle">Une seule porte d'entrée pour les outils, les agents et les sessions IA isolées.</p>
         </div>
         <div class="status-chip"><span class="dot" id="overall-dot"></span><span id="overall-label">Vérification…</span></div>
       </header>
@@ -24,55 +24,52 @@
       </section>
 
       <section class="section">
-        <div class="section-heading"><h2>Outils</h2><span>routage hybride</span></div>
+        <div class="section-heading"><h2>Plan de contrôle</h2><span>local seulement</span></div>
         <div class="grid tools">
           <article class="card tool-card accent-orange">
-            <div class="card-top"><span class="icon">↯</span><span class="mode">API / WEBHOOK</span></div>
-            <h3>n8n</h3><p>Automatisations, déclencheurs et agents.</p>
+            <div class="card-top"><span class="icon">↯</span><span class="mode">WORKFLOWS</span></div>
+            <h3>n8n</h3><p>Automatisations, déclencheurs et agents avec validation humaine.</p>
             <a class="button" href="http://127.0.0.1:5678/" target="_blank" rel="noreferrer">Ouvrir n8n</a>
           </article>
           <article class="card tool-card accent-blue">
             <div class="card-top"><span class="icon">◈</span><span class="mode">MÉMOIRE</span></div>
-            <h3>Qdrant</h3><p>Collections et mémoire vectorielle locale.</p>
+            <h3>Qdrant</h3><p>Collections et mémoire vectorielle locale pour les projets.</p>
             <a class="button" href="http://127.0.0.1:6333/dashboard" target="_blank" rel="noreferrer">Ouvrir Qdrant</a>
           </article>
           <article class="card tool-card accent-purple">
-            <div class="card-top"><span class="icon">✦</span><span class="mode">PASSERELLE</span></div>
-            <h3>LiteLLM</h3><p>Routes de modèles, sans imposer ChatGPT API.</p>
+            <div class="card-top"><span class="icon">✦</span><span class="mode">API OPTIONNELLE</span></div>
+            <h3>LiteLLM</h3><p>Passerelle pour les fournisseurs autorisés, sans imposer une API payante.</p>
             <a class="button" href="http://127.0.0.1:4000/" target="_blank" rel="noreferrer">Ouvrir LiteLLM</a>
           </article>
-          <article class="card tool-card accent-green">
-            <div class="card-top"><span class="icon">◎</span><span class="mode">NAVIGATEUR</span></div>
-            <h3>ChatGPT web</h3><p>Accès web manuel ; worker isolé ensuite.</p>
-            <a class="button" href="https://chatgpt.com/" target="_blank" rel="noreferrer">Ouvrir ChatGPT</a>
-          </article>
-          <article class="card tool-card accent-orange">
-            <div class="card-top"><span class="icon">◌</span><span class="mode">NAVIGATEUR</span></div>
-            <h3>Claude web</h3><p>Accès web manuel ; worker isolé ensuite.</p>
-            <a class="button" href="https://claude.ai/" target="_blank" rel="noreferrer">Ouvrir Claude</a>
-          </article>
-          <article class="card tool-card accent-blue">
-            <div class="card-top"><span class="icon">◇</span><span class="mode">NAVIGATEUR</span></div>
-            <h3>Gemini web</h3><p>Accès web manuel ; worker isolé ensuite.</p>
-            <a class="button" href="https://gemini.google.com/" target="_blank" rel="noreferrer">Ouvrir Gemini</a>
-          </article>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading"><h2>Sessions IA</h2><span>profils navigateur séparés</span></div>
+        <div class="notice">
+          Le bouton web ouvre un onglet normal. « Copier lancement isolé » prépare la commande locale avec un profil dédié.
+        </div>
+        <div class="grid tools" id="browser-tools">
+          <article class="card empty-card">Chargement du registre navigateur…</article>
         </div>
       </section>
 
       <section class="section split">
         <article class="card panel">
-          <div class="section-heading"><h2>CLI disponibles</h2><span>local</span></div>
+          <div class="section-heading"><h2>Commandes utiles</h2><span>local</span></div>
+          <div class="cli-row"><code>make browser-check</code><button data-copy="make browser-check">Copier</button></div>
+          <div class="cli-row"><code>make browser NAME=chatgpt</code><button data-copy="make browser NAME=chatgpt">Copier</button></div>
+          <div class="cli-row"><code>docker compose --env-file .env -f compose/compose.yaml ps</code><button data-copy="docker compose --env-file .env -f compose/compose.yaml ps">Copier</button></div>
           <div class="cli-row"><code>gh auth status</code><button data-copy="gh auth status">Copier</button></div>
-          <div class="cli-row"><code>git status --short</code><button data-copy="git status --short">Copier</button></div>
-          <div class="cli-row"><code>docker compose ps</code><button data-copy="docker compose ps">Copier</button></div>
         </article>
         <article class="card panel">
           <div class="section-heading"><h2>Règles de connexion</h2><span>sécurité</span></div>
           <ul class="rules">
-            <li><strong>API</strong> si elle est stable et autorisée.</li>
+            <li><strong>API</strong> uniquement si elle est stable, autorisée et utile.</li>
             <li><strong>CLI</strong> pour Git, Docker et les outils techniques.</li>
-            <li><strong>Navigateur</strong> pour les services sans API utile.</li>
-            <li><strong>Humain</strong> pour MFA, paiement, suppression et publication.</li>
+            <li><strong>Navigateur isolé</strong> pour les services web sans API rentable.</li>
+            <li><strong>Humain</strong> pour MFA, CAPTCHA, paiement, suppression et publication.</li>
+            <li><strong>Jamais</strong> d'export de cookies ni de rotation de comptes pour contourner des quotas.</li>
           </ul>
         </article>
       </section>

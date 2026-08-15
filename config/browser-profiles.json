@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "profile_storage": "local_only",
+    "cookies": "never_export",
+    "login": "interactive_once_per_provider",
+    "automation": "human_first",
+    "account_rotation": "forbidden"
+  },
+  "profiles": [
+    {
+      "id": "chatgpt",
+      "label": "ChatGPT",
+      "url": "https://chatgpt.com/",
+      "icon": "◎",
+      "accent": "green",
+      "description": "Session web locale, séparée des autres fournisseurs.",
+      "command": "./scripts/browser-open.sh chatgpt",
+      "capabilities": ["chat", "files", "projects"]
+    },
+    {
+      "id": "claude",
+      "label": "Claude",
+      "url": "https://claude.ai/",
+      "icon": "◌",
+      "accent": "orange",
+      "description": "Profil Chromium indépendant avec connexion humaine.",
+      "command": "./scripts/browser-open.sh claude",
+      "capabilities": ["chat", "artifacts", "projects"]
+    },
+    {
+      "id": "gemini",
+      "label": "Gemini",
+      "url": "https://gemini.google.com/",
+      "icon": "◇",
+      "accent": "blue",
+      "description": "Profil Google isolé ; aucune clé API requise.",
+      "command": "./scripts/browser-open.sh gemini",
+      "capabilities": ["chat", "files", "google"]
+    },
+    {
+      "id": "deepseek",
+      "label": "DeepSeek",
+      "url": "https://chat.deepseek.com/",
+      "icon": "⌁",
+      "accent": "purple",
+      "description": "Accès web dédié pour le code et le raisonnement.",
+      "command": "./scripts/browser-open.sh deepseek",
+      "capabilities": ["chat", "code", "reasoning"]
+    },
+    {
+      "id": "mistral",
+      "label": "Le Chat Mistral",
+      "url": "https://chat.mistral.ai/",
+      "icon": "▦",
+      "accent": "orange",
+      "description": "Session Mistral locale dans son propre profil.",
+      "command": "./scripts/browser-open.sh mistral",
+      "capabilities": ["chat", "code", "files"]
+    },
+    {
+      "id": "suno",
+      "label": "Suno",
+      "url": "https://suno.com/",
+      "icon": "♫",
+      "accent": "blue",
+      "description": "Outil créatif isolé du reste des comptes IA.",
+      "command": "./scripts/browser-open.sh suno",
+      "capabilities": ["music", "library", "create"]
+    }
+  ]
+}
