@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { buildReadinessReport, type ReadinessReport } from "../core/readiness.js";
 import { openControlPlane } from "../control/control-plane.js";
 import { listNotificationRecords } from "../notifications/store.js";
+import { loadEmergencyStop } from "../safety/store.js";
 import { createSessionId, ensureWebAccessToken, verifyWebAccessToken } from "./auth.js";
 import { renderDashboardPage, renderLoginPage } from "./page.js";
 
@@ -191,6 +192,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
             positiveInteger(url.searchParams.get("notifications"), 50, 200),
             control.paths.root,
           );
+          const emergencyStop = await loadEmergencyStop(control.paths.root);
           let readinessReport: ReadinessReport | undefined;
           let readinessError: string | undefined;
           if (selectedProject) {
@@ -209,6 +211,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
             runs,
             events,
             notifications,
+            emergencyStop,
             readiness: readinessReport,
             readinessError,
             readOnly: true,
