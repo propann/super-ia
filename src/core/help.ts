@@ -1,8 +1,10 @@
 export function printHelp(): void {
-  console.log(`Super IA v0.15.0
+  console.log(`Super IA v0.16.0
 
 Usage:
   superia matrix [--once]                       Console Matrix multi-projets
+  superia web [serve] [--port 3210]            Interface locale en lecture seule
+  superia web token [--json]                   Affiche le token web local
   superia readiness [--json]                    Verdict global hors ligne
   superia doctor [--json]                       Détecte les IA et outils locaux
   superia providers [--json]                    Affiche les fournisseurs
@@ -83,6 +85,8 @@ Usage:
 
 Principes:
   - Raspberry Pi 5 utilisé comme plan de contrôle, jamais comme modèle obligatoire
+  - interface web uniquement sur 127.0.0.1 avec token privé et session HttpOnly
+  - interface web en lecture seule, sans CORS ni contrôle destructif
   - mode agent par défaut en lecture seule
   - build uniquement dans un worktree avec chemins autorisés
   - DAG sans cycle et dépendances terminées avant exécution
