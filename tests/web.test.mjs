@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openControlPlane } from "../dist/control/control-plane.js";
 import { writeNotificationRecord } from "../dist/notifications/store.js";
+import { engageEmergencyStop } from "../dist/safety/store.js";
 import { ensureWebAccessToken } from "../dist/web/auth.js";
 import { startWebServer } from "../dist/web/server.js";
 
@@ -125,6 +126,7 @@ test("web dashboard stays local, authenticated and read-only", async () => {
     const pageHtml = await page.text();
     assert.match(pageHtml, /SUPER IA \/\/ CONTROL MATRIX/);
     assert.match(pageHtml, /Notifications locales/);
+    assert.match(pageHtml, /arrêt d'urgence via CLI uniquement/i);
 
     const overview = await fetch(`${base}/api/overview`, { headers: { cookie } });
     assert.equal(overview.status, 200);
@@ -137,7 +139,15 @@ test("web dashboard stays local, authenticated and read-only", async () => {
     assert.equal(data.runs[0].status, "completed");
     assert.equal(data.notifications.length, 1);
     assert.equal(data.notifications[0].title, "Run terminé");
+    assert.equal(data.emergencyStop.engaged, false);
     assert.equal(data.readiness.overall, "warn");
+
+    await engageEmergencyStop("maintenance", env.home);
+    const stopped = await fetch(`${base}/api/overview`, { headers: { cookie } });
+    assert.equal(stopped.status, 200);
+    const stoppedData = await stopped.json();
+    assert.equal(stoppedData.emergencyStop.engaged, true);
+    assert.equal(stoppedData.emergencyStop.category, "maintenance");
 
     const bearer = await fetch(`${base}/api/overview`, { headers: { authorization: `Bearer ${token}` } });
     assert.equal(bearer.status, 200);
