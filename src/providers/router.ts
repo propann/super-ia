@@ -1,4 +1,5 @@
 import type { CostProfile, ProviderCheck } from "../core/types.js";
+import type { ProviderBenchmarkSummary } from "./benchmark-types.js";
 
 export type RoutingMode = "plan" | "build" | "review";
 export type RoutingBudget = "zero" | "low" | "any";
@@ -11,6 +12,7 @@ export interface RoutingRequest {
   preferredProviders: string[];
   readyForRealAgents: boolean;
   readinessBlockers?: string[];
+  benchmarks?: Record<string, ProviderBenchmarkSummary>;
 }
 
 export interface ProviderRouteCandidate {
@@ -20,6 +22,8 @@ export interface ProviderRouteCandidate {
   score: number;
   cost: CostProfile;
   installed: boolean | null;
+  benchmark?: ProviderBenchmarkSummary;
+  benchmarkScore: number;
   reasons: string[];
   rejectedBy: string[];
 }
@@ -63,10 +67,25 @@ function preferenceScore(id: string, preferred: string[]): number {
   return index < 0 ? 0 : Math.max(1, 100 - index * 10);
 }
 
+function measuredScore(summary: ProviderBenchmarkSummary | undefined): number {
+  if (!summary?.trustedForRouting) return 0;
+  let score = (summary.successRate - 0.5) * 30;
+  if (summary.averageQualityScore !== undefined) score += ((summary.averageQualityScore - 50) / 50) * 15;
+  if (summary.medianDurationMs <= 30_000) score += 8;
+  else if (summary.medianDurationMs <= 120_000) score += 3;
+  else if (summary.medianDurationMs > 300_000) score -= 5;
+  if (summary.averageCostEur === 0) score += 5;
+  else if (summary.averageCostEur <= 0.25) score += 3;
+  else if (summary.averageCostEur > 1) score -= 3;
+  return Math.round(Math.max(-40, Math.min(45, score)));
+}
+
 function candidate(provider: ProviderCheck, request: RoutingRequest): ProviderRouteCandidate {
   const rejectedBy: string[] = [];
   const reasons: string[] = [];
   const allowed = allowedCosts(request.budget);
+  const benchmark = request.benchmarks?.[`${provider.id}:${request.mode}`];
+  const benchmarkScore = measuredScore(benchmark);
 
   if (provider.status !== "ready") rejectedBy.push(`adaptateur ${provider.status}`);
   if (provider.installed !== true) rejectedBy.push(provider.installed === null ? "fournisseur assisté non exécutable" : "commande absente du PATH");
@@ -83,11 +102,17 @@ function candidate(provider: ProviderCheck, request: RoutingRequest): ProviderRo
     if (provider.official) score += 20;
     if (provider.capabilities.structuredOutput) score += 20;
     if (provider.capabilities.runCommands) score += request.requireCommands ? 20 : 5;
+    score += benchmarkScore;
     reasons.push("adaptateur prêt et commande présente");
     reasons.push(`capacités compatibles avec le mode ${request.mode}`);
     reasons.push(`coût ${provider.cost} autorisé par le budget ${request.budget}`);
     if (provider.official) reasons.push("intégration officielle");
     if (request.preferredProviders.includes(provider.id)) reasons.push("préférence du projet");
+    if (benchmark?.trustedForRouting) {
+      reasons.push(`mesures locales utilisées : n=${benchmark.sampleCount}, succès=${Math.round(benchmark.successRate * 100)}%, médiane=${benchmark.medianDurationMs}ms, score=${benchmarkScore >= 0 ? "+" : ""}${benchmarkScore}`);
+    } else if (benchmark) {
+      reasons.push(`mesures locales insuffisantes : n=${benchmark.sampleCount}/3, score ignoré`);
+    }
   }
 
   return {
@@ -97,6 +122,8 @@ function candidate(provider: ProviderCheck, request: RoutingRequest): ProviderRo
     score,
     cost: provider.cost,
     installed: provider.installed,
+    benchmark,
+    benchmarkScore,
     reasons,
     rejectedBy,
   };
