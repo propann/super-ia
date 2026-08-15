@@ -26,7 +26,7 @@ async function linuxProcessState(pid) {
     const stat = await readFile(`/proc/${pid}/stat`, "utf8");
     return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[0];
   } catch (error) {
-    if (error && typeof error === "object" && error.code === "ENOENT") return undefined;
+    if (error && typeof error === "object" && ["ENOENT", "ESRCH"].includes(error.code)) return undefined;
     throw error;
   }
 }
