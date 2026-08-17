@@ -138,6 +138,8 @@ test("web dashboard stays local, authenticated and read-only", async () => {
     assert.match(pageHtml, /openConsole/);
     assert.match(pageHtml, /AGRANDIR/);
     assert.match(pageHtml, /dissolveGroup/);
+    assert.match(pageHtml, /dragGroup/);
+    assert.match(pageHtml, /dropOnGroup/);
     assert.match(pageHtml, /Notifications locales/);
     assert.match(pageHtml, /consoles SSH contrôlables/i);
 
