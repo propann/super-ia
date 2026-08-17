@@ -5,7 +5,7 @@ function shell(title: string, body: string, script = ""): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title}</title>
-<style>.arena-columns{grid-template-columns:repeat(3,minmax(0,1fr))}.group-chip{display:flex;align-items:center;gap:8px}.group-chip .btn{padding:4px 8px;font-size:10px;margin-left:auto}@media(max-width:900px){.arena-columns{grid-template-columns:1fr 1fr}}@media(max-width:600px){.arena-columns{grid-template-columns:1fr}}</style>
+<style>.arena-columns{grid-template-columns:repeat(3,minmax(0,1fr))}.arena-grid{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}.entity-card{min-height:68px;padding:8px}.entity-icon{width:24px;height:24px;margin-bottom:5px}.entity-meta{font-size:10px;margin-top:2px}.group-chip{display:flex;align-items:center;gap:8px}.group-chip .btn{padding:4px 8px;font-size:10px;margin-left:auto}@media(max-width:980px){.arena-columns{grid-template-columns:1fr 1fr}}@media(max-width:760px){.arena-columns{grid-template-columns:1fr}}</style>
 <style>
 :root{color-scheme:dark;--bg:#050806;--panel:#0b120d;--line:#1e3b27;--green:#7cff96;--muted:#8ca493;--amber:#ffbd59;--red:#ff6b6b;--white:#e8f1ea}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#102018 0,#050806 42%);color:var(--white);font:14px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
