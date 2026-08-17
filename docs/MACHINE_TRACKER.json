@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "project": "Super IA machine preparation",
+  "updatedAt": "2026-08-15",
+  "profiles": ["core", "standard", "full"],
+  "targetProfile": "standard",
+  "tasks": [
+    {
+      "id": "MCH-001",
+      "title": "Définir les profils de toolchain",
+      "status": "done",
+      "evidence": ["install/tools/toolchain-manifest.json", "tests/toolchain-install.test.mjs"]
+    },
+    {
+      "id": "MCH-002",
+      "title": "Installer les dépendances système explicitement",
+      "status": "done",
+      "evidence": ["install/tools/system-packages-debian.sh", ".github/workflows/ci.yml"]
+    },
+    {
+      "id": "MCH-003",
+      "title": "Installer les CLI sans root",
+      "status": "done",
+      "evidence": ["install/tools/bootstrap-user-tools.sh", "tests/toolchain-install.test.mjs"]
+    },
+    {
+      "id": "MCH-004",
+      "title": "Vérifier Node et Gitleaks par SHA-256",
+      "status": "done",
+      "evidence": ["install/tools/bootstrap-user-tools.sh"]
+    },
+    {
+      "id": "MCH-005",
+      "title": "Produire un rapport de toolchain privé",
+      "status": "done",
+      "evidence": ["install/tools/verify-toolchain.sh"]
+    },
+    {
+      "id": "MCH-006",
+      "title": "Construire la matrice de connexions universelle",
+      "status": "done",
+      "evidence": ["src/connections/catalog.ts", "tests/connections.test.mjs"]
+    },
+    {
+      "id": "MCH-007",
+      "title": "Protéger le registre de connexions et les références de secrets",
+      "status": "done",
+      "evidence": ["src/connections/store.ts", "tests/connections.test.mjs"]
+    },
+    {
+      "id": "MCH-008",
+      "title": "Créer le tableau Connection Matrix",
+      "status": "done",
+      "evidence": ["src/connections/dashboard.ts", "tests/connections-cli.test.mjs"]
+    },
+    {
+      "id": "MCH-009",
+      "title": "Détecter les coffres de secrets disponibles",
+      "status": "done",
+      "evidence": ["src/connections/secret-backends.ts", "tests/secret-backends.test.mjs"]
+    },
+    {
+      "id": "MCH-010",
+      "title": "Installer le profil standard sur le Pi cible",
+      "status": "blocked",
+      "blockedBy": "Pi hors ligne",
+      "evidenceExpected": ["~/.superia/toolchain-status.json", "sortie verify-toolchain.sh"]
+    },
+    {
+      "id": "MCH-011",
+      "title": "Valider Bubblewrap sur le noyau du Pi",
+      "status": "blocked",
+      "blockedBy": "Pi hors ligne",
+      "evidenceExpected": ["~/.superia/sandbox-status.json"]
+    },
+    {
+      "id": "MCH-012",
+      "title": "Authentifier les CLI choisies",
+      "status": "blocked",
+      "blockedBy": "Accès interactif aux comptes requis",
+      "evidenceExpected": ["connection doctor sans secret", "run plan réel et receipt"]
+    },
+    {
+      "id": "MCH-013",
+      "title": "Tester les APIs et endpoints activés",
+      "status": "planned",
+      "dependencies": ["MCH-010", "MCH-012"],
+      "evidenceExpected": ["test de santé borné", "budget explicite", "aucune clé dans les logs"]
+    },
+    {
+      "id": "MCH-014",
+      "title": "Tester MCP, ACP, A2A et worker SSH",
+      "status": "planned",
+      "dependencies": ["MCH-010"],
+      "evidenceExpected": ["handshake", "permissions", "timeout", "journal sans secret"]
+    },
+    {
+      "id": "MCH-015",
+      "title": "Choisir et valider le coffre de secrets du Pi",
+      "status": "planned",
+      "dependencies": ["MCH-010"],
+      "evidenceExpected": ["backend retenu", "restauration testée", "permissions vérifiées"]
+    }
+  ],
+  "releaseGate": {
+    "required": ["MCH-010", "MCH-011", "MCH-012", "MCH-015"],
+    "automaticMerge": false
+  }
+}
