@@ -134,6 +134,9 @@ test("web dashboard stays local, authenticated and read-only", async () => {
     assert.match(pageHtml, /agent-cards/);
     assert.match(pageHtml, /project-cards/);
     assert.match(pageHtml, /pair-card/);
+    assert.match(pageHtml, /console-preview/);
+    assert.match(pageHtml, /openConsole/);
+    assert.match(pageHtml, /AGRANDIR/);
     assert.match(pageHtml, /dissolveGroup/);
     assert.match(pageHtml, /Notifications locales/);
     assert.match(pageHtml, /arrêt d'urgence via CLI uniquement/i);
