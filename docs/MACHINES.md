@@ -29,4 +29,4 @@ superia machine add vps \
   --identity ~/.ssh/super-agent-vps --enabled
 ```
 
-`machine list` et `machine doctor` vérifient la configuration locale sans ouvrir de connexion réseau. Le terminal temps réel devra passer par une session SSH/tmux séparée et journalisée. WinRM reste déclaré comme transport manuel tant que son exécution n'a pas reçu une politique et un backend dédiés.
+`machine list` et `machine doctor` vérifient la configuration locale sans ouvrir de connexion réseau. Depuis l'interface web locale, une carte SSH peut ouvrir une session interactive, afficher sa sortie en direct et accepter des commandes. Seules les clés SSH ou l'agent SSH sont acceptés : aucun mot de passe n'est stocké ou transmis par Super IA. WinRM reste déclaré comme transport manuel tant que son exécution n'a pas reçu une politique et un backend dédiés.

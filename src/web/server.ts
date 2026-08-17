@@ -6,6 +6,7 @@ import { loadEmergencyStop } from "../safety/store.js";
 import { ensureMachineStore, inspectMachines } from "../machines/store.js";
 import { ensureConnectionStore, inspectConnections } from "../connections/store.js";
 import { ensureArenaState, writeArenaState } from "../arena/store.js";
+import { ConsoleManager } from "./console.js";
 import { createSessionId, ensureWebAccessToken, verifyWebAccessToken } from "./auth.js";
 import { renderDashboardPage, renderLoginPage } from "./page.js";
 
@@ -118,6 +119,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
   const readiness = options.readiness ?? buildReadinessReport;
   const sessionTtlMs = Math.max(60_000, options.sessionTtlMs ?? 8 * 60 * 60_000);
   const sessions = new Map<string, number>();
+  const consoles = new ConsoleManager();
   let actualPort = requestedPort;
 
   const authenticated = (request: any): boolean => {
@@ -198,6 +200,39 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
         if (references.some((reference) => !known.has(reference))) throw new Error("L'arène référence une IA ou une machine inconnue.");
         const state = await writeArenaState({ schemaVersion: 1, updatedAt: new Date().toISOString(), selected: parsed.selected ?? [], groups: parsed.groups ?? [] }, options.controlHome);
         sendJson(response, 200, state);
+        return;
+      }
+
+      const consoleMatch = /^\/api\/console\/([a-z0-9][a-z0-9._-]{1,63})(?:\/(open|input|stream|close))?$/.exec(url.pathname);
+      if (consoleMatch) {
+        const machineId = consoleMatch[1];
+        const action = consoleMatch[2];
+        const machineStore = await ensureMachineStore(options.controlHome);
+        const machine = machineStore.store.machines.find((item) => item.id === machineId);
+        if (!machine) { sendJson(response, 404, { error: "Console inconnue." }); return; }
+        if (action === "open" && request.method === "POST") {
+          if (!machine.enabled) { sendJson(response, 409, { error: "Cette console est désactivée." }); return; }
+          const session = consoles.open(machine);
+          sendJson(response, 200, { id: machine.id, status: "opening", history: session.history });
+          return;
+        }
+        if (action === "input" && request.method === "POST") {
+          const parsed = JSON.parse(await readBody(request)) as { data?: string };
+          consoles.input(machine.id, parsed.data ?? "");
+          sendJson(response, 202, { accepted: true });
+          return;
+        }
+        if (action === "stream" && request.method === "GET") {
+          consoles.subscribe(machine.id, response);
+          return;
+        }
+        if (action === "close" && request.method === "POST") {
+          consoles.close(machine.id);
+          sendJson(response, 200, { closed: true });
+          return;
+        }
+        response.setHeader("Allow", "GET, POST");
+        sendJson(response, 405, { error: "Méthode refusée." });
         return;
       }
 
@@ -284,7 +319,8 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
     host,
     port: actualPort,
     tokenPath: access.path,
-    close: async () => {
+      close: async () => {
+      consoles.closeAll();
       sessions.clear();
       await new Promise<void>((resolve, reject) => server.close((error: unknown) => error ? reject(error) : resolve()));
     },

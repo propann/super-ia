@@ -139,7 +139,7 @@ test("web dashboard stays local, authenticated and read-only", async () => {
     assert.match(pageHtml, /AGRANDIR/);
     assert.match(pageHtml, /dissolveGroup/);
     assert.match(pageHtml, /Notifications locales/);
-    assert.match(pageHtml, /arrêt d'urgence via CLI uniquement/i);
+    assert.match(pageHtml, /consoles SSH contrôlables/i);
 
     const overview = await fetch(`${base}/api/overview`, { headers: { cookie } });
     assert.equal(overview.status, 200);
