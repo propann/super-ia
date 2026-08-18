@@ -65,7 +65,7 @@ function sqlString(value: string): string {
 }
 
 function digest(data: unknown): string {
-  return createHash("sha256").update(data).digest("hex");
+  return createHash("sha256").update(typeof data === "string" ? data : JSON.stringify(data ?? "")).digest("hex");
 }
 
 function missing(error: unknown): boolean {

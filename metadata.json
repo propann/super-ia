@@ -1,0 +1,8 @@
+{
+  "name": "Super IA",
+  "description": "Local and multi-provider orchestrator for AI development agents with interactive web dashboard and control matrix",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

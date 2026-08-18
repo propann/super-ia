@@ -35,7 +35,7 @@ export async function ensureWebAccessToken(controlHome?: string): Promise<WebAcc
     if (!isMissing(error)) throw error;
   }
 
-  const token = randomBytes(32).toString("base64url");
+  const token = (randomBytes(32) as any).toString("base64url");
   await writeFile(path, `${token}\n`, { encoding: "utf8", mode: 0o600, flag: "wx" });
   await chmod(path, 0o600);
   return { path, token, created: true };
@@ -48,5 +48,5 @@ export function verifyWebAccessToken(expected: string, candidate: string): boole
 }
 
 export function createSessionId(): string {
-  return randomBytes(24).toString("base64url");
+  return (randomBytes(24) as any).toString("base64url");
 }

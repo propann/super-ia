@@ -28,6 +28,14 @@ export interface AiConnection {
   requiredEnv: string[];
   protocolVersion?: string;
   notes: string;
+  model?: string;
+  role?: string;
+  systemPrompt?: string;
+  isLeader?: boolean;
+  authPath?: "cli" | "api" | "hybrid";
+  keyPreview?: string;
+  apiKeyConfigured?: boolean;
+  customBaseUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

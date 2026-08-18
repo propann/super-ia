@@ -4,6 +4,7 @@ import { ensureControlHome } from "../control/home.js";
 import { findExecutable } from "../utils/command.js";
 import { defaultConnections } from "./catalog.js";
 import { evaluateEndpointPolicy } from "./network-policy.js";
+import { getDecryptedEnvironment, listVaultEntries } from "../security/vault.js";
 import type { AiConnection, ConnectionCheck, ConnectionKind, ConnectionState, ConnectionStore } from "./types.js";
 
 const kinds: ConnectionKind[] = ["cli-session", "api-key-env", "openai-compatible", "cloud-identity", "mcp-stdio", "mcp-http", "acp-stdio", "a2a-http", "ssh-cli", "web-assisted", "local-endpoint"];
@@ -48,13 +49,54 @@ async function writeStore(path: string, store: ConnectionStore): Promise<void> {
 }
 
 function mergeCatalog(store: ConnectionStore): number {
-  const existing = new Set(store.connections.map((item) => item.id));
-  const additions = defaultConnections().filter((item) => !existing.has(item.id));
-  if (!additions.length) return 0;
-  store.connections.push(...additions);
-  store.connections.sort((a, b) => a.id.localeCompare(b.id));
-  store.updatedAt = new Date().toISOString();
-  return additions.length;
+  const existingMap = new Map(store.connections.map((item) => [item.id, item]));
+  const defaults = defaultConnections();
+  let changed = 0;
+  for (const def of defaults) {
+    const found = existingMap.get(def.id);
+    if (!found) {
+      store.connections.push(def);
+      changed++;
+    } else {
+      if (def.enabled && !found.enabled) {
+        found.enabled = true;
+        changed++;
+      }
+      if (def.role && (!found.role || found.role === "Agent IA")) {
+        found.role = def.role;
+        changed++;
+      }
+      if (def.model && !found.model) {
+        found.model = def.model;
+        changed++;
+      }
+      if (def.systemPrompt && !found.systemPrompt) {
+        found.systemPrompt = def.systemPrompt;
+        changed++;
+      }
+      if (def.isLeader !== undefined && found.isLeader === undefined) {
+        found.isLeader = def.isLeader;
+        changed++;
+      }
+      if (def.authPath && !found.authPath) {
+        found.authPath = def.authPath;
+        changed++;
+      }
+      if (def.notes && (!found.notes || !found.notes.includes("Rôle:"))) {
+        found.notes = def.notes;
+        changed++;
+      }
+      if (def.label && found.label !== def.label) {
+        found.label = def.label;
+        changed++;
+      }
+    }
+  }
+  if (changed > 0) {
+    store.connections.sort((a, b) => a.id.localeCompare(b.id));
+    store.updatedAt = new Date().toISOString();
+  }
+  return changed;
 }
 
 export async function ensureConnectionStore(root?: string): Promise<{ path: string; store: ConnectionStore; created: boolean; addedDefaults: number }> {
@@ -163,7 +205,43 @@ export async function inspectConnection(
 
 export async function inspectConnections(root?: string): Promise<ConnectionCheck[]> {
   const { store } = await ensureConnectionStore(root);
-  return Promise.all(store.connections.map((connection) => inspectConnection(connection)));
+  const decryptedEnv = await getDecryptedEnvironment(root).catch(() => ({}));
+  const mergedEnv = { ...process.env, ...decryptedEnv };
+  const vaultEntries = await listVaultEntries(root).catch(() => []);
+  const vaultMap = new Map(vaultEntries.map((v) => [v.provider.toLowerCase(), v]));
+
+  return Promise.all(
+    store.connections.map(async (connection) => {
+      const check = await inspectConnection(connection, mergedEnv);
+      const providerKey = (connection.providerId || connection.id).toLowerCase();
+      let matchedEntry = vaultMap.get(providerKey);
+      if (!matchedEntry) {
+        for (const [k, v] of vaultMap.entries()) {
+          if (providerKey.includes(k) || connection.id.toLowerCase().includes(k)) {
+            matchedEntry = v;
+            break;
+          }
+        }
+      }
+
+      if (matchedEntry && matchedEntry.isConfigured) {
+        check.keyPreview = matchedEntry.preview;
+        check.apiKeyConfigured = true;
+        if (!check.authPath) check.authPath = matchedEntry.preferredMode || (connection.kind === "cli-session" ? "cli" : "api");
+        if (connection.requiredEnv.some((env) => env === matchedEntry?.envVarName) && check.environmentMissing.includes(matchedEntry.envVarName)) {
+          check.environmentMissing = check.environmentMissing.filter((e) => e !== matchedEntry?.envVarName);
+          if (!check.environmentPresent.includes(matchedEntry.envVarName)) {
+            check.environmentPresent.push(matchedEntry.envVarName);
+          }
+        }
+      } else {
+        check.apiKeyConfigured = false;
+        if (!check.authPath) check.authPath = connection.kind === "cli-session" ? "cli" : "api";
+      }
+
+      return check;
+    })
+  );
 }
 
 export async function writeSecretsTemplate(root?: string): Promise<string> {

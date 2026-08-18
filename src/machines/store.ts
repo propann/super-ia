@@ -39,12 +39,16 @@ export async function ensureMachineStore(root?: string): Promise<{ path: string;
   const path = machinePath(home.root);
   try { await access(path); } catch (error) {
     if (!missing(error)) throw error;
-    const store: MachineStore = { schemaVersion: 1, updatedAt: new Date().toISOString(), machines: [] };
+    const store: MachineStore = { schemaVersion: 1, updatedAt: new Date().toISOString(), machines: defaultMachines() };
     await writeStore(path, store);
     return { path, store, created: true };
   }
   const store = JSON.parse(await readFile(path, "utf8")) as MachineStore;
   if (store.schemaVersion !== 1 || !Array.isArray(store.machines)) throw new Error("machines.json est invalide ou incompatible.");
+  if (store.machines.length === 0) {
+    store.machines = defaultMachines();
+    await writeStore(path, store);
+  }
   store.machines.forEach(validateMachine);
   return { path, store, created: false };
 }
@@ -82,9 +86,46 @@ export async function inspectMachine(machine: RemoteMachine, executableResolver:
   return { ...machine, state: machine.authMode === "manual" ? "manual" : "ready", ready: true, reasons: ["SSH configuré; aucun test réseau automatique"], networkChecked: false };
 }
 
+export function defaultMachines(now = new Date().toISOString()): RemoteMachine[] {
+  return [
+    {
+      id: "pi5",
+      label: "Raspberry Pi 5 (ARM64 / SSH)",
+      platform: "linux",
+      transport: "ssh",
+      host: "192.168.1.50",
+      port: 22,
+      user: "pi",
+      enabled: true,
+      authMode: "key",
+      sessionName: "superia-pi5",
+      notes: "Console matérielle Raspberry Pi 5 sous Raspberry Pi OS 64-bit",
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "win11",
+      label: "Windows 11 Dev Station (SSH)",
+      platform: "windows",
+      transport: "ssh",
+      host: "192.168.1.100",
+      port: 22,
+      user: "developer",
+      shell: "powershell.exe",
+      enabled: true,
+      authMode: "key",
+      sessionName: "superia-win11",
+      notes: "Console distante Windows 11 avec PowerShell 7",
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+}
+
 export async function inspectMachines(root?: string): Promise<MachineCheck[]> {
   const { store } = await ensureMachineStore(root);
-  return Promise.all(store.machines.map((machine) => inspectMachine(machine)));
+  const machines = store.machines.length > 0 ? store.machines : defaultMachines();
+  return Promise.all(machines.map((machine) => inspectMachine(machine)));
 }
 
 export type { MachinePlatform, MachineTransport };

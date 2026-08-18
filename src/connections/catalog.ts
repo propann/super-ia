@@ -12,55 +12,173 @@ interface Seed {
   requiredEnv?: string[];
   protocolVersion?: string;
   notes: string;
+  model?: string;
+  role?: string;
+  systemPrompt?: string;
+  isLeader?: boolean;
+  authPath?: "cli" | "api" | "hybrid";
 }
 
 const seeds: Seed[] = [
-  { id: "codex-cli", label: "OpenAI Codex CLI", kind: "cli-session", providerId: "codex-cli", authMode: "session", command: "codex", notes: "Connexion ChatGPT interactive ou clé OpenAI gérée hors dépôt." },
-  { id: "claude-code", label: "Anthropic Claude Code", kind: "cli-session", providerId: "claude-code", authMode: "session", command: "claude", notes: "Connexion navigateur, organisation ou clé Anthropic selon le compte." },
-  { id: "mistral-vibe", label: "Mistral Vibe", kind: "cli-session", providerId: "mistral-vibe", authMode: "session", command: "vibe", notes: "Session Vibe ou MISTRAL_API_KEY hors dépôt." },
-  { id: "gemini-cli", label: "Google Gemini CLI", kind: "cli-session", providerId: "gemini-cli", authMode: "session", command: "gemini", notes: "Connexion Google interactive ou clé Gemini." },
-  { id: "qwen-code", label: "Qwen Code", kind: "cli-session", providerId: "qwen-code", authMode: "session", command: "qwen", notes: "Assistant multi-fournisseurs avec authentification interactive." },
-  { id: "opencode", label: "OpenCode", kind: "cli-session", providerId: "opencode", authMode: "session", command: "opencode", notes: "Coquille multi-fournisseurs configurée avec /connect." },
-  { id: "aider", label: "Aider", kind: "cli-session", providerId: "aider", authMode: "environment", command: "aider", notes: "Supporte de nombreux fournisseurs et endpoints compatibles." },
-  { id: "mini-swe-agent", label: "mini-SWE-agent", kind: "cli-session", providerId: "mini-swe-agent", authMode: "environment", command: "mini", notes: "Agent minimal, à maintenir en mode confirmation dans Super IA." },
-
-  { id: "openai-api", label: "OpenAI API", kind: "api-key-env", providerId: "openai", authMode: "environment", baseUrl: "https://api.openai.com/v1", requiredEnv: ["OPENAI_API_KEY"], notes: "API officielle, désactivée tant qu'un budget explicite n'est pas configuré." },
-  { id: "anthropic-api", label: "Anthropic API", kind: "api-key-env", providerId: "anthropic", authMode: "environment", baseUrl: "https://api.anthropic.com", requiredEnv: ["ANTHROPIC_API_KEY"], notes: "API officielle Anthropic." },
-  { id: "mistral-api", label: "Mistral API", kind: "api-key-env", providerId: "mistral", authMode: "environment", baseUrl: "https://api.mistral.ai/v1", requiredEnv: ["MISTRAL_API_KEY"], notes: "API officielle Mistral." },
-  { id: "gemini-api", label: "Google Gemini API", kind: "api-key-env", providerId: "gemini", authMode: "environment", baseUrl: "https://generativelanguage.googleapis.com", requiredEnv: ["GEMINI_API_KEY"], notes: "API Gemini ou configuration Google Cloud selon le compte." },
-
-  { id: "azure-openai", label: "Azure OpenAI / Microsoft Foundry", kind: "cloud-identity", providerId: "azure-openai", authMode: "session", requiredEnv: ["AZURE_OPENAI_ENDPOINT"], notes: "Authentification par identité Microsoft Entra recommandée ou AZURE_OPENAI_API_KEY stockée hors dépôt." },
-  { id: "aws-bedrock", label: "AWS Bedrock", kind: "cloud-identity", providerId: "aws-bedrock", authMode: "session", notes: "Utilise la chaîne d'identité AWS : profil, rôle attaché ou variables temporaires. Ne pas copier ~/.aws dans Super IA." },
-  { id: "google-vertex-ai", label: "Google Vertex AI", kind: "cloud-identity", providerId: "vertex-ai", authMode: "session", notes: "Utilise Application Default Credentials, Workload Identity ou compte attaché." },
-  { id: "github-models", label: "GitHub Models", kind: "api-key-env", providerId: "github-models", authMode: "environment", baseUrl: "https://models.github.ai/inference", requiredEnv: ["GITHUB_TOKEN"], notes: "Jeton finement limité avec permission models:read ou jeton GitHub App." },
-
-  { id: "openrouter", label: "OpenRouter", kind: "openai-compatible", providerId: "openrouter", authMode: "environment", baseUrl: "https://openrouter.ai/api/v1", requiredEnv: ["OPENROUTER_API_KEY"], notes: "Passerelle multi-modèles compatible OpenAI." },
-  { id: "deepseek-api", label: "DeepSeek API", kind: "openai-compatible", providerId: "deepseek", authMode: "environment", baseUrl: "https://api.deepseek.com", requiredEnv: ["DEEPSEEK_API_KEY"], notes: "Endpoint compatible OpenAI." },
-  { id: "groq-api", label: "Groq API", kind: "openai-compatible", providerId: "groq", authMode: "environment", baseUrl: "https://api.groq.com/openai/v1", requiredEnv: ["GROQ_API_KEY"], notes: "Endpoint compatible OpenAI." },
-  { id: "huggingface-router", label: "Hugging Face Inference Providers", kind: "openai-compatible", providerId: "huggingface", authMode: "environment", baseUrl: "https://router.huggingface.co/v1", requiredEnv: ["HF_TOKEN"], notes: "Routeur compatible OpenAI avec jeton d'inférence à permissions minimales." },
-  { id: "together-api", label: "Together AI", kind: "openai-compatible", providerId: "together", authMode: "environment", baseUrl: "https://api.together.ai/v1", requiredEnv: ["TOGETHER_API_KEY"], notes: "Endpoint compatible OpenAI." },
-  { id: "generic-openai-compatible", label: "Endpoint compatible OpenAI", kind: "openai-compatible", providerId: "generic", authMode: "environment", requiredEnv: ["OPENAI_API_KEY"], notes: "Base URL et nom de variable configurables sans enregistrer la valeur du secret." },
-
-  { id: "mcp-stdio", label: "Serveur MCP stdio", kind: "mcp-stdio", authMode: "none", notes: "Processus local lancé avec une commande explicite." },
-  { id: "mcp-http", label: "Serveur MCP HTTP", kind: "mcp-http", authMode: "environment", protocolVersion: "MCP", notes: "Endpoint HTTP/S avec secrets référencés par variables d'environnement." },
-  { id: "acp-stdio", label: "Agent ACP stdio", kind: "acp-stdio", authMode: "none", protocolVersion: "ACP", notes: "Agent de code piloté par protocole Agent Client Protocol." },
-  { id: "a2a-http", label: "Agent A2A HTTP", kind: "a2a-http", authMode: "environment", protocolVersion: "A2A", notes: "Worker distant avec carte d'agent et cycle de tâches." },
-  { id: "ssh-worker", label: "Worker distant SSH", kind: "ssh-cli", authMode: "session", command: "ssh", notes: "Exécute un agent CLI sur une autre machine sans copier les clés dans Super IA." },
-
-  { id: "chatgpt-web", label: "ChatGPT Web assisté", kind: "web-assisted", authMode: "manual", notes: "Paquet de contexte préparé puis transfert humain contrôlé." },
-  { id: "claude-web", label: "Claude Web assisté", kind: "web-assisted", authMode: "manual", notes: "Paquet de contexte expurgé et import manuel." },
-  { id: "mistral-web", label: "Mistral Le Chat assisté", kind: "web-assisted", authMode: "manual", notes: "Utilisation manuelle de l'interface officielle." },
-  { id: "deepseek-web", label: "DeepSeek Web assisté", kind: "web-assisted", authMode: "manual", notes: "Utilisation manuelle sans automatisation fragile." },
-
-  { id: "ollama-local", label: "Ollama local expérimental", kind: "local-endpoint", providerId: "ollama", authMode: "none", baseUrl: "http://127.0.0.1:11434", notes: "Catalogue seulement; aucun modèle local n'est installé par défaut." },
-  { id: "lmstudio-local", label: "LM Studio local expérimental", kind: "local-endpoint", providerId: "lmstudio", authMode: "none", baseUrl: "http://127.0.0.1:1234/v1", notes: "Endpoint compatible OpenAI, désactivé par défaut." },
-  { id: "localai-local", label: "LocalAI expérimental", kind: "local-endpoint", providerId: "localai", authMode: "none", baseUrl: "http://127.0.0.1:8080/v1", notes: "Endpoint local optionnel hors MVP Pi." }
+  {
+    id: "claude-3-7-sonnet",
+    label: "Claude 3.7 Sonnet — Architecte & Chef",
+    kind: "cli-session",
+    providerId: "claude-code",
+    authMode: "session",
+    command: "claude",
+    model: "claude-3-7-sonnet",
+    role: "Chef d'équipe & Architecte",
+    isLeader: true,
+    authPath: "cli",
+    systemPrompt: "Tu es le Chef d'équipe & Architecte Système. Tu analyses la structure globale, segments les tâches techniques et coordonnes l'exécution entre les experts du groupe.",
+    notes: "Rôle: Chef d'équipe & Architecte. Pilotage de projet, décomposition modulaire et arbitrage technique."
+  },
+  {
+    id: "gpt-4o-coder",
+    label: "GPT-4o — Codeur Principal",
+    kind: "cli-session",
+    providerId: "codex-cli",
+    authMode: "session",
+    command: "codex",
+    model: "gpt-4o",
+    role: "Codeur Principal",
+    isLeader: false,
+    authPath: "cli",
+    systemPrompt: "Tu es le Codeur Principal. Tu rédiges et implémentes le code métier avec typage strict, modularité et couverture de tests.",
+    notes: "Rôle: Codeur Principal & Architecture. Génération, refactoring et complétion TypeScript/Python."
+  },
+  {
+    id: "groq-llama-3-3",
+    label: "Groq Llama 3.3 70B — Inférence Éclair",
+    kind: "openai-compatible",
+    providerId: "groq",
+    authMode: "environment",
+    baseUrl: "https://api.groq.com/openai/v1",
+    requiredEnv: ["GROQ_API_KEY"],
+    model: "llama-3.3-70b-versatile",
+    role: "Codeur Éclair & Prototypage",
+    authPath: "api",
+    systemPrompt: "Tu es le Codeur Éclair Groq (500+ tok/s). Tu génères rapidement des prototypes, scripts et implémentations fonctionnelles.",
+    notes: "Rôle: Codeur Éclair & Prototypage. Inférence ultra-rapide pour génération instantanée et scripts."
+  },
+  {
+    id: "gemini-2-5-pro",
+    label: "Gemini 2.5 Pro — Super Contexte",
+    kind: "cli-session",
+    providerId: "gemini-cli",
+    authMode: "session",
+    command: "gemini",
+    model: "gemini-2.5-pro",
+    role: "Super Contexte & Multimodal",
+    authPath: "cli",
+    systemPrompt: "Tu es l'Analyste Grand Contexte Gemini. Tu absorbes les dépôts complets (2M tokens) et documentations volumineuses pour guider les décisions.",
+    notes: "Rôle: Super Contexte & Multimodal. Analyse de dépôts complets (2M tokens) et documentation."
+  },
+  {
+    id: "grok-3-reason",
+    label: "Grok 3 — Débogage & Invariants",
+    kind: "openai-compatible",
+    providerId: "xai",
+    authMode: "environment",
+    baseUrl: "https://api.x.ai/v1",
+    requiredEnv: ["XAI_API_KEY"],
+    model: "grok-3",
+    role: "Débogage Profond & Algorithmique",
+    authPath: "api",
+    systemPrompt: "Tu es l'Expert Débogage & Logique Grok 3. Tu isoles les bogues complexes, vérifies les invariants et optimises la robustesse.",
+    notes: "Rôle: Débogage Profond & Algorithmique. Traçage d'erreurs complexes et logique pure."
+  },
+  {
+    id: "mistral-large-2",
+    label: "Mistral Large 2 — Validateur Souverain",
+    kind: "api-key-env",
+    providerId: "mistral",
+    authMode: "environment",
+    baseUrl: "https://api.mistral.ai/v1",
+    requiredEnv: ["MISTRAL_API_KEY"],
+    model: "mistral-large-latest",
+    role: "Contrôle Qualité & Validateur",
+    authPath: "api",
+    systemPrompt: "Tu es le Validateur Qualité Souverain Mistral. Tu effectues des revues de code rigoureuses et vérifies le respect des critères de sécurité et conformité.",
+    notes: "Rôle: Contrôle Qualité & Souveraineté. Revue de conformité et validation stricte."
+  },
+  {
+    id: "deepseek-r1-reason",
+    label: "DeepSeek R1 — Raisonnement Math",
+    kind: "openai-compatible",
+    providerId: "deepseek",
+    authMode: "environment",
+    baseUrl: "https://api.deepseek.com",
+    requiredEnv: ["DEEPSEEK_API_KEY"],
+    model: "deepseek-reasoner",
+    role: "Raisonnement Mathématique & STEM",
+    authPath: "api",
+    systemPrompt: "Tu es le Spécialiste Raisonnement Mathématique & Algorithmique DeepSeek R1. Tu résous les calculs mathématiques, arbres de décision et algorithmes optimaux.",
+    notes: "Rôle: Raisonnement Mathématique & STEM. Résolution algorithmique et calculs distribués."
+  },
+  {
+    id: "ui-designer-ia",
+    label: "Agent Dessin & UI/UX",
+    kind: "openai-compatible",
+    providerId: "gemini",
+    authMode: "environment",
+    baseUrl: "https://generativelanguage.googleapis.com",
+    requiredEnv: ["GEMINI_API_KEY"],
+    model: "gemini-2.5-flash",
+    role: "Dessinateur & Designer UI/UX",
+    authPath: "api",
+    systemPrompt: "Tu es le Designer UI/UX & Dessinateur. Tu crées des interfaces ergonomiques, des composants CSS modernes, des maquettes SVG et des icônes vectorielles.",
+    notes: "Rôle: Designer UI/UX & Visuels. Création de composants CSS, maquettes SVG et ergonomie."
+  },
+  {
+    id: "embedded-hardware-ia",
+    label: "Spécialiste Microcontrôleurs & IoT",
+    kind: "openai-compatible",
+    providerId: "openai",
+    authMode: "environment",
+    baseUrl: "https://api.openai.com/v1",
+    requiredEnv: ["OPENAI_API_KEY"],
+    model: "gpt-4o",
+    role: "Spécialiste Microcontrôleurs (ESP32/STM32/Pico)",
+    authPath: "api",
+    systemPrompt: "Tu es le Spécialiste Microcontrôleurs (ESP32, STM32, Arduino, Raspberry Pi Pico). Tu développes du code embarqué C/C++, gères GPIO, I2C, SPI, UART, PWM et contraintes temps réel.",
+    notes: "Rôle: Firmware ESP32 / Pico / Arduino. Programmation bas niveau C++, GPIO, I2C, SPI et PWM."
+  },
+  {
+    id: "audio-midi-ia",
+    label: "Spécialiste Musique & MIDI",
+    kind: "openai-compatible",
+    providerId: "anthropic",
+    authMode: "environment",
+    baseUrl: "https://api.anthropic.com",
+    requiredEnv: ["ANTHROPIC_API_KEY"],
+    model: "claude-3-7-sonnet",
+    role: "Spécialiste Musique & Synthèse MIDI",
+    authPath: "api",
+    systemPrompt: "Tu es le Spécialiste Audio & MIDI. Tu conçois la synthèse sonore (WebAudio API, oscillateurs, filtres) et gères le protocole MIDI (NoteOn/Off, CC, SysEx, MIDI Clock).",
+    notes: "Rôle: Synthèse Audio & Protocole MIDI. WebAudio API, oscillateurs, horloge MIDI Clock et SysEx."
+  },
+  {
+    id: "openrouter-hub",
+    label: "OpenRouter — Passerelle Multi-IA",
+    kind: "openai-compatible",
+    providerId: "openrouter",
+    authMode: "environment",
+    baseUrl: "https://openrouter.ai/api/v1",
+    requiredEnv: ["OPENROUTER_API_KEY"],
+    model: "anthropic/claude-3.7-sonnet",
+    role: "Passerelle Multi-Modèles & Secours",
+    authPath: "api",
+    systemPrompt: "Tu es la Passerelle Multi-IA OpenRouter. Tu offres un accès unifié à tous les modèles récents avec basculement de secours.",
+    notes: "Rôle: Passerelle Multi-IA & Réserve. Accès immédiat à des centaines de modèles avec basculement."
+  }
 ];
 
 export function defaultConnections(now = new Date().toISOString()): AiConnection[] {
   return seeds.map((seed) => ({
     ...seed,
-    enabled: false,
+    enabled: true,
     args: [],
     requiredEnv: seed.requiredEnv ?? [],
     createdAt: now,

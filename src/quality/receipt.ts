@@ -6,7 +6,7 @@ import { runCommand } from "../utils/command.js";
 import type { ReceiptArtifact, ReceiptReview, ReceiptValidation, ReceiptVerification, RunReceipt } from "./types.js";
 
 function sha256(value: unknown): string {
-  return createHash("sha256").update(value).digest("hex");
+  return createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value ?? "")).digest("hex");
 }
 
 async function exists(path: string): Promise<boolean> {
