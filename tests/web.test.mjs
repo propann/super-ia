@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { openControlPlane } from "../dist/control/control-plane.js";
@@ -44,6 +44,9 @@ function readiness(root) {
 async function fixture() {
   const home = await mkdtemp(join(tmpdir(), "superia-web-home-"));
   const root = await mkdtemp(join(tmpdir(), "superia-web-project-"));
+  const vault = join(home, "vault");
+  await mkdir(join(vault, "Inbox"), { recursive: true });
+  await writeFile(join(vault, "Référence locale.md"), "# Référence locale\n\nOllama et Obsidian travaillent ensemble.\n", "utf8");
   const control = await openControlPlane(home);
   const project = control.registerProject(scan(root));
   control.syncTasks(project.id, [{
@@ -73,7 +76,7 @@ async function fixture() {
     taskId: "TASK-0001",
     runId: run.id,
   }, home);
-  return { home, root, project };
+  return { home, root, vault, project };
 }
 
 test("web dashboard stays local, authenticated and read-only", async () => {
@@ -82,6 +85,8 @@ test("web dashboard stays local, authenticated and read-only", async () => {
     controlHome: env.home,
     port: 0,
     sessionTtlMs: 60_000,
+    vaultPath: env.vault,
+    inboxPath: join(env.vault, "Inbox"),
     readiness: async (root) => readiness(root),
   });
   const base = `http://${server.host}:${server.port}`;
@@ -101,6 +106,12 @@ test("web dashboard stays local, authenticated and read-only", async () => {
     assert.equal(redirected.status, 303);
     assert.equal(redirected.headers.get("location"), "/login");
 
+    const loginPage = await fetch(`${base}/login`);
+    assert.equal(loginPage.status, 200);
+    const loginHtml = await loginPage.text();
+    assert.doesNotMatch(loginHtml, new RegExp(token));
+    assert.doesNotMatch(loginHtml, /name="token"[^>]*value=/);
+
     const unauthorized = await fetch(`${base}/api/overview`);
     assert.equal(unauthorized.status, 401);
     assert.match(unauthorized.headers.get("content-security-policy") ?? "", /default-src 'self'/);
@@ -113,6 +124,9 @@ test("web dashboard stays local, authenticated and read-only", async () => {
       redirect: "manual",
     });
     assert.equal(denied.status, 401);
+    const deniedHtml = await denied.text();
+    assert.doesNotMatch(deniedHtml, new RegExp(token));
+    assert.doesNotMatch(deniedHtml, /name="token"[^>]*value=/);
 
     const login = await fetch(`${base}/session`, {
       method: "POST",
@@ -129,19 +143,48 @@ test("web dashboard stays local, authenticated and read-only", async () => {
     const page = await fetch(`${base}/`, { headers: { cookie } });
     assert.equal(page.status, 200);
     const pageHtml = await page.text();
-    assert.match(pageHtml, /SUPER IA \/\/ CONTROL MATRIX/);
-    assert.match(pageHtml, /Arène · IA \+ consoles/);
-    assert.match(pageHtml, /agent-cards/);
-    assert.match(pageHtml, /project-cards/);
-    assert.match(pageHtml, /pair-card/);
-    assert.match(pageHtml, /console-preview/);
-    assert.match(pageHtml, /openConsole/);
-    assert.match(pageHtml, /AGRANDIR/);
-    assert.match(pageHtml, /dissolveGroup/);
-    assert.match(pageHtml, /dragGroup/);
-    assert.match(pageHtml, /dropOnGroup/);
-    assert.match(pageHtml, /Notifications locales/);
-    assert.match(pageHtml, /consoles SSH contrôlables/i);
+    assert.match(pageHtml, /AZOTH/);
+    assert.match(pageHtml, /Mistral API/);
+    assert.match(pageHtml, /Utiliser Obsidian avec citations/);
+
+    const matrixPage = await fetch(`${base}/matrix`, { headers: { cookie } });
+    assert.equal(matrixPage.status, 200);
+    const matrixHtml = await matrixPage.text();
+    assert.match(matrixHtml, /SUPER IA \/\/ CONTROL MATRIX/);
+    assert.match(matrixHtml, /CONFIGURER MISTRAL/);
+    assert.match(matrixHtml, /console-preview/);
+
+    const vaultStatus = await fetch(`${base}/api/vault/status`, { headers: { cookie } });
+    assert.equal(vaultStatus.status, 200);
+    assert.deepEqual(await vaultStatus.json(), {
+      available: true,
+      path: env.vault,
+      notes: null,
+      indexState: "on-demand",
+      mode: "inbox-write",
+      inbox: join(env.vault, "Inbox"),
+    });
+
+    const vaultSearch = await fetch(`${base}/api/vault/search`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ query: "Ollama Obsidian" }),
+    });
+    assert.equal(vaultSearch.status, 200);
+    assert.equal((await vaultSearch.json()).matches[0].path, "Référence locale.md");
+
+    const draft = await fetch(`${base}/api/vault/draft`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ title: "Synthèse locale", content: "Brouillon validé.", sources: ["Référence locale.md", "../secret"] }),
+    });
+    assert.equal(draft.status, 201);
+    const draftResult = await draft.json();
+    assert.match(draftResult.path, /^Inbox\/.*Synthèse locale\.md$/);
+    const draftContent = await readFile(join(env.vault, draftResult.path), "utf8");
+    assert.match(draftContent, /status: brouillon/);
+    assert.match(draftContent, /\[\[Référence locale\]\]/);
+    assert.doesNotMatch(draftContent, /secret/);
 
     const overview = await fetch(`${base}/api/overview`, { headers: { cookie } });
     assert.equal(overview.status, 200);
