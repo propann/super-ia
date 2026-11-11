@@ -575,7 +575,7 @@ th{color:var(--muted);font-size:10px;text-transform:uppercase}
 </html>`;
 }
 
-export function renderLoginPage(error = "", tokenHint = ""): string {
+export function renderLoginPage(error = ""): string {
   return shell("Super IA — connexion", `<main class="wrap" style="max-width:500px;margin:12vh auto">
   <section class="panel">
     <div class="brand">SUPER IA // LOCAL ACCESS</div>
@@ -583,10 +583,9 @@ export function renderLoginPage(error = "", tokenHint = ""): string {
     <form method="post" action="/session">
       <div class="form-group" style="margin-top:14px">
         <label for="token">Token local</label>
-        <input id="token" name="token" type="password" autocomplete="current-password" ${tokenHint ? `value="${tokenHint}" ` : ""}required autofocus style="width:100%;padding:9px;background:#030604;border:1px solid var(--line-bright);border-radius:6px;color:var(--white)">
+        <input id="token" name="token" type="password" autocomplete="current-password" required autofocus style="width:100%;padding:9px;background:#030604;border:1px solid var(--line-bright);border-radius:6px;color:var(--white)">
       </div>
       <div class="error">${error}</div>
-      ${tokenHint ? `<div class="sub" style="margin-bottom:10px;font-size:11.5px;color:var(--green)">✓ Jeton de session pré-chargé : <code>${tokenHint}</code></div>` : ""}
       <button class="btn" type="submit" style="width:100%;margin-top:8px">OUVRIR LA MATRICE</button>
     </form>
   </section>
@@ -624,6 +623,10 @@ function selectEntity(type, id){
 }
 
 const PROVIDER_MODELS = {
+  'ollama': [
+    { id: 'qwen3:8b', label: 'Qwen 3 8B — local polyvalent' },
+    { id: 'hf.co/richardyoung/Qwen3-8B-Abliterated-GGUF:Q4_K_M', label: 'Qwen 3 8B Abliterated Q4 — local libre' }
+  ],
   'groq': [
     { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile (Défaut)' },
     { id: 'deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 70B (Raisonnement)' },
@@ -670,6 +673,7 @@ const PROVIDER_MODELS = {
 };
 
 const PROVIDER_DEFAULTS = {
+  'ollama': { name: 'Ollama local', envVar: '', defaultUrl: 'http://127.0.0.1:11434', cli: 'ollama', tag: 'Local / Privé / Gratuit' },
   'groq': { name: 'Groq', envVar: 'GROQ_API_KEY', defaultUrl: 'https://api.groq.com/openai/v1', cli: 'groq', tag: 'Ultra-Rapide / Éco' },
   'openai': { name: 'OpenAI', envVar: 'OPENAI_API_KEY', defaultUrl: 'https://api.openai.com/v1', cli: 'codex', tag: 'Standard / GPT-4o' },
   'anthropic': { name: 'Anthropic', envVar: 'ANTHROPIC_API_KEY', defaultUrl: 'https://api.anthropic.com', cli: 'claude', tag: 'Code & Raisonnement' },
@@ -682,6 +686,7 @@ const PROVIDER_DEFAULTS = {
 
 function getProviderKey(id, label){
   const str = (id + ' ' + label).toLowerCase();
+  if(str.includes('ollama')) return 'ollama';
   if(str.includes('groq')) return 'groq';
   if(str.includes('gpt') || str.includes('openai') || str.includes('codex') || str.includes('embedded') || str.includes('microcontr')) return 'openai';
   if(str.includes('claude') || str.includes('anthropic') || str.includes('audio') || str.includes('midi')) return 'anthropic';
@@ -1326,6 +1331,7 @@ function removeMemberFromGroup(groupIndex, memberKey){
 
 function badgeClass(id, label){
   const str = (id + ' ' + label).toLowerCase();
+  if(str.includes('ollama')) return 'badge-local';
   if(str.includes('groq')) return 'badge-groq';
   if(str.includes('gpt') || str.includes('openai') || str.includes('codex')) return 'badge-gpt';
   if(str.includes('claude') || str.includes('anthropic')) return 'badge-claude';
@@ -1921,6 +1927,7 @@ el('btn-sync-folder').addEventListener('click', () => triggerFolderPicker());
 el('folder-picker').addEventListener('change', (event) => onNativeFolderPicked(event));
 el('btn-new-card').addEventListener('click', () => openNewCardModal());
 el('btn-open-credentials').addEventListener('click', () => openCredentialsModal());
+el('btn-configure-mistral').addEventListener('click', () => openCredentialsModal('mistral'));
 el('cred-provider').addEventListener('change', () => onCredProviderChange());
 el('btn-cred-toggle-eye').addEventListener('click', () => toggleKeyVisibility());
 el('form-credentials').addEventListener('submit', (e) => submitCredentialsForm(e));
@@ -1948,6 +1955,9 @@ export function renderDashboardPage(): string {
       <div class="sub" id="generated">Chargement de la matrice…</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn" id="btn-configure-mistral" type="button" style="background:#241339;border-color:#9b63d8;color:#e5c7ff;font-size:11px;display:flex;align-items:center;gap:6px">
+        <span>🇫🇷</span> <span>CONFIGURER MISTRAL</span>
+      </button>
       <button class="btn" id="btn-open-credentials" type="button" style="background:#0b2413;border-color:#1c5528;color:#7cff96;font-size:11px;display:flex;align-items:center;gap:6px">
         <span>🔐</span> <span>COFFRE CLÉS API (AES-256)</span>
       </button>

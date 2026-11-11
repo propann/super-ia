@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { lstat, mkdir, readdir, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { scanRepository } from "../core/repository-scanner.js";
 import type { SuperIaTask } from "../core/types.js";
@@ -12,14 +12,15 @@ import { loadEmergencyStop } from "../safety/store.js";
 import { ensureMachineStore, inspectMachines, saveMachine } from "../machines/store.js";
 import { ensureConnectionStore, inspectConnections, saveConnection } from "../connections/store.js";
 import { ensureArenaState, writeArenaState } from "../arena/store.js";
-import { deleteEncryptedApiKey, listVaultEntries, saveEncryptedApiKey } from "../security/vault.js";
+import { deleteEncryptedApiKey, getDecryptedApiKey, listVaultEntries, saveEncryptedApiKey } from "../security/vault.js";
 import { ConsoleManager } from "./console.js";
 import { createSessionId, ensureWebAccessToken, verifyWebAccessToken } from "./auth.js";
 import { renderDashboardPage, renderLoginPage } from "./page.js";
+import { renderChatPage } from "./chat-page.js";
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 3210;
-const BODY_LIMIT = 16 * 1024;
+const BODY_LIMIT = 128 * 1024;
 
 export interface WebServerOptions {
   host?: string;
@@ -29,6 +30,8 @@ export interface WebServerOptions {
   controlHome?: string;
   sessionTtlMs?: number;
   readiness?: (root: string) => Promise<ReadinessReport>;
+  vaultPath?: string;
+  inboxPath?: string;
 }
 
 export interface RunningWebServer {
@@ -76,6 +79,74 @@ function parseCookies(header: string | undefined): Record<string, string> {
     if (key) result[key] = value;
   }
   return result;
+}
+
+type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+
+function cleanMessages(value: unknown): ChatMessage[] {
+  if (!Array.isArray(value)) throw new Error("Historique de conversation invalide.");
+  return value.slice(-20).map((item) => {
+    const role = (item as ChatMessage)?.role;
+    const content = String((item as ChatMessage)?.content ?? "").trim().slice(0, 8_000);
+    if (!["system", "user", "assistant"].includes(role) || !content) throw new Error("Message invalide.");
+    return { role, content };
+  });
+}
+
+async function jsonRequest(url: string, init: RequestInit): Promise<any> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120_000);
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error?.message || payload?.error || `HTTP ${response.status}`);
+    return payload;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function beginChatStream(response: any): void {
+  response.statusCode = 200;
+  response.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  response.setHeader("Cache-Control", "no-store, no-transform");
+  response.setHeader("X-Accel-Buffering", "no");
+  response.flushHeaders?.();
+}
+
+function writeChatEvent(response: any, value: unknown): void {
+  response.write(`data: ${JSON.stringify(value)}\n\n`);
+}
+
+function mistralDeltaText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!Array.isArray(value)) return "";
+  return value.map((part: any) => typeof part?.text === "string" ? part.text : "").join("");
+}
+
+async function markdownFiles(root: string, limit = 2_000): Promise<string[]> {
+  const result: string[] = [];
+  async function walk(directory: string): Promise<void> {
+    if (result.length >= limit) return;
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      if (entry.name.startsWith(".") || result.length >= limit) continue;
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) await walk(path);
+      else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) result.push(path);
+    }
+  }
+  await walk(root);
+  return result;
+}
+
+const vaultFileCache = new Map<string, { expiresAt: number; files: string[] }>();
+
+async function cachedMarkdownFiles(root: string, limit = 2_000): Promise<string[]> {
+  const cached = vaultFileCache.get(root);
+  if (cached && cached.expiresAt > Date.now()) return cached.files;
+  const files = await markdownFiles(root, limit);
+  vaultFileCache.set(root, { expiresAt: Date.now() + 30_000, files });
+  return files;
 }
 
 async function readBody(request: any): Promise<string> {
@@ -159,7 +230,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
 
       if (request.method === "GET" && url.pathname === "/login") {
         if (authenticated(request)) redirect(response, "/");
-        else send(response, 200, "text/html; charset=utf-8", renderLoginPage("", access.token));
+        else send(response, 200, "text/html; charset=utf-8", renderLoginPage());
         return;
       }
 
@@ -167,7 +238,7 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
         const body = new URLSearchParams(await readBody(request));
         const candidate = body.get("token") ?? "";
         if (!verifyWebAccessToken(access.token, candidate)) {
-          send(response, 401, "text/html; charset=utf-8", renderLoginPage("Token local incorrect.", access.token));
+          send(response, 401, "text/html; charset=utf-8", renderLoginPage("Token local incorrect."));
           return;
         }
         const session = createSessionId();
@@ -376,12 +447,33 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
           sendJson(response, 400, { error: "Fournisseur et clé API requis." });
           return;
         }
+        const provider = parsed.provider.trim().toLowerCase();
+        if (!/^[a-z0-9._-]{2,40}$/.test(provider)) {
+          sendJson(response, 400, { error: "Identifiant de fournisseur invalide." });
+          return;
+        }
+        if (parsed.apiKey.trim() === "KEEP_EXISTING") {
+          const existing = await getDecryptedApiKey(provider, options.controlHome);
+          if (!existing) {
+            sendJson(response, 409, { error: `Aucune clé existante pour ${provider}. Collez une nouvelle clé.` });
+            return;
+          }
+          const entries = await listVaultEntries(options.controlHome);
+          const entry = entries.find((item) => item.provider === provider);
+          sendJson(response, 200, { ok: true, provider, preview: entry?.preview ?? "configurée", preferredMode: entry?.preferredMode ?? "api", message: `Clé ${provider.toUpperCase()} existante conservée dans le coffre chiffré.` });
+          return;
+        }
         const result = await saveEncryptedApiKey(parsed.provider, parsed.apiKey, {
           preferredMode: parsed.preferredMode || "api",
           customBaseUrl: parsed.customBaseUrl,
           envVarName: parsed.envVarName,
           root: options.controlHome
         });
+        const verification = await getDecryptedApiKey(provider, options.controlHome);
+        if (verification !== parsed.apiKey.trim()) {
+          sendJson(response, 500, { error: `La clé ${provider.toUpperCase()} a été écrite mais sa relecture chiffrée a échoué.` });
+          return;
+        }
 
         // Also if agentId is provided or provider matches an agent, update connection
         if (parsed.agentId) {
@@ -428,6 +520,248 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
           await saveConnection(conn, options.controlHome);
         }
         sendJson(response, 200, { ok: true, agentId: parsed.agentId, authPath: parsed.authPath });
+        return;
+      }
+
+      if (url.pathname === "/api/chat/models" && request.method === "GET" && url.searchParams.get("provider") === "mistral") {
+        const apiKey = await getDecryptedApiKey("mistral", options.controlHome);
+        if (!apiKey) {
+          sendJson(response, 409, { models: [], error: "Clé Mistral absente. Ouvre Config Mistral et enregistre ta clé API." });
+          return;
+        }
+        try {
+          const payload = await jsonRequest("https://api.mistral.ai/v1/models", {
+            method: "GET",
+            headers: { authorization: `Bearer ${apiKey}` },
+          });
+          const entries = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+          const models = [...new Map(entries
+            .filter((item: any) => item && item.archived !== true && item.capabilities?.completion_chat === true)
+            .map((item: any) => ({ name: String(item.id || "").trim() }))
+            .filter((item: { name: string }) => item.name)
+            .map((item: { name: string }) => [item.name, item])).values()];
+          if (!models.length) {
+            sendJson(response, 502, { models: [], error: "Mistral n’a retourné aucun modèle de conversation disponible pour cette clé." });
+            return;
+          }
+          sendJson(response, 200, { models });
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          sendJson(response, 502, { models: [], error: `Impossible de lire les modèles accessibles sur Mistral : ${detail}` });
+        }
+        return;
+      }
+
+      if (url.pathname === "/api/chat/models" && request.method === "GET") {
+        try {
+          const payload = await jsonRequest("http://127.0.0.1:11434/api/tags", { method: "GET" });
+          const models = Array.isArray(payload.models)
+            ? [...new Map(payload.models
+              .map((item: any) => ({ name: String(item.name || item.model || "").trim() }))
+              .filter((item: { name: string }) => item.name)
+              .map((item: { name: string }) => [item.name, item])).values()]
+            : [];
+          sendJson(response, 200, { models });
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          sendJson(response, 503, { models: [], error: `Impossible de lire les modèles Ollama (127.0.0.1:11434) : ${detail}` });
+        }
+        return;
+      }
+
+      if (url.pathname === "/api/chat" && request.method === "POST") {
+        const parsed = JSON.parse(await readBody(request)) as {
+          provider?: "ollama" | "mistral";
+          model?: string;
+          temperature?: number;
+          maxTokens?: number;
+          messages?: unknown;
+        };
+        const provider = parsed.provider === "mistral" ? "mistral" : "ollama";
+        const stream = url.searchParams.get("stream") === "1";
+        const model = String(parsed.model || (provider === "mistral" ? "mistral-small-latest" : "qwen3:8b")).slice(0, 180);
+        if (!/^[a-zA-Z0-9._:/-]+$/.test(model)) throw new Error("Nom de modèle invalide.");
+        const messages = cleanMessages(parsed.messages);
+        const temperature = Math.max(0, Math.min(2, Number(parsed.temperature ?? 0.7)));
+        const maxTokens = Math.max(128, Math.min(8_192, Math.floor(Number(parsed.maxTokens ?? 2_048))));
+        if (provider === "mistral") {
+          const apiKey = await getDecryptedApiKey("mistral", options.controlHome);
+          if (!apiKey) {
+            sendJson(response, 409, { error: "Clé Mistral absente. Utilisez Configurer Mistral." });
+            return;
+          }
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 120_000);
+          let upstream: Response;
+          try {
+            upstream = await fetch("https://api.mistral.ai/v1/chat/completions", {
+              method: "POST",
+              headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}`, accept: stream ? "text/event-stream" : "application/json" },
+              body: JSON.stringify({ model, messages, temperature, max_tokens: maxTokens, ...(stream ? { stream: true, stream_options: { include_usage: true } } : {}) }),
+              signal: controller.signal,
+            });
+          } catch (error) {
+            clearTimeout(timer);
+            throw error;
+          }
+          if (!upstream.ok) {
+            clearTimeout(timer);
+            const payload = await upstream.json().catch(() => ({}));
+            throw new Error(payload?.message || payload?.error?.message || payload?.error || `Mistral HTTP ${upstream.status}`);
+          }
+          if (stream) {
+            if (!upstream.body) { clearTimeout(timer); throw new Error("Flux Mistral vide."); }
+            beginChatStream(response);
+            const reader = upstream.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let usage: any = null;
+            const dispatch = (block: string) => {
+              for (const line of block.split(/\r?\n/)) {
+                if (!line.startsWith("data:")) continue;
+                const data = line.slice(5).trim();
+                if (!data || data === "[DONE]") continue;
+                let event: any;
+                try { event = JSON.parse(data); } catch { continue; }
+                const delta = mistralDeltaText(event?.choices?.[0]?.delta?.content);
+                if (delta) writeChatEvent(response, { type: "delta", text: delta });
+                if (event?.usage && typeof event.usage === "object") usage = event.usage;
+              }
+            };
+            try {
+              while (true) {
+                const part = await reader.read();
+                buffer += decoder.decode(part.value ?? new Uint8Array(), { stream: !part.done });
+                let boundary = buffer.search(/\r?\n\r?\n/);
+                while (boundary >= 0) {
+                  const match = /\r?\n\r?\n/.exec(buffer.slice(boundary));
+                  const delimiterLength = match?.[0].length ?? 2;
+                  dispatch(buffer.slice(0, boundary));
+                  buffer = buffer.slice(boundary + delimiterLength);
+                  boundary = buffer.search(/\r?\n\r?\n/);
+                }
+                if (part.done) break;
+              }
+              if (buffer.trim()) dispatch(buffer);
+              writeChatEvent(response, { type: "done", model, usage: usage ? { promptTokens: Number(usage.prompt_tokens || 0), completionTokens: Number(usage.completion_tokens || 0), totalTokens: Number(usage.total_tokens || 0) } : null });
+            } catch (error) {
+              writeChatEvent(response, { type: "error", error: error instanceof Error ? error.message : String(error) });
+            } finally {
+              clearTimeout(timer);
+              response.end();
+            }
+            return;
+          }
+          const payload = await upstream.json().catch(() => ({}));
+          const message = String(payload?.choices?.[0]?.message?.content ?? "").trim();
+          if (!message) throw new Error("Mistral n'a renvoyé aucun texte.");
+          sendJson(response, 200, { provider, model, message, usage: payload?.usage ? { promptTokens: Number(payload.usage.prompt_tokens || 0), completionTokens: Number(payload.usage.completion_tokens || 0), totalTokens: Number(payload.usage.total_tokens || 0) } : null });
+          return;
+        }
+        const upstream = await fetch("http://127.0.0.1:11434/api/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ model, messages, stream, options: { temperature, num_predict: maxTokens } }),
+        });
+        const payload = stream ? null : await upstream.json().catch(() => ({}));
+        if (!upstream.ok) {
+          const detail = payload?.error || (await upstream.text().catch(() => ""));
+          sendJson(response, upstream.status, { error: detail || `Ollama HTTP ${upstream.status}` });
+          return;
+        }
+        if (stream) {
+          if (!upstream.body) throw new Error("Flux Ollama vide.");
+          beginChatStream(response);
+          const reader = upstream.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          try {
+            while (true) {
+              const part = await reader.read();
+              buffer += decoder.decode(part.value ?? new Uint8Array(), { stream: !part.done });
+              let newline = buffer.indexOf("\n");
+              while (newline >= 0) {
+                const line = buffer.slice(0, newline).trim();
+                buffer = buffer.slice(newline + 1);
+                if (line) {
+                  const event = JSON.parse(line);
+                  const delta = String(event?.message?.content || "");
+                  if (delta) writeChatEvent(response, { type: "delta", text: delta });
+                  if (event?.done) writeChatEvent(response, { type: "done", model, usage: { promptTokens: Number(event.prompt_eval_count || 0), completionTokens: Number(event.eval_count || 0), totalTokens: Number(event.prompt_eval_count || 0) + Number(event.eval_count || 0) } });
+                }
+                newline = buffer.indexOf("\n");
+              }
+              if (part.done) break;
+            }
+          } catch (error) {
+            writeChatEvent(response, { type: "error", error: error instanceof Error ? error.message : String(error) });
+          } finally {
+            response.end();
+          }
+          return;
+        }
+        const message = String(payload?.message?.content ?? "").trim();
+        if (!message) throw new Error("Ollama n'a renvoyé aucun texte.");
+        sendJson(response, 200, { provider, model, message, usage: { promptTokens: Number(payload.prompt_eval_count || 0), completionTokens: Number(payload.eval_count || 0), totalTokens: Number(payload.prompt_eval_count || 0) + Number(payload.eval_count || 0) } });
+        return;
+      }
+
+      if (url.pathname === "/api/vault/status" && request.method === "GET") {
+        const vaultPath = options.vaultPath ?? process.env.AZOTH_VAULT_PATH ?? "";
+        const inboxPath = options.inboxPath ?? process.env.AZOTH_INBOX_PATH ?? join(vaultPath, "Inbox");
+        try {
+          const info = await lstat(vaultPath);
+          const cached = vaultFileCache.get(vaultPath);
+          sendJson(response, 200, { available: info.isDirectory(), path: vaultPath, notes: cached?.files.length ?? null, indexState: cached ? "ready" : "on-demand", mode: "inbox-write", inbox: inboxPath });
+        } catch {
+          sendJson(response, 200, { available: false, path: vaultPath, notes: null, indexState: "unavailable", mode: "read-only" });
+        }
+        return;
+      }
+
+      if (url.pathname === "/api/vault/draft" && request.method === "POST") {
+        const parsed = JSON.parse(await readBody(request)) as { title?: string; content?: string; sources?: string[] };
+        const title = String(parsed.title || "Note IA").trim().slice(0, 100);
+        const content = String(parsed.content || "").trim().slice(0, 80_000);
+        if (!content) { sendJson(response, 400, { error: "Contenu vide." }); return; }
+        const vaultPath = options.vaultPath ?? process.env.AZOTH_VAULT_PATH ?? "";
+        if (!vaultPath) { sendJson(response, 409, { error: "Coffre Obsidian non monté." }); return; }
+        const inboxPath = options.inboxPath ?? process.env.AZOTH_INBOX_PATH ?? join(vaultPath, "Inbox");
+        const safeTitle = title.normalize("NFKD").replace(/[^a-zA-Z0-9À-ÿ _-]/g, "").replace(/\s+/g, " ").trim() || "Note IA";
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const fileName = `${timestamp} — ${safeTitle}.md`;
+        const relativePath = `Inbox/${fileName}`;
+        const destination = join(inboxPath, fileName);
+        const sources = Array.isArray(parsed.sources)
+          ? parsed.sources.map(String).filter((item) => item && !item.includes("..") && !item.startsWith("/") && item.endsWith(".md")).map((item) => item.replace(/[\[\]\r\n]/g, "")).slice(0, 20)
+          : [];
+        const note = `---\ncreated: ${new Date().toISOString()}\nsource: Azoth IA\nstatus: brouillon\n---\n\n# ${title}\n\n${content}\n${sources.length ? `\n## Sources\n\n${sources.map((item) => `- [[${item.replace(/\.md$/i, "")}]]`).join("\n")}\n` : ""}`;
+        await writeFile(destination, note, { encoding: "utf8", flag: "wx", mode: 0o600 });
+        vaultFileCache.delete(vaultPath);
+        sendJson(response, 201, { ok: true, path: relativePath });
+        return;
+      }
+
+      if (url.pathname === "/api/vault/search" && request.method === "POST") {
+        const parsed = JSON.parse(await readBody(request)) as { query?: string };
+        const query = String(parsed.query || "").trim().toLocaleLowerCase("fr").slice(0, 200);
+        if (query.length < 2) { sendJson(response, 400, { error: "Recherche trop courte." }); return; }
+        const vaultPath = options.vaultPath ?? process.env.AZOTH_VAULT_PATH ?? "";
+        if (!vaultPath) { sendJson(response, 409, { error: "Coffre Obsidian non monté." }); return; }
+        const files = await cachedMarkdownFiles(vaultPath);
+        const terms = [...new Set(query.split(/[^\p{L}\p{N}_-]+/u).filter((term) => term.length >= 3))].slice(0, 12);
+        const matches: Array<{ path: string; excerpt: string; score: number }> = [];
+        for (const path of files) {
+          const content = await readFile(path, "utf8").catch(() => "");
+          const lowered = content.toLocaleLowerCase("fr");
+          const found = terms.map((term) => ({ term, index: lowered.indexOf(term) })).filter((item) => item.index >= 0);
+          if (found.length) {
+            const index = Math.min(...found.map((item) => item.index));
+            matches.push({ path: path.slice(vaultPath.length + 1), excerpt: content.slice(Math.max(0, index - 120), index + 360).replace(/\s+/g, " ").trim(), score: found.length });
+          }
+        }
+        matches.sort((left, right) => right.score - left.score || left.path.localeCompare(right.path));
+        sendJson(response, 200, { query, matches: matches.slice(0, 20) });
         return;
       }
 
@@ -587,6 +921,11 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
       }
 
       if (request.method === "GET" && url.pathname === "/") {
+        send(response, 200, "text/html; charset=utf-8", renderChatPage());
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/matrix") {
         send(response, 200, "text/html; charset=utf-8", renderDashboardPage());
         return;
       }

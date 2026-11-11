@@ -104,6 +104,20 @@ const seeds: Seed[] = [
     notes: "Rôle: Contrôle Qualité & Souveraineté. Revue de conformité et validation stricte."
   },
   {
+    id: "ollama-local",
+    label: "Ollama local — Cerveau privé",
+    kind: "local-endpoint",
+    providerId: "ollama",
+    authMode: "none",
+    baseUrl: "http://127.0.0.1:11434",
+    requiredEnv: [],
+    model: "qwen3:8b",
+    role: "Assistant local privé",
+    authPath: "cli",
+    systemPrompt: "Tu es le cerveau local privé d'Azoth. Tu privilégies les données locales et tu ne transmets aucun contenu du coffre Obsidian à un service distant sans autorisation explicite.",
+    notes: "Rôle: Assistant local privé. Modèle Ollama interchangeable, exécution hors ligne et sans coût API."
+  },
+  {
     id: "deepseek-r1-reason",
     label: "DeepSeek R1 — Raisonnement Math",
     kind: "openai-compatible",
