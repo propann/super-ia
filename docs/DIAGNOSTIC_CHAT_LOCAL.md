@@ -33,8 +33,8 @@ systemctl --user status superia-local.target ollama.service superia-web.service 
 La cible démarre les services locaux Ollama, Super IA et Veille. Les fichiers
 d’unité et leurs compléments sont dans `~/.config/systemd/user/`.
 
-La commande vérifie l’état des unités utilisateur `ollama.service` et
-`superia-web.service`, l’API Ollama, la route de santé Super IA, la liste des
+La commande vérifie l’état des unités utilisateur `ollama.service`,
+`superia-web.service` et `veille-azoth.service`, l’API Ollama, la route de santé Super IA, la liste des
 modèles accessibles et, pour chacun, un test texte, l’outil workspace
 `list_files` sur `src` et les trois outils rack en lecture seule : inventaire
 Ollama, recherche dans la veille en cache et état de Quant Core. Les appels
