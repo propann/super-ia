@@ -8,6 +8,7 @@ import { writeNotificationRecord } from "../dist/notifications/store.js";
 import { engageEmergencyStop } from "../dist/safety/store.js";
 import { ensureWebAccessToken } from "../dist/web/auth.js";
 import { normalizeChatTemperature, startWebServer } from "../dist/web/server.js";
+import { saveEncryptedApiKey } from "../dist/security/vault.js";
 import { saveMachine } from "../dist/machines/store.js";
 import { saveConnection } from "../dist/connections/store.js";
 
@@ -154,8 +155,8 @@ test("web dashboard stays local, authenticated and read-only", async () => {
     assert.match(pageHtml, /AZOTH/);
     assert.match(pageHtml, /Mistral API/);
     assert.match(pageHtml, /Utiliser Obsidian avec citations/);
-    assert.match(pageHtml, /maximum sûr 1,0/);
-    assert.match(pageHtml, /max="1"/);
+    assert.match(pageHtml, /Profil stable : 0,6 avec raisonnement, 0,7 sans/);
+    assert.doesNotMatch(pageHtml, /id="temperature"/);
 
     const matrixPage = await fetch(`${base}/matrix`, { headers: { cookie } });
     assert.equal(matrixPage.status, 200);
@@ -252,5 +253,184 @@ test("web token files fail closed and remote listening is refused", async () => 
     );
   } finally {
     await rm(home, { recursive: true, force: true });
+  }
+});
+
+test("Mistral never receives requested Obsidian vault context", async () => {
+  const env = await fixture();
+  const inbox = join(env.vault, "Inbox");
+  await saveEncryptedApiKey("mistral", "test-key-never-sent", { root: env.home });
+  const server = await startWebServer({
+    controlHome: env.home,
+    port: 0,
+    vaultPath: env.vault,
+    inboxPath: inbox,
+    readiness: async (root) => readiness(root),
+  });
+  const originalFetch = globalThis.fetch;
+  let upstreamBody;
+  try {
+    globalThis.fetch = async (input, init) => {
+      assert.equal(String(input), "https://api.mistral.ai/v1/chat/completions");
+      upstreamBody = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: "Réponse distante." } }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const token = (await readFile(server.tokenPath, "utf8")).trim();
+    const response = await fetch(`http://${server.host}:${server.port}/api/chat`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        provider: "mistral",
+        model: "mistral-small-latest",
+        vaultContext: true,
+        messages: [{ role: "user", content: "Ollama Obsidian" }],
+      }),
+    });
+    assert.equal(response.status, 200);
+    assert.ok(upstreamBody);
+    assert.doesNotMatch(JSON.stringify(upstreamBody.messages), /Référence locale|Obsidian travaillent ensemble/);
+    assert.equal(upstreamBody.messages.some((message) => message.role === "system"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await server.close();
+    await rm(env.home, { recursive: true, force: true });
+    await rm(env.root, { recursive: true, force: true });
+  }
+});
+
+test("le chat local peut interroger le rack MU-TH-UR via les seules capacités autorisées", async () => {
+  const env = await fixture();
+  const server = await startWebServer({ controlHome: env.home, port: 0, sessionTtlMs: 60_000, readiness: async root => readiness(root) });
+  const nativeFetch = globalThis.fetch;
+  let rackRequests = [];
+  try {
+    const base = `http://${server.host}:${server.port}`;
+    const token = (await readFile(server.tokenPath, "utf8")).trim();
+    const login = await nativeFetch(`${base}/session`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token }),
+      redirect: "manual",
+    });
+    const cookie = login.headers.get("set-cookie");
+    assert.equal(login.status, 303);
+
+    globalThis.fetch = async (input, init = {}) => {
+      const url = String(input);
+      if (url === "http://127.0.0.1:11434/api/chat") {
+        const request = JSON.parse(String(init.body));
+        assert.equal(request.options.temperature, 0.6);
+        assert.equal(request.options.num_ctx, 8192);
+        assert.equal(request.think, true);
+        assert.ok(request.tools.some(item => item.function.name === "mother_list_models"));
+        assert.ok(request.tools.some(item => item.function.name === "mother_search_articles"));
+        assert.ok(request.tools.some(item => item.function.name === "mother_trading_status"));
+        const last = request.messages.at(-1);
+        if (last.role === "tool") {
+          const userPrompt = request.messages.filter(item => item.role === "user").at(-1).content;
+          const marker = userPrompt.includes("articles") ? "TEST RACK VEILLE OK" : userPrompt.includes("Quant") ? "TEST RACK QUANT OK" : "TEST RACK MODELES OK";
+          return Response.json({ message: { role: "assistant", content: marker }, prompt_eval_count: 20, eval_count: 4, done_reason: "stop" });
+        }
+        const prompt = request.messages.filter(item => item.role === "user").at(-1).content;
+        const call = prompt.includes("articles")
+          ? { name: "mother_search_articles", arguments: { query: "Ollama", limit: 5 } }
+          : prompt.includes("Quant")
+            ? { name: "mother_trading_status", arguments: {} }
+            : { name: "mother_list_models", arguments: {} };
+        return Response.json({ message: { role: "assistant", content: "", tool_calls: [{ function: call }] }, prompt_eval_count: 10, eval_count: 0, done_reason: "stop" });
+      }
+      if (url === "http://127.0.0.1:8765/api/rack/internal/call") {
+        const rackRequest = JSON.parse(String(init.body));
+        rackRequests.push(rackRequest);
+        return Response.json({ capability: rackRequest.capability, status: "ok", data: { models: [{ name: "qwen3:8b" }], count: 0, online: true, declared_mode: "dry-run" } });
+      }
+      return nativeFetch(input, init);
+    };
+
+    for (const probe of [
+      { prompt: "liste les modèles", marker: "TEST RACK MODELES OK", tool: "mother_list_models" },
+      { prompt: "cherche des articles", marker: "TEST RACK VEILLE OK", tool: "mother_search_articles" },
+      { prompt: "lis l'état Quant", marker: "TEST RACK QUANT OK", tool: "mother_trading_status" },
+    ]) {
+      const response = await nativeFetch(`${base}/api/chat?stream=1`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ provider: "ollama", model: "qwen3:8b", messages: [{ role: "user", content: probe.prompt }] }),
+      });
+      assert.equal(response.status, 200);
+      const events = (await response.text()).split(/\r?\n\r?\n/).flatMap(block => {
+        const line = block.split(/\r?\n/).find(value => value.startsWith("data:"));
+        if (!line) return [];
+        try { return [JSON.parse(line.slice(5).trim())]; } catch { return []; }
+      });
+      assert.ok(events.some(event => event.type === "tool" && event.name === probe.tool && event.status === "effectué"));
+      assert.ok(events.some(event => event.type === "delta" && event.text === probe.marker));
+    }
+    assert.deepEqual(rackRequests, [
+      { capability: "ai.models.list", input: {} },
+      { capability: "watch.articles.search", input: { query: "Ollama", limit: 5 } },
+      { capability: "trading.status.read", input: {} },
+    ]);
+  } finally {
+    globalThis.fetch = nativeFetch;
+    await server.close();
+    await rm(env.home, { recursive: true, force: true });
+    await rm(env.root, { recursive: true, force: true });
+  }
+});
+
+test("Ollama chat reports progress before inference returns", async () => {
+  const env = await fixture();
+  const server = await startWebServer({
+    controlHome: env.home,
+    port: 0,
+    vaultPath: env.vault,
+    inboxPath: join(env.vault, "Inbox"),
+    readiness: async (root) => readiness(root),
+  });
+  const originalFetch = globalThis.fetch;
+  let releaseInference;
+  let markInferenceStarted;
+  const inferenceStarted = new Promise((resolve) => { markInferenceStarted = resolve; });
+  try {
+    globalThis.fetch = async (input) => {
+      assert.equal(String(input), "http://127.0.0.1:11434/api/chat");
+      markInferenceStarted();
+      return await new Promise((resolve) => { releaseInference = resolve; });
+    };
+    const token = (await readFile(server.tokenPath, "utf8")).trim();
+    const response = await originalFetch(`http://${server.host}:${server.port}/api/chat?stream=1`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ provider: "ollama", model: "qwen3:8b", think: true, messages: [{ role: "user", content: "Réponds." }] }),
+    });
+    assert.equal(response.status, 200);
+    const reader = response.body.getReader();
+    const first = await reader.read();
+    assert.match(new TextDecoder().decode(first.value), /"type":"status"/);
+    assert.match(new TextDecoder().decode(first.value), /prépare sa réponse/);
+    await inferenceStarted;
+    releaseInference(new Response(JSON.stringify({
+      message: { content: "Réponse locale." },
+      done_reason: "stop",
+      prompt_eval_count: 4,
+      eval_count: 3,
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    let rest = "";
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      rest += new TextDecoder().decode(part.value);
+    }
+    assert.match(rest, /"type":"delta","text":"Réponse locale\."/);
+    assert.match(rest, /"type":"done"/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await server.close();
+    await rm(env.home, { recursive: true, force: true });
+    await rm(env.root, { recursive: true, force: true });
   }
 });
