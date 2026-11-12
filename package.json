@@ -13,6 +13,7 @@
     "test": "npm run build && node --test tests/*.test.mjs",
     "check": "npm run build && npm test",
     "doctor": "npm run build --silent && node dist/index.js doctor",
+    "diagnose:chat": "node scripts/diagnostiquer-chat-local.mjs",
     "readiness": "npm run build --silent && node dist/index.js readiness",
     "control": "npm run build --silent && node dist/index.js control status",
     "context": "npm run build --silent && node dist/index.js context build",

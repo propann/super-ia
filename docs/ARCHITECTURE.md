@@ -38,6 +38,10 @@ branche agent/task-xxxx-* dans un worktree séparé
 
 La console `superia matrix` agrège ce flux et affiche l'état réel du dépôt, des missions, des fournisseurs et de la politique économique.
 
+La cible d’unification des outils est documentée dans
+[`ARCHITECTURE_RACK_LOGICIEL.md`](ARCHITECTURE_RACK_LOGICIEL.md) : capacités
+canoniques, modules raccordables et permissions communes.
+
 ## Contrat futur d'un adaptateur
 
 Un adaptateur devra déclarer : transport, méthode d'authentification, capacités, coût, limites, mode non interactif, permissions nécessaires et format de résultat.

@@ -218,6 +218,18 @@ Seul le nom `TEAM_AI_API_KEY` est enregistré.
 
 ## Protocoles
 
+### État d’intégration MCP
+
+Les types `mcp-stdio` et `mcp-http` peuvent être déclarés dans le registre.
+Aujourd’hui, `connection doctor` contrôle les métadonnées, l’exécutable et les
+variables attendues ; il ne lance pas de handshake MCP, ne découvre pas les
+outils et ne les appelle pas. La sonde HTTP générique `connection probe` ne
+fait pas de requête JSON-RPC. Ces entrées décrivent donc des connexions, mais
+ne rendent pas encore leurs capacités disponibles dans le chat ou la CLI.
+
+Voir l’[étude MCP pour Super IA](ETUDE_MCP_SUPERIA.md) pour les bénéfices,
+l’état du code, les risques et la recommandation d’intégration au rack logiciel.
+
 ### MCP stdio
 
 ```bash

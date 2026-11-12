@@ -110,6 +110,34 @@ Vue de travail : [`TASK_TRACKER.md`](TASK_TRACKER.md)
 - [ ] rétention des reçus de notifications ;
 - [ ] canal distant optionnel explicitement configuré.
 
+## Architecture transversale — rack logiciel
+
+Étude de faisabilité et modèle conceptuel :
+[`ARCHITECTURE_RACK_LOGICIEL.md`](ARCHITECTURE_RACK_LOGICIEL.md).
+
+- [ ] inventorier les outils et relier chaque outil à ses capacités réelles ;
+- [ ] repérer les capacités dupliquées et les ressources concernées ;
+- [ ] définir le schéma canonique d’une capacité et de sa permission ;
+- [ ] extraire les outils du chat en registre partagé chat/CLI ;
+- [ ] ajouter un client MCP `stdio` allowlist après le registre canonique ;
+- [ ] prototyper un rack local par projet sans activation automatique ;
+- [ ] exposer ensuite un serveur MCP Super IA en lecture seule ;
+- [ ] revoir les règles d’écriture, de shell, de réseau et de dépense avant
+  d’élargir chaque module.
+
+L’état réel, les deux rôles MCP et les critères du pilote sont détaillés dans
+[`ETUDE_MCP_SUPERIA.md`](ETUDE_MCP_SUPERIA.md).
+
+## Optimisation des modèles locaux
+
+Le profil Qwen3, les mesures déjà disponibles et le protocole d’essais sont
+documentés dans [`OPTIMISATION_IA_LOCALE.md`](OPTIMISATION_IA_LOCALE.md).
+
+- [ ] relever le placement CPU/GPU et les modèles résidents via `/api/ps` ;
+- [ ] comparer thinking activé/désactivé sur les tâches usuelles ;
+- [ ] établir trois mesures par modèle, à chaud et à froid ;
+- [ ] choisir le modèle par défaut à partir de qualité, latence et mémoire.
+
 ## Publication stable
 
 La fusion vers `main` reste bloquée tant que :
