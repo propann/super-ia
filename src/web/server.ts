@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
-import { lstat, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { lstat, mkdir, readdir, readFile, realpath, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { scanRepository } from "../core/repository-scanner.js";
 import type { SuperIaTask } from "../core/types.js";
 import { listTasks } from "../core/task-store.js";
@@ -91,7 +91,38 @@ function parseCookies(header: string | undefined): Record<string, string> {
   return result;
 }
 
-type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+type ChatMessage = { role: string; content: string; tool_calls?: any[]; tool_name?: string };
+
+const CHAT_TOOLS = [
+  { type: "function", function: { name: "list_files", description: "Lister le workspace courant", parameters: { type: "object", properties: { path: { type: "string" } } } } },
+  { type: "function", function: { name: "read_file", description: "Lire un fichier texte du workspace", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } } },
+  { type: "function", function: { name: "write_file", description: "Créer ou remplacer un fichier texte du workspace", parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } } },
+];
+
+async function runChatTool(name: string, args: any): Promise<string> {
+  const root = await realpath(process.cwd());
+  const input = name === "list_files" ? String(args.path || ".") : String(args.path || "");
+  const path = resolve(root, input);
+  const rel = relative(root, path);
+  if (!rel || rel === ".." || rel.startsWith(".." + sep) || rel.split(sep).some(p => p.startsWith(".") || /^(node_modules|dist|backups)$/i.test(p))) throw new Error("Chemin hors workspace, privé ou généré refusé.");
+  if (/^(\.env|.*\.(pem|key|p12)|.*credentials.*|.*secret.*)$/i.test(rel)) throw new Error("Fichier sensible refusé.");
+  const parent = await realpath(dirname(path)).catch(() => root);
+  if (parent !== root && !parent.startsWith(root + sep)) throw new Error("Lien symbolique hors workspace refusé.");
+  if (name === "list_files") return JSON.stringify((await readdir(path, { withFileTypes: true })).slice(0, 200).map(x => ({ name: x.name, type: x.isDirectory() ? "directory" : "file" })));
+  if (name === "read_file") {
+    const info = await lstat(path);
+    if (!info.isFile() || info.size > 200000) throw new Error("Lecture limitée aux fichiers de moins de 200 Ko.");
+    return (await readFile(path, "utf8")).slice(0, 50000);
+  }
+  if (name === "write_file") {
+    const content = String(args.content || "");
+    if (Buffer.byteLength(content, "utf8") > 100000) throw new Error("Écriture limitée à 100 Ko.");
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, content, { encoding: "utf8", flag: "w", mode: 0o600 });
+    return "Écriture effectuée : " + rel;
+  }
+  throw new Error("Outil inconnu.");
+}
 
 function cleanMessages(value: unknown): ChatMessage[] {
   if (!Array.isArray(value)) throw new Error("Historique de conversation invalide.");
@@ -679,38 +710,48 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
           sendJson(response, 200, { provider, model, message, sources: sources.map(item => item.path), usage: payload?.usage ? { promptTokens: Number(payload.usage.prompt_tokens || 0), completionTokens: Number(payload.usage.completion_tokens || 0), totalTokens: Number(payload.usage.total_tokens || 0) } : null });
           return;
         }
-        const upstream = await fetch("http://127.0.0.1:11434/api/chat", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ model, messages, stream, options: { temperature, num_predict: maxTokens } }),
-        });
-        const payload = stream ? null : await upstream.json().catch(() => ({}));
-        if (!upstream.ok) {
-          const detail = payload?.error || (await upstream.text().catch(() => ""));
-          sendJson(response, upstream.status, { error: detail || `Ollama HTTP ${upstream.status}` });
-          return;
+        let payload: any = null;
+        let toolTurns = 0;
+        const toolEvents: Array<{ type: string; name: string; status: string; result: string }> = [];
+        while (true) {
+          const upstream = await fetch("http://127.0.0.1:11434/api/chat", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ model, messages, stream: false, tools: CHAT_TOOLS, options: { temperature, num_predict: maxTokens } }),
+          });
+          payload = await upstream.json().catch(() => ({}));
+          if (!upstream.ok) {
+            sendJson(response, upstream.status, { error: payload?.error || `Ollama HTTP ${upstream.status}` });
+            return;
+          }
+          const assistant = payload?.message;
+          const calls = Array.isArray(assistant?.tool_calls) ? assistant.tool_calls : [];
+          if (!calls.length || toolTurns >= 5) break;
+          messages.push({ role: "assistant", content: String(assistant.content || ""), tool_calls: calls });
+          for (const call of calls.slice(0, 4)) {
+            const name = String(call?.function?.name || "");
+            let result: string;
+            try {
+              const args = typeof call?.function?.arguments === "string" ? JSON.parse(call.function.arguments) : call?.function?.arguments || {};
+              result = await runChatTool(name, args);
+              toolEvents.push({ type: "tool", name, status: "effectué", result: result.slice(0, 1000) });
+            } catch (error) {
+              result = `ÉCHEC outil ${name}: ${error instanceof Error ? error.message : String(error)}`;
+              toolEvents.push({ type: "tool", name, status: "échec", result });
+            }
+            messages.push({ role: "tool", tool_name: name, content: result });
+          }
+          toolTurns += 1;
         }
         if (stream) {
-          if (!upstream.body) throw new Error("Flux Ollama vide.");
           beginChatStream(response);
           writeChatEvent(response, { type: "sources", sources: sources.map(item => item.path) });
-          let thinkingReported = false;
-          try {
-            for await (const event of readOllamaEvents(upstream.body)) {
-              if (event.message?.thinking && !thinkingReported) {
-                writeChatEvent(response, { type: "thinking" });
-                thinkingReported = true;
-              }
-              const delta = String(event.message?.content || "");
-              if (delta) writeChatEvent(response, { type: "delta", text: delta });
-              if (event.done_reason === "length") writeChatEvent(response, { type: "truncated" });
-              if (event.done) writeChatEvent(response, { type: "done", model, usage: { promptTokens: Number(event.prompt_eval_count || 0), completionTokens: Number(event.eval_count || 0), totalTokens: Number(event.prompt_eval_count || 0) + Number(event.eval_count || 0) } });
-            }
-          } catch (error) {
-            writeChatEvent(response, { type: "error", error: error instanceof Error ? error.message : String(error) });
-          } finally {
-            response.end();
-          }
+          for (const event of toolEvents) writeChatEvent(response, event);
+          const finalText = String(payload?.message?.content || "");
+          if (finalText) writeChatEvent(response, { type: "delta", text: finalText });
+          if (payload?.done_reason === "length") writeChatEvent(response, { type: "truncated" });
+          writeChatEvent(response, { type: "done", model, usage: { promptTokens: Number(payload.prompt_eval_count || 0), completionTokens: Number(payload.eval_count || 0), totalTokens: Number(payload.prompt_eval_count || 0) + Number(payload.eval_count || 0) } });
+          response.end();
           return;
         }
         const message = String(payload?.message?.content ?? "").trim();
