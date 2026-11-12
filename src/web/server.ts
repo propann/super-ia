@@ -18,6 +18,7 @@ import { createSessionId, ensureWebAccessToken, verifyWebAccessToken } from "./a
 import { renderDashboardPage, renderLoginPage } from "./page.js";
 import { renderChatPage } from "./chat-page.js";
 import { findVaultContext } from "./vault-context.js";
+import { readOllamaEvents } from "./ollama-stream.js";
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 3210;
@@ -693,27 +694,17 @@ export async function startWebServer(options: WebServerOptions = {}): Promise<Ru
           if (!upstream.body) throw new Error("Flux Ollama vide.");
           beginChatStream(response);
           writeChatEvent(response, { type: "sources", sources: sources.map(item => item.path) });
-          const reader = upstream.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
+          let thinkingReported = false;
           try {
-            while (true) {
-              const part = await reader.read();
-              buffer += decoder.decode(part.value ?? new Uint8Array(), { stream: !part.done });
-              let newline = buffer.indexOf("\n");
-              while (newline >= 0) {
-                const line = buffer.slice(0, newline).trim();
-                buffer = buffer.slice(newline + 1);
-                if (line) {
-                  const event = JSON.parse(line);
-                  const delta = String(event?.message?.content || "");
-                  if (delta) writeChatEvent(response, { type: "delta", text: delta });
-                  if (event?.done && event.done_reason === "length") writeChatEvent(response, { type: "truncated" });
-                  if (event?.done) writeChatEvent(response, { type: "done", model, usage: { promptTokens: Number(event.prompt_eval_count || 0), completionTokens: Number(event.eval_count || 0), totalTokens: Number(event.prompt_eval_count || 0) + Number(event.eval_count || 0) } });
-                }
-                newline = buffer.indexOf("\n");
+            for await (const event of readOllamaEvents(upstream.body)) {
+              if (event.message?.thinking && !thinkingReported) {
+                writeChatEvent(response, { type: "thinking" });
+                thinkingReported = true;
               }
-              if (part.done) break;
+              const delta = String(event.message?.content || "");
+              if (delta) writeChatEvent(response, { type: "delta", text: delta });
+              if (event.done_reason === "length") writeChatEvent(response, { type: "truncated" });
+              if (event.done) writeChatEvent(response, { type: "done", model, usage: { promptTokens: Number(event.prompt_eval_count || 0), completionTokens: Number(event.eval_count || 0), totalTokens: Number(event.prompt_eval_count || 0) + Number(event.eval_count || 0) } });
             }
           } catch (error) {
             writeChatEvent(response, { type: "error", error: error instanceof Error ? error.message : String(error) });
